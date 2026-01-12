@@ -1,0 +1,26 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
+
+export default function RootLayoutClient({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const pathname = usePathname()
+  const isAdminPage = pathname?.startsWith('/admin')
+
+  if (isAdminPage) {
+    return <>{children}</>
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="min-h-screen">{children}</main>
+      <Footer />
+    </>
+  )
+}
