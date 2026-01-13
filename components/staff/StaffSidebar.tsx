@@ -10,7 +10,6 @@ import {
   ShoppingCart,
   Newspaper,
   Ticket,
-  BarChart3,
   Users,
   Home,
   LogOut,
@@ -25,24 +24,23 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { label: 'Categories', href: '/admin/categories', icon: FolderTree },
-  { label: 'Products', href: '/admin/products', icon: ShoppingBag },
-  { label: 'Orders', href: '/admin/orders', icon: ShoppingCart },
-  { label: 'News', href: '/admin/news', icon: Newspaper },
-  { label: 'Vouchers', href: '/admin/vouchers', icon: Ticket },
-  { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
-  { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Dashboard', href: '/staff', icon: LayoutDashboard },
+  { label: 'Đơn hàng', href: '/staff/orders', icon: ShoppingCart },
+  { label: 'Sản phẩm', href: '/staff/products', icon: ShoppingBag },
+  { label: 'Danh mục', href: '/staff/categories', icon: FolderTree },
+  { label: 'Tin tức', href: '/staff/news', icon: Newspaper },
+  { label: 'Vouchers', href: '/staff/vouchers', icon: Ticket },
+  { label: 'Khách hàng', href: '/staff/customers', icon: Users },
 ]
 
-export default function AdminSidebar() {
+export default function StaffSidebar() {
   const pathname = usePathname()
 
   return (
     <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-screen">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
-        <Link href="/admin" className="block">
+        <Link href="/staff" className="block">
           <div className="relative w-full h-12 mb-2">
             <Image
               src="/images/logo.png"
@@ -53,7 +51,7 @@ export default function AdminSidebar() {
               priority
             />
           </div>
-          <div className="text-xs text-gray-700 font-medium">Admin Panel</div>
+          <div className="text-xs text-gray-700 font-medium">Staff Panel</div>
         </Link>
       </div>
 
@@ -61,7 +59,7 @@ export default function AdminSidebar() {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const isActive = pathname === item.href || (item.href !== '/staff' && pathname.startsWith(item.href + '/'))
           return (
             <Link
               key={item.href}
@@ -69,7 +67,7 @@ export default function AdminSidebar() {
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
                 isActive
-                  ? 'bg-primary-green text-white'
+                  ? 'bg-[#0A923C] text-white'
                   : 'text-gray-700 hover:bg-gray-100'
               )}
             >
@@ -83,8 +81,8 @@ export default function AdminSidebar() {
       {/* User Info & Actions */}
       <div className="p-4 border-t border-gray-200">
         <div className="mb-4 p-3 bg-white rounded-lg">
-          <div className="font-semibold text-gray-900">Nông Xanh Shop</div>
-          <div className="text-sm text-gray-500">admin@nongxanh.vn</div>
+          <div className="font-semibold text-gray-900">Nhân viên</div>
+          <div className="text-sm text-gray-500">staff@nongxanh.vn</div>
         </div>
         <div className="space-y-2">
           <Link

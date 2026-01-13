@@ -11,8 +11,10 @@ export default function RootLayoutClient({
 }) {
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
+  const isStaffPage = pathname?.startsWith('/staff')
 
-  if (isAdminPage) {
+  // Hide Header/Footer for admin and staff pages
+  if (isAdminPage || isStaffPage) {
     return <>{children}</>
   }
 

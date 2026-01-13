@@ -6,7 +6,7 @@ import StatusBadge from '@/components/admin/StatusBadge'
 import { mockOrders } from '@/data/admin'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
-export default function OrdersPage() {
+export default function StaffOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [orderList] = useState(mockOrders)
 
@@ -89,7 +89,7 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    <StatusBadge status={order.status}>
+                    <StatusBadge status={order.status as 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'}>
                       {getStatusLabel(order.status)}
                     </StatusBadge>
                   </td>
@@ -108,9 +108,12 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center justify-end">
-                      <button className="px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-colors text-sm font-semibold">
+                    <div className="flex items-center justify-end gap-2">
+                      <button className="px-3 py-2 bg-[#0A923C] text-white rounded-lg hover:bg-[#10723A] transition-colors text-sm font-semibold">
                         Xem
+                      </button>
+                      <button className="px-3 py-2 bg-[#10723A] text-white rounded-lg hover:bg-[#0A923C] transition-colors text-sm font-semibold">
+                        Cập nhật
                       </button>
                     </div>
                   </td>

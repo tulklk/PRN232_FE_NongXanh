@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 
 interface StatusBadgeProps {
-  status: 'active' | 'inactive' | 'processing' | 'confirmed' | 'pending' | 'paid' | 'public' | 'hidden' | 'published' | 'unpublished'
+  status: 'active' | 'inactive' | 'processing' | 'confirmed' | 'pending' | 'paid' | 'public' | 'hidden' | 'published' | 'unpublished' | 'shipped' | 'delivered' | 'cancelled'
   children: React.ReactNode
   className?: string
 }
@@ -17,6 +17,9 @@ const statusConfig = {
   hidden: 'bg-gray-100 text-gray-800',
   published: 'bg-green-100 text-green-800',
   unpublished: 'bg-gray-100 text-gray-800',
+  shipped: 'bg-purple-100 text-purple-800',
+  delivered: 'bg-green-100 text-green-800',
+  cancelled: 'bg-red-100 text-red-800',
 }
 
 export default function StatusBadge({ status, children, className }: StatusBadgeProps) {

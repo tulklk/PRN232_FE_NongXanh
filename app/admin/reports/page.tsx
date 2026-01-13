@@ -29,7 +29,7 @@ export default function ReportsPage() {
 
   const handleApply = () => {
     // Filter logic would go here
-    console.log('Apply filter:', startDate, endDate)
+    // TODO: Implement filter logic
   }
 
   const handleReset = () => {
