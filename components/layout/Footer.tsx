@@ -1,148 +1,185 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { MapPin, Phone, Mail, FileText, Building2, Warehouse } from 'lucide-react'
+import { MapPin, Phone, Mail, FileText, Building2, Warehouse, QrCode } from 'lucide-react'
 import { ACCOUNT_LINKS, INFO_LINKS, SUPPORT_LINKS, COMPANY_INFO } from '@/lib/constants'
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-50 border-t border-gray-200">
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Company Info */}
-          <div>
-            <div className="mb-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="relative w-16 h-16">
-                  <Image
-                    src="/images/logo.png"
-                    alt="Nông Xanh Logo"
-                    fill
-                    className="object-contain"
-                    sizes="64px"
-                  />
-                </div>
-                <span className="text-primary-green font-bold text-lg">NÔNG XANH</span>
+    <footer>
+      {/* Green top bar */}
+      <div className="bg-[#0A923C] h-1"></div>
+      
+      <div className="bg-gray-100 py-8">
+        <div className="max-w-[1400px] mx-auto px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+            {/* Company Info */}
+            <div className="lg:col-span-2">
+              <div className="mb-4">
+                <Link href="/" className="inline-block mb-4">
+                  <div className="relative w-40 h-12">
+                    <Image
+                      src="/images/logo.png"
+                      alt="Nông Xanh Logo"
+                      fill
+                      className="object-contain object-left [filter:brightness(0)_saturate(100%)_invert(36%)_sepia(93%)_saturate(1352%)_hue-rotate(118deg)_brightness(97%)_contrast(101%)]"
+                      sizes="160px"
+                    />
+                  </div>
+                </Link>
               </div>
-              <p className="text-sm text-gray-600 flex items-center gap-2">
-                <Building2 size={16} />
-                {COMPANY_INFO.name}
-              </p>
+              <div className="space-y-2 text-xs text-gray-600">
+                <p className="flex items-start gap-2">
+                  <Building2 size={14} className="mt-0.5 text-[#0A923C] flex-shrink-0" />
+                  <span>{COMPANY_INFO.name}</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <MapPin size={14} className="mt-0.5 text-[#0A923C] flex-shrink-0" />
+                  <span>Địa chỉ ĐKKD: {COMPANY_INFO.registeredAddress}</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <MapPin size={14} className="mt-0.5 text-[#0A923C] flex-shrink-0" />
+                  <span>Địa chỉ liên hệ: {COMPANY_INFO.contactAddress}</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <Warehouse size={14} className="mt-0.5 text-[#0A923C] flex-shrink-0" />
+                  <span>Kho Tân Phú: {COMPANY_INFO.warehouseAddress}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Mail size={14} className="text-[#0A923C] flex-shrink-0" />
+                  <span>Email: {COMPANY_INFO.email}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Phone size={14} className="text-[#0A923C] flex-shrink-0" />
+                  <span>Hotline: {COMPANY_INFO.hotline} (8h00 - 18h00)</span>
+                </p>
+                <p className="flex items-start gap-2 mt-3">
+                  <FileText size={14} className="mt-0.5 text-[#0A923C] flex-shrink-0" />
+                  <span className="text-[10px]">{COMPANY_INFO.businessLicense}</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <FileText size={14} className="mt-0.5 text-[#0A923C] flex-shrink-0" />
+                  <span className="text-[10px]">{COMPANY_INFO.foodSafetyLicense}</span>
+                </p>
+              </div>
             </div>
-            <div className="space-y-2 text-sm text-gray-600">
-              <p className="flex items-start gap-2">
-                <MapPin size={16} className="mt-1 text-primary-green" />
-                <span>ĐKKD: {COMPANY_INFO.registeredAddress}</span>
-              </p>
-              <p className="flex items-start gap-2">
-                <MapPin size={16} className="mt-1 text-primary-green" />
-                <span>Liên hệ: {COMPANY_INFO.contactAddress}</span>
-              </p>
-              <p className="flex items-start gap-2">
-                <Warehouse size={16} className="mt-1 text-primary-green" />
-                <span>Kho: {COMPANY_INFO.warehouseAddress}</span>
-              </p>
-              <p className="flex items-center gap-2">
-                <Mail size={16} className="text-primary-green" />
-                <span>Email: {COMPANY_INFO.email}</span>
-              </p>
-              <p className="flex items-center gap-2">
-                <Phone size={16} className="text-primary-green" />
-                <span>Hotline: {COMPANY_INFO.hotline} (08:00 - 18:00)</span>
-              </p>
-              <p className="flex items-start gap-2 mt-4">
-                <FileText size={16} className="mt-1 text-primary-green" />
-                <span className="text-xs">{COMPANY_INFO.businessLicense}</span>
-              </p>
-              <p className="flex items-start gap-2">
-                <FileText size={16} className="mt-1 text-primary-green" />
-                <span className="text-xs">{COMPANY_INFO.foodSafetyLicense}</span>
-              </p>
+
+            {/* Account & Information */}
+            <div>
+              <h3 className="font-bold text-gray-900 mb-4 text-sm">TÀI KHOẢN</h3>
+              <ul className="space-y-2 mb-6">
+                {ACCOUNT_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="text-xs text-gray-600 hover:text-[#0A923C] transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              <h3 className="font-bold text-gray-900 mb-4 text-sm">THÔNG TIN</h3>
+              <ul className="space-y-2">
+                {INFO_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="text-xs text-gray-600 hover:text-[#0A923C] transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
 
-          {/* Account & Information */}
-          <div>
-            <h3 className="font-bold text-gray-900 mb-4">TÀI KHOẢN</h3>
-            <ul className="space-y-2">
-              {ACCOUNT_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-sm text-gray-600 hover:text-primary-green">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {/* Support */}
+            <div>
+              <h3 className="font-bold text-gray-900 mb-4 text-sm">HỖ TRỢ</h3>
+              <ul className="space-y-2">
+                {SUPPORT_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="text-xs text-gray-600 hover:text-[#0A923C] transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-            <h3 className="font-bold text-gray-900 mb-4 mt-6">THÔNG TIN</h3>
-            <ul className="space-y-2">
-              {INFO_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-sm text-gray-600 hover:text-primary-green">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h3 className="font-bold text-gray-900 mb-4">HỖ TRỢ</h3>
-            <ul className="space-y-2">
-              {SUPPORT_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-sm text-gray-600 hover:text-primary-green">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
-            {/* VietGAP Certification */}
-            <div className="mt-6">
-              <h3 className="font-bold text-gray-900 mb-4">KẾT NỐI VỚI NÔNG XANH</h3>
-              <div className="bg-primary-green-light rounded-lg p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 bg-primary-green rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-xs">VG</span>
+            {/* Connect & App Downloads */}
+            <div>
+              <h3 className="font-bold text-gray-900 mb-4 text-sm">KẾT NỐI VỚI NÔNG XANH</h3>
+              
+              {/* Connection Card */}
+              <div className="bg-white rounded-md p-3 mb-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="relative w-11 h-11">
+                    <Image
+                      src="/images/logo.png"
+                      alt="Nông Xanh"
+                      fill
+                      className="object-contain"
+                      sizes="44px"
+                    />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Đã được chứng nhận</p>
-                    <p className="text-xs text-gray-600">VietGAP & Organic</p>
+                    <p className="text-base font-bold text-[#0A923C]">NongXanh</p>
+                    <p className="text-[10px] text-gray-500">15.310 người theo dõi</p>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-2">
-                  <div className="flex-1 bg-white rounded p-2 flex items-center justify-center">
-                    <span className="text-primary-green">✓</span>
-                  </div>
-                  <div className="flex-1 bg-white rounded p-2 flex items-center justify-center">
-                    <span className="text-yellow-500">★</span>
-                  </div>
-                </div>
+                <p className="text-[10px] text-gray-600 mb-2">
+                  Hãy là người đầu tiên trong số bạn bè của bạn thích nội dung này nay
+                </p>
               </div>
-            </div>
-          </div>
 
-          {/* App Downloads */}
-          <div>
-            <h3 className="font-bold text-gray-900 mb-4">TẢI ỨNG DỤNG TRÊN ĐIỆN THOẠI</h3>
-            <div className="space-y-2">
-              <button className="w-full bg-black text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-800">
-                Tải về trên App Store
-              </button>
-              <button className="w-full bg-black text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-800">
-                Tải về trên Google Play
-              </button>
-            </div>
-            <div className="flex gap-4 mt-4">
-              <div className="w-20 h-20 bg-blue-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">A</span>
+              {/* Certifications */}
+              <div className="flex gap-2 mb-4">
+                <div className="bg-white rounded-md p-2 flex items-center gap-2 shadow-sm">
+                  <div className="w-6 h-6 bg-[#0A923C] rounded flex items-center justify-center">
+                    <span className="text-white text-[10px]">✓</span>
+                  </div>
+                  <span className="text-[10px] text-gray-600">ĐÃ THÔNG BÁO<br/>BỘ CÔNG THƯƠNG</span>
+                </div>
+                <div className="bg-white rounded-md p-2 flex items-center gap-2 shadow-sm">
+                  <div className="w-6 h-6 bg-red-500 rounded flex items-center justify-center">
+                    <span className="text-white text-[10px]">▶</span>
+                  </div>
+                  <span className="text-[10px] text-gray-600">Food Channel<br/>YouTube</span>
+                </div>
               </div>
-              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">▶</span>
+
+              <h3 className="font-bold text-gray-900 mb-4 text-sm">TẢI ỨNG DỤNG TRÊN ĐIỆN THOẠI</h3>
+              <div className="flex gap-3">
+                {/* QR Code */}
+                <div className="w-16 h-16 bg-white rounded-md shadow-sm flex items-center justify-center">
+                  <QrCode size={40} className="text-gray-400" />
+                </div>
+                
+                {/* App Store Buttons */}
+                <div className="flex flex-col gap-2">
+                  <button className="bg-black text-white py-1.5 px-3 rounded-md text-[10px] hover:bg-gray-800 flex items-center gap-2">
+                    <span className="text-sm">🍎</span>
+                    <div className="text-left">
+                      <div className="text-[8px] opacity-80">Tải về trên</div>
+                      <div className="font-semibold text-[10px]">App Store</div>
+                    </div>
+                  </button>
+                  <button className="bg-black text-white py-1.5 px-3 rounded-md text-[10px] hover:bg-gray-800 flex items-center gap-2">
+                    <span className="text-sm">▶️</span>
+                    <div className="text-left">
+                      <div className="text-[8px] opacity-80">TẢI VỀ TRÊN</div>
+                      <div className="font-semibold text-[10px]">Google Play</div>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Copyright */}
+      <div className="bg-gray-200 py-3">
+        <div className="max-w-[1400px] mx-auto px-8">
+          <p className="text-center text-xs text-gray-600">
+            Copyright © Nông Xanh 2026. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>

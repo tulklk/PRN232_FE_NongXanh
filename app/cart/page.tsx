@@ -61,7 +61,7 @@ export default function CartPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-[1400px] mx-auto px-8 py-8">
         <Link
           href="/products"
           className="inline-flex items-center gap-2 text-primary-green hover:underline mb-6"

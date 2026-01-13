@@ -8,7 +8,7 @@ export default function PaymentSuccessPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-4 py-12">
+      <div className="max-w-[1400px] mx-auto px-8 py-12">
         {/* Success Message */}
         <div className="max-w-2xl mx-auto bg-white rounded-lg border-4 border-blue-500 p-12 text-center mb-12">
           <div className="flex justify-center mb-6">

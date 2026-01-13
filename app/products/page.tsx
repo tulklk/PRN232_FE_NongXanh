@@ -44,7 +44,7 @@ function ProductsContent() {
 
   return (
     <div className="bg-white min-h-screen">
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-[1400px] mx-auto px-8 py-8">
         <div className="flex gap-6">
           {/* Sidebar */}
           <CategorySidebar activeCategory={category} />

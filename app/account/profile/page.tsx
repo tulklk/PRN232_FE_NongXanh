@@ -1,0 +1,201 @@
+'use client'
+
+import Image from 'next/image'
+
+export default function ProfilePage() {
+  return (
+    <div>
+      {/* Banner */}
+      <div className="bg-gradient-to-r from-green-600 to-green-400 rounded-lg p-6 mb-6 text-white relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-2xl font-bold mb-1.5">TRỞ THÀNH CTV</h2>
+          <p className="text-lg">CÙNG NÔNG XANH NGAY!</p>
+          <p className="text-sm mt-2.5">HOA HỒNG LÊN ĐẾN 20%</p>
+          <button className="mt-4 bg-yellow-400 text-green-800 px-6 py-2.5 rounded-md text-sm font-bold hover:bg-yellow-300">
+            THAM GIA NGAY
+          </button>
+        </div>
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20">
+          <div className="text-8xl">🌿</div>
+        </div>
+      </div>
+
+      {/* Profile Form */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-6">Thông tin tài khoản</h2>
+
+        <form className="space-y-6">
+          {/* Name */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">
+              Tên <span className="text-red-500">*</span>
+            </label>
+            <div className="md:col-span-3">
+              <input
+                type="text"
+                defaultValue="Thành Tú"
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              />
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">
+              Số điện thoại <span className="text-red-500">*</span>
+            </label>
+            <div className="md:col-span-3 flex gap-3">
+              <input
+                type="text"
+                placeholder="Nhập số điện thoại"
+                className="flex-1 border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              />
+              <button
+                type="button"
+                className="text-[#0A923C] text-sm font-medium hover:underline"
+              >
+                Cập nhật
+              </button>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">Email</label>
+            <div className="md:col-span-3">
+              <input
+                type="email"
+                defaultValue="tulkik32@gmail.com"
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              />
+            </div>
+          </div>
+
+          {/* City */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">
+              Thành phố <span className="text-red-500">*</span>
+            </label>
+            <div className="md:col-span-3">
+              <select className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]">
+                <option value="">Tỉnh/Thành</option>
+                <option value="hcm">TP. Hồ Chí Minh</option>
+                <option value="hn">Hà Nội</option>
+                <option value="dn">Đà Nẵng</option>
+              </select>
+            </div>
+          </div>
+
+          {/* District */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">
+              Quận huyện <span className="text-red-500">*</span>
+            </label>
+            <div className="md:col-span-3">
+              <select className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]">
+                <option value="">Quận/Huyện</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Ward */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">
+              Phường/Xã <span className="text-red-500">*</span>
+            </label>
+            <div className="md:col-span-3">
+              <select className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]">
+                <option value="">Phường/Xã</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Address */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">
+              Địa chỉ <span className="text-red-500">*</span>
+            </label>
+            <div className="md:col-span-3">
+              <input
+                type="text"
+                placeholder="Địa chỉ cụ thể"
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              />
+            </div>
+          </div>
+
+          {/* Gender */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">Giới tính</label>
+            <div className="md:col-span-3 flex gap-6">
+              <label className="flex items-center gap-2.5 text-sm">
+                <input type="radio" name="gender" value="male" className="text-[#0A923C] w-4 h-4" />
+                Nam
+              </label>
+              <label className="flex items-center gap-2.5 text-sm">
+                <input type="radio" name="gender" value="female" className="text-[#0A923C] w-4 h-4" />
+                Nữ
+              </label>
+              <label className="flex items-center gap-2.5 text-sm">
+                <input type="radio" name="gender" value="other" defaultChecked className="text-[#0A923C] w-4 h-4" />
+                Khác
+              </label>
+            </div>
+          </div>
+
+          {/* Birthday */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <label className="text-sm text-gray-600">Sinh nhật</label>
+            <div className="md:col-span-3 grid grid-cols-3 gap-4">
+              <select className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]">
+                <option value="">Ngày</option>
+                {Array.from({ length: 31 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>{i + 1}</option>
+                ))}
+              </select>
+              <select className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]">
+                <option value="">Tháng</option>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
+                ))}
+              </select>
+              <select className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]">
+                <option value="">Năm</option>
+                {Array.from({ length: 100 }, (_, i) => (
+                  <option key={2024 - i} value={2024 - i}>{2024 - i}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Change Password */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+            <div></div>
+            <div className="md:col-span-3">
+              <label className="flex items-center gap-2.5 text-sm">
+                <input type="checkbox" className="text-[#0A923C] w-4 h-4" />
+                Thay đổi mật khẩu
+              </label>
+            </div>
+          </div>
+
+          {/* Note */}
+          <p className="text-xs text-gray-500 italic">
+            * Để thay đổi số điện thoại, vui lòng nhập số điện thoại và nhấn nút Cập nhật bên cạnh ô số điện thoại hoặc liên hệ với chúng tôi qua{' '}
+            <a href="#" className="text-[#0A923C] hover:underline">Thông tin liên hệ</a>
+          </p>
+
+          {/* Submit */}
+          <div className="flex justify-center pt-6">
+            <button
+              type="submit"
+              className="bg-[#0A923C] text-white px-8 py-3 rounded-md text-sm font-medium hover:bg-[#087a32] transition-colors"
+            >
+              LƯU THAY ĐỔI
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

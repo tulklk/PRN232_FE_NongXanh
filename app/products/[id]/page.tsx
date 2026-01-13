@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Package, Truck, Phone, MessageCircle } from 'lucide-react'
-import ProductCard from '@/components/products/ProductCard'
+import { ShoppingCart, Phone, MessageCircle, Heart } from 'lucide-react'
 import ProductGrid from '@/components/products/ProductGrid'
 import RatingStars from '@/components/common/RatingStars'
 import QuantitySelector from '@/components/common/QuantitySelector'
@@ -41,41 +40,41 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   return (
     <div className="bg-white min-h-screen">
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-[1400px] mx-auto px-8 py-5">
         {/* Breadcrumbs */}
-        <nav className="text-sm text-gray-600 mb-6">
+        <nav className="text-xs text-gray-600 mb-4">
           <Link href="/" className="hover:text-primary-green">
             Trang chủ
           </Link>
-          <span className="mx-2">/</span>
+          <span className="mx-1.5">/</span>
           <Link href="/products" className="hover:text-primary-green">
             Trái cây tươi ngon
           </Link>
-          <span className="mx-2">/</span>
+          <span className="mx-1.5">/</span>
           <span className="text-gray-900">{product.name}</span>
         </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
           {/* Product Images */}
-          <div>
-            <div className="relative w-full aspect-square bg-gray-100 rounded-lg mb-4">
+          <div className="lg:col-span-5">
+            <div className="relative w-full aspect-square bg-gray-100 rounded-lg mb-3">
               <Image
                 src={product.image}
                 alt={product.name}
                 fill
                 className="object-cover rounded-lg"
-                sizes="(max-width: 768px) 100vw, 50vw"
+                sizes="(max-width: 768px) 100vw, 40vw"
               />
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="relative aspect-square bg-gray-100 rounded-lg">
+            <div className="grid grid-cols-4 gap-1.5">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="relative aspect-square bg-gray-100 rounded cursor-pointer hover:ring-2 hover:ring-primary-green">
                   <Image
                     src={product.image}
                     alt={`${product.name} ${i}`}
                     fill
-                    className="object-cover rounded-lg"
-                    sizes="(max-width: 768px) 33vw, 16vw"
+                    className="object-cover rounded"
+                    sizes="(max-width: 768px) 25vw, 10vw"
                   />
                 </div>
               ))}
@@ -83,90 +82,102 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           </div>
 
           {/* Product Info */}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">{product.name}</h1>
-            <div className="flex items-center gap-4 mb-4">
-              <RatingStars rating={averageRating} size={20} showNumber />
-              <span className="text-sm text-gray-600">
+          <div className="lg:col-span-5">
+            <h1 className="text-lg font-bold text-gray-900 mb-2">{product.name}</h1>
+            <div className="flex items-center gap-3 mb-3 text-xs">
+              <RatingStars rating={averageRating} size={14} showNumber />
+              <span className="text-gray-400">|</span>
+              <Link href="#reviews" className="text-primary-green hover:underline">
                 Xem {product.reviewCount} đánh giá
-              </span>
-              <span className="text-sm text-gray-600">{product.salesCount} đã bán</span>
+              </Link>
+              <span className="text-gray-400">|</span>
+              <span className="text-gray-600">{product.salesCount} đã bán</span>
             </div>
 
-            <div className="mb-6">
-              <div className="flex items-center gap-4 mb-2">
-                <span className="text-3xl font-bold text-primary-green">
+            <div className="mb-4">
+              <div className="flex items-center gap-3 mb-1.5">
+                <span className="text-xl font-bold text-primary-green">
                   {formatCurrency(product.currentPrice)}
                 </span>
                 {product.originalPrice && (
                   <>
-                    <span className="text-xl text-gray-400 line-through">
+                    <span className="text-sm text-gray-400 line-through">
                       {formatCurrency(product.originalPrice)}
-                    </span>
-                    <span className="bg-red-500 text-white text-sm font-semibold px-2 py-1 rounded">
-                      Giảm {discount}%
                     </span>
                   </>
                 )}
               </div>
+              {discount > 0 && (
+                <div className="inline-block">
+                  <span className="border border-gray-300 text-gray-600 text-xs px-2 py-0.5 rounded">
+                    Giảm {discount}%
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="border-t border-b border-gray-200 py-4 mb-6 space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Vận chuyển đến:</p>
-                <p className="font-semibold">Quận 1 - TP. HCM</p>
+            <div className="space-y-2.5 text-xs mb-4">
+              <div className="flex">
+                <span className="text-gray-500 w-28">Vận chuyển đến:</span>
+                <Link href="#" className="text-primary-green hover:underline">Quận 1 - Tp. HCM &gt;</Link>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Phí vận chuyển:</p>
-                <p className="font-semibold">35.000 ₫</p>
+              <div className="flex">
+                <span className="text-gray-500 w-28">Phí vận chuyển:</span>
+                <span className="text-primary-green font-medium">35.000 ₫</span>
               </div>
             </div>
 
-            <div className="mb-6">
-              <p className="text-sm font-semibold mb-3">Đóng Gói:</p>
-              <div className="flex gap-4">
-                {['Trái', 'Combo 5 trái', 'Combo 10 Trái'].map((option) => (
-                  <label key={option} className="flex items-center cursor-pointer">
-                    <input
-                      type="radio"
-                      name="packaging"
-                      value={option}
-                      defaultChecked={option === 'Trái'}
-                      className="mr-2 text-primary-green focus:ring-primary-green"
-                    />
-                    <span className="text-sm">{option}</span>
-                  </label>
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2">Đóng Gói:</p>
+              <div className="flex flex-wrap gap-2">
+                {['Combo 5 Gói', 'Combo 10 gói', 'Gói 70Gram', 'Combo 15 gói'].map((option, idx) => (
+                  <button
+                    key={option}
+                    className={`px-3 py-1.5 text-xs border rounded transition-colors ${
+                      idx === 3
+                        ? 'border-primary-green text-primary-green bg-green-50'
+                        : 'border-gray-300 text-gray-700 hover:border-primary-green'
+                    }`}
+                  >
+                    {idx === 3 && <span className="text-primary-green mr-1">✓</span>}
+                    {option}
+                  </button>
                 ))}
               </div>
             </div>
 
-            <div className="mb-6">
-              <p className="text-sm font-semibold mb-3">Số lượng:</p>
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2">Số lượng:</p>
               <QuantitySelector defaultValue={1} />
             </div>
 
-            <div className="flex gap-4 mb-6">
-              <button className="flex-1 bg-primary-green text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors flex items-center justify-center gap-2">
-                <ShoppingCart size={20} />
+            <div className="flex gap-2">
+              <button className="flex-1 border border-primary-green text-primary-green py-2 px-4 rounded text-xs font-medium hover:bg-green-50 transition-colors flex items-center justify-center gap-1.5">
                 THÊM VÀO GIỎ HÀNG
               </button>
-              <button className="flex-1 bg-primary-green-dark text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-green transition-colors">
+              <button className="flex-1 bg-primary-green text-white py-2 px-4 rounded text-xs font-medium hover:bg-primary-green-dark transition-colors">
                 MUA NGAY
               </button>
+              <button className="p-2 border border-gray-300 rounded hover:border-red-400 hover:text-red-400 transition-colors">
+                <Heart size={16} />
+              </button>
             </div>
+          </div>
 
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm font-semibold mb-2">Thông tin thêm:</p>
-              <p className="text-sm text-gray-600 mb-3">
+          {/* Contact Sidebar */}
+          <div className="lg:col-span-2">
+            <div className="border border-gray-200 rounded-lg p-3">
+              <p className="text-xs font-semibold mb-1.5">Thông tin thêm:</p>
+              <p className="text-xs text-gray-500 mb-3">
                 Mua sỉ vui lòng liên hệ chúng tôi:
               </p>
-              <div className="flex gap-2">
-                <button className="flex-1 bg-primary-green text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-primary-green-dark flex items-center justify-center gap-2">
-                  <Phone size={16} />
-                  01234567899
+              <div className="space-y-2">
+                <button className="w-full bg-primary-green text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-primary-green-dark flex items-center justify-center gap-1.5">
+                  <Phone size={12} />
+                  028 777 02 614
                 </button>
-                <button className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-blue-600 flex items-center justify-center gap-2">
-                  <MessageCircle size={16} />
+                <button className="w-full border border-primary-green text-primary-green py-1.5 px-2 rounded text-xs font-medium hover:bg-green-50 flex items-center justify-center gap-1.5">
+                  <MessageCircle size={12} />
                   Gửi tin nhắn
                 </button>
               </div>
@@ -175,13 +186,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         </div>
 
         {/* Product Description */}
-        <section className="mb-12">
-          <div className="bg-primary-green text-white py-3 px-6 rounded-t-lg">
-            <h2 className="text-lg font-semibold">Thông tin sản phẩm</h2>
+        <section className="mb-8">
+          <div className="bg-primary-green text-white py-2 px-4 rounded-t-lg">
+            <h2 className="text-sm font-semibold">Thông tin sản phẩm</h2>
           </div>
-          <div className="border border-gray-200 rounded-b-lg p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <div className="relative w-full aspect-square bg-gray-100 rounded-lg">
+          <div className="border border-gray-200 rounded-b-lg p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+              <div className="relative w-full aspect-video bg-gray-100 rounded-lg">
                 <Image
                   src={product.image}
                   alt={product.name}
@@ -191,16 +202,16 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 />
               </div>
               <div>
-                <h3 className="text-xl font-bold mb-4">{product.description || product.name}</h3>
-                <div className="space-y-4">
+                <h3 className="text-base font-bold mb-3">{product.description || product.name}</h3>
+                <div className="space-y-3">
                   <div>
-                    <h4 className="font-semibold mb-2">
-                      Tại Sao Bạn Nên Chọn Dừa Sọ Tươi Của Foodmap?
+                    <h4 className="text-sm font-semibold mb-1.5">
+                      Tại Sao Bạn Nên Chọn Sản Phẩm Của Nông Xanh?
                     </h4>
-                    <ul className="space-y-2 text-sm text-gray-700">
+                    <ul className="space-y-1.5 text-xs text-gray-700">
                       <li>• Tiện lợi tối đa - Khui là uống</li>
                       <li>• Size L (Từ 450gr) - Nhiều nước & cơm dày</li>
-                      <li>• Cam kết vị ngọt thanh chuẩn vị dừa xiêm</li>
+                      <li>• Cam kết vị ngọt thanh chuẩn vị</li>
                       <li>• An toàn & tươi mới mỗi ngày</li>
                     </ul>
                   </div>
@@ -208,13 +219,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </div>
             </div>
             {product.specifications && (
-              <div className="border-t border-gray-200 pt-6">
-                <h4 className="font-semibold mb-4">Thông số kỹ thuật</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="border-t border-gray-200 pt-4">
+                <h4 className="text-sm font-semibold mb-3">Thông số kỹ thuật</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                   {Object.entries(product.specifications).map(([key, value]) => (
                     <div key={key} className="flex">
-                      <span className="font-semibold w-48">{key}:</span>
-                      <span className="text-gray-700">{value}</span>
+                      <span className="font-medium w-36 text-gray-600">{key}:</span>
+                      <span className="text-gray-800">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -224,53 +235,53 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         </section>
 
         {/* Reviews Section */}
-        <section className="mb-12">
-          <div className="bg-primary-green text-white py-3 px-6 rounded-t-lg">
-            <h2 className="text-lg font-semibold">Đánh giá sản phẩm</h2>
+        <section id="reviews" className="mb-8">
+          <div className="bg-primary-green text-white py-2 px-4 rounded-t-lg">
+            <h2 className="text-sm font-semibold">Đánh giá sản phẩm</h2>
           </div>
-          <div className="border border-gray-200 rounded-b-lg p-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="border border-gray-200 rounded-b-lg p-4">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="text-4xl font-bold text-primary-green mb-2">
+                <div className="text-2xl font-bold text-primary-green mb-1.5">
                   {averageRating.toFixed(1)}★
                 </div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="space-y-1">
                   {[5, 4, 3, 2, 1].map((star) => {
                     const count = productReviews.filter((r) => r.rating === star).length
                     const percentage = productReviews.length > 0 ? (count / productReviews.length) * 100 : 0
                     return (
-                      <div key={star} className="flex items-center gap-2">
-                        <span className="text-sm w-8">{star}★</span>
-                        <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div key={star} className="flex items-center gap-1.5 text-xs">
+                        <span className="w-6">{star}★</span>
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-yellow-400"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
-                        <span className="text-sm text-gray-600 w-8">{count}</span>
+                        <span className="text-gray-500 w-6">{count}</span>
                       </div>
                     )
                   })}
                 </div>
               </div>
-              <button className="bg-primary-green text-white px-6 py-2 rounded-lg hover:bg-primary-green-dark">
+              <button className="bg-primary-green text-white px-4 py-1.5 rounded text-xs hover:bg-primary-green-dark">
                 GỬI ĐÁNH GIÁ CỦA BẠN
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {productReviews.map((review) => (
                 <ReviewCard key={review.id} review={review} />
               ))}
             </div>
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+            <div className="flex items-center justify-center gap-1.5 mt-4">
+              <button className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">
                 Trước
               </button>
-              <button className="px-4 py-2 bg-primary-green text-white rounded-lg">1</button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+              <button className="px-3 py-1 bg-primary-green text-white rounded text-xs">1</button>
+              <button className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">
                 2
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+              <button className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">
                 Sau
               </button>
             </div>
@@ -279,7 +290,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
         {/* Related Products */}
         <section>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">CÁC SẢN PHẨM TƯƠNG TỰ</h2>
+          <h2 className="text-base font-bold text-gray-900 mb-4">CÁC SẢN PHẨM TƯƠNG TỰ</h2>
           <ProductGrid products={relatedProducts} columns={4} />
         </section>
       </div>
