@@ -2,7 +2,7 @@
 
 Website thương mại điện tử cho nông sản tươi ngon, đặc sản vùng miền được xây dựng với Next.js 14, TypeScript và Tailwind CSS.
 
-## Tính năng
+## Tính năng hihui
 
 - 🏠 **Trang chủ** - Hero banner, sản phẩm hot deals, đặc sản vùng miền, tin tức
 - 🛍️ **Danh sách sản phẩm** - Lọc theo danh mục, thương hiệu, khoảng giá, sắp xếp
