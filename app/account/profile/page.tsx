@@ -1,8 +1,56 @@
 'use client'
 
 import Image from 'next/image'
+import { useUser } from '@/contexts/UserContext'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function ProfilePage() {
+  const { user, isLoading } = useUser()
+  const router = useRouter()
+  const [formData, setFormData] = useState({
+    displayName: '',
+    phoneNumber: '',
+    email: '',
+    city: '',
+    district: '',
+    ward: '',
+    address: '',
+    gender: 'other',
+    birthday: { day: '', month: '', year: '' },
+    changePassword: false,
+  })
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/login')
+      return
+    }
+
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        displayName: user.displayName || '',
+        phoneNumber: user.phoneNumber || '',
+        email: user.email || '',
+      }))
+    }
+  }, [user, isLoading, router])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A923C] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Đang tải...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
   return (
     <div>
       {/* Banner */}
@@ -33,7 +81,8 @@ export default function ProfilePage() {
             <div className="md:col-span-3">
               <input
                 type="text"
-                defaultValue="Thành Tú"
+                value={formData.displayName}
+                onChange={(e) => setFormData((prev) => ({ ...prev, displayName: e.target.value }))}
                 className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
               />
             </div>
@@ -46,7 +95,9 @@ export default function ProfilePage() {
             </label>
             <div className="md:col-span-3 flex gap-3">
               <input
-                type="text"
+                type="tel"
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData((prev) => ({ ...prev, phoneNumber: e.target.value }))}
                 placeholder="Nhập số điện thoại"
                 className="flex-1 border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
               />
@@ -65,7 +116,8 @@ export default function ProfilePage() {
             <div className="md:col-span-3">
               <input
                 type="email"
-                defaultValue="tulkik32@gmail.com"
+                value={formData.email}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
               />
             </div>
@@ -77,7 +129,11 @@ export default function ProfilePage() {
               Thành phố <span className="text-red-500">*</span>
             </label>
             <div className="md:col-span-3">
-              <select className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]">
+              <select
+                value={formData.city}
+                onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              >
                 <option value="">Tỉnh/Thành</option>
                 <option value="hcm">TP. Hồ Chí Minh</option>
                 <option value="hn">Hà Nội</option>
@@ -92,7 +148,11 @@ export default function ProfilePage() {
               Quận huyện <span className="text-red-500">*</span>
             </label>
             <div className="md:col-span-3">
-              <select className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]">
+              <select
+                value={formData.district}
+                onChange={(e) => setFormData((prev) => ({ ...prev, district: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              >
                 <option value="">Quận/Huyện</option>
               </select>
             </div>
@@ -104,7 +164,11 @@ export default function ProfilePage() {
               Phường/Xã <span className="text-red-500">*</span>
             </label>
             <div className="md:col-span-3">
-              <select className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]">
+              <select
+                value={formData.ward}
+                onChange={(e) => setFormData((prev) => ({ ...prev, ward: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+              >
                 <option value="">Phường/Xã</option>
               </select>
             </div>
@@ -118,6 +182,8 @@ export default function ProfilePage() {
             <div className="md:col-span-3">
               <input
                 type="text"
+                value={formData.address}
+                onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
                 placeholder="Địa chỉ cụ thể"
                 className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
               />
@@ -129,15 +195,36 @@ export default function ProfilePage() {
             <label className="text-sm text-gray-600">Giới tính</label>
             <div className="md:col-span-3 flex gap-6">
               <label className="flex items-center gap-2.5 text-sm">
-                <input type="radio" name="gender" value="male" className="text-[#0A923C] w-4 h-4" />
+                <input
+                  type="radio"
+                  name="gender"
+                  value="male"
+                  checked={formData.gender === 'male'}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
+                  className="text-[#0A923C] w-4 h-4"
+                />
                 Nam
               </label>
               <label className="flex items-center gap-2.5 text-sm">
-                <input type="radio" name="gender" value="female" className="text-[#0A923C] w-4 h-4" />
+                <input
+                  type="radio"
+                  name="gender"
+                  value="female"
+                  checked={formData.gender === 'female'}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
+                  className="text-[#0A923C] w-4 h-4"
+                />
                 Nữ
               </label>
               <label className="flex items-center gap-2.5 text-sm">
-                <input type="radio" name="gender" value="other" defaultChecked className="text-[#0A923C] w-4 h-4" />
+                <input
+                  type="radio"
+                  name="gender"
+                  value="other"
+                  checked={formData.gender === 'other'}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
+                  className="text-[#0A923C] w-4 h-4"
+                />
                 Khác
               </label>
             </div>
@@ -147,19 +234,31 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
             <label className="text-sm text-gray-600">Sinh nhật</label>
             <div className="md:col-span-3 grid grid-cols-3 gap-4">
-              <select className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]">
+              <select
+                value={formData.birthday.day}
+                onChange={(e) => setFormData((prev) => ({ ...prev, birthday: { ...prev.birthday, day: e.target.value } }))}
+                className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]"
+              >
                 <option value="">Ngày</option>
                 {Array.from({ length: 31 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>{i + 1}</option>
                 ))}
               </select>
-              <select className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]">
+              <select
+                value={formData.birthday.month}
+                onChange={(e) => setFormData((prev) => ({ ...prev, birthday: { ...prev.birthday, month: e.target.value } }))}
+                className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]"
+              >
                 <option value="">Tháng</option>
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
                 ))}
               </select>
-              <select className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]">
+              <select
+                value={formData.birthday.year}
+                onChange={(e) => setFormData((prev) => ({ ...prev, birthday: { ...prev.birthday, year: e.target.value } }))}
+                className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]"
+              >
                 <option value="">Năm</option>
                 {Array.from({ length: 100 }, (_, i) => (
                   <option key={2024 - i} value={2024 - i}>{2024 - i}</option>
@@ -173,7 +272,12 @@ export default function ProfilePage() {
             <div></div>
             <div className="md:col-span-3">
               <label className="flex items-center gap-2.5 text-sm">
-                <input type="checkbox" className="text-[#0A923C] w-4 h-4" />
+                <input
+                  type="checkbox"
+                  checked={formData.changePassword}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, changePassword: e.target.checked }))}
+                  className="text-[#0A923C] w-4 h-4"
+                />
                 Thay đổi mật khẩu
               </label>
             </div>

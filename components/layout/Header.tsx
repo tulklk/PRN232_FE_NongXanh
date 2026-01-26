@@ -3,18 +3,30 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, QrCode, Cherry, Coffee, Star, Leaf, Sprout } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, QrCode, Cherry, Coffee, Star, Leaf, Sprout, LogOut } from 'lucide-react'
 import LoginModal from '@/components/auth/LoginModal'
+import RegisterModal from '@/components/auth/RegisterModal'
+import SuccessPopup from '@/components/common/SuccessPopup'
+import { useUser } from '@/contexts/UserContext'
+import type { User as UserType, AuthTokens } from '@/contexts/UserContext'
 
 export default function Header() {
+    const router = useRouter()
+    const { user, isAuthenticated, login, logout } = useUser()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isLoginOpen, setIsLoginOpen] = useState(false)
+    const [isRegisterOpen, setIsRegisterOpen] = useState(false)
     const [cartCount] = useState(1)
-    const [isLoggedIn] = useState(true)
+    const [showUserMenu, setShowUserMenu] = useState(false)
   
     // Login states
     const [loginLoading, setLoginLoading] = useState(false)
     const [loginError, setLoginError] = useState('')
+    
+    // Success popup states
+    const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+    const [successMessage, setSuccessMessage] = useState('')
 
     const handleLogin = async (email: string, password: string) => {
         try {
@@ -38,18 +50,38 @@ export default function Header() {
                 throw new Error(data.error || 'Đăng nhập thất bại')
             }
 
-            localStorage.setItem('user', JSON.stringify(data))
-            if (data.accessToken) {
-                localStorage.setItem('authToken', data.accessToken)
+            // Extract user data and tokens
+            const { tokens, ...userData } = data
+            
+            if (!tokens || !tokens.idToken) {
+                throw new Error('Không nhận được tokens từ server')
             }
 
+            // Use UserContext to store user data and tokens
+            login(userData as UserType, tokens as AuthTokens)
+
             setIsLoginOpen(false)
-            window.location.href = '/account/profile'
+            
+            // Show success popup with user name
+            const userName = (userData as UserType).displayName || 'bạn'
+            setSuccessMessage(`Đăng nhập thành công!\nChào mừng ${userName}`)
+            setShowSuccessPopup(true)
+            
+            // Navigate after popup
+            setTimeout(() => {
+                router.push('/account/profile')
+            }, 500)
         } catch (err: any) {
             setLoginError(err.message || 'Đăng nhập thất bại')
         } finally {
             setLoginLoading(false)
         }
+    }
+
+    const handleLogout = () => {
+        logout()
+        setShowUserMenu(false)
+        router.push('/')
     }
 
     return (
@@ -121,11 +153,41 @@ export default function Header() {
                                 </Link>
 
                                 {/* User */}
-                                {isLoggedIn ? (
-                                    <Link href="/account" className="flex items-center gap-2 hover:text-yellow-300 transition-colors">
-                                        <User size={20} />
-                                        <span className="text-sm hidden lg:inline">Thành Tú</span>
-                                    </Link>
+                                {isAuthenticated && user ? (
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setShowUserMenu(!showUserMenu)}
+                                            className="flex items-center gap-2 hover:text-yellow-300 transition-colors"
+                                        >
+                                            <User size={20} />
+                                            <span className="text-sm hidden lg:inline">{user.displayName || 'Tài khoản'}</span>
+                                        </button>
+                                        {showUserMenu && (
+                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                                <Link
+                                                    href="/account"
+                                                    onClick={() => setShowUserMenu(false)}
+                                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                >
+                                                    Tài khoản của tôi
+                                                </Link>
+                                                <Link
+                                                    href="/account/orders"
+                                                    onClick={() => setShowUserMenu(false)}
+                                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                >
+                                                    Đơn hàng
+                                                </Link>
+                                                <button
+                                                    onClick={handleLogout}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                                >
+                                                    <LogOut size={16} />
+                                                    Đăng xuất
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : (
                                     <button
                                         onClick={() => setIsLoginOpen(true)}
@@ -249,6 +311,39 @@ export default function Header() {
                 onLogin={handleLogin}
                 loading={loginLoading}
                 error={loginError}
+                onSwitchToRegister={() => {
+                    setIsLoginOpen(false)
+                    setIsRegisterOpen(true)
+                }}
+            />
+
+            {/* Register Modal */}
+            <RegisterModal
+                isOpen={isRegisterOpen}
+                onClose={() => setIsRegisterOpen(false)}
+                onSwitchToLogin={() => {
+                    setIsRegisterOpen(false)
+                    setIsLoginOpen(true)
+                }}
+                onRegisterSuccess={() => {
+                    // Show success popup
+                    setSuccessMessage('Đăng ký tài khoản thành công')
+                    setShowSuccessPopup(true)
+                    
+                    // Close register modal and open login modal after popup
+                    setTimeout(() => {
+                        setIsRegisterOpen(false)
+                        setIsLoginOpen(true)
+                    }, 500)
+                }}
+            />
+
+            {/* Success Popup */}
+            <SuccessPopup
+                message={successMessage}
+                isOpen={showSuccessPopup}
+                onClose={() => setShowSuccessPopup(false)}
+                duration={2000}
             />
         </>
     )

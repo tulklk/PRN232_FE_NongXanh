@@ -15,8 +15,8 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">ĐĂNG NHẬP</h1>
           <p className="text-gray-600 text-sm">
-            FoodMap chào bạn, bạn cần đăng kí hoặc đăng nhập tài khoản trước khi mua hàng để nhận
-            được nhiều ưu đãi và FoodMap phục vụ bạn tốt hơn nhé! Cảm ơn bạn rất nhiều!
+            nongxanh chào bạn, bạn cần đăng kí hoặc đăng nhập tài khoản trước khi mua hàng để nhận
+            được nhiều ưu đãi và nongxanh phục vụ bạn tốt hơn nhé! Cảm ơn bạn rất nhiều!
           </p>
         </div>
 

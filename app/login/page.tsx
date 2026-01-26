@@ -3,9 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import LoginModal from '@/components/auth/LoginModal'
+import { useUser } from '@/contexts/UserContext'
+import type { User, AuthTokens } from '@/contexts/UserContext'
 
 export default function LoginPage() {
     const router = useRouter()
+    const { login } = useUser()
     const [isOpen, setIsOpen] = useState(true)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -37,12 +40,17 @@ export default function LoginPage() {
                 throw new Error(data.error || 'Đăng nhập thất bại')
             }
 
-            localStorage.setItem('user', JSON.stringify(data))
-
-            if (data.accessToken) {
-                localStorage.setItem('authToken', data.accessToken)
+            // Extract user data and tokens
+            const { tokens, ...userData } = data
+            
+            if (!tokens || !tokens.idToken) {
+                throw new Error('Không nhận được tokens từ server')
             }
 
+            // Use UserContext to store user data and tokens
+            login(userData as User, tokens as AuthTokens)
+
+            // Redirect to account profile
             router.push('/account/profile')
 
         } catch (err: any) {

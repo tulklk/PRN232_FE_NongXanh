@@ -42,7 +42,16 @@ export async function POST(request: Request) {
         }
 
         const authData = await authRes.json()
-        return NextResponse.json(authData)
+        
+        // Return both user data and tokens
+        return NextResponse.json({
+            ...authData,
+            tokens: {
+                idToken: devAuthData.idToken,
+                refreshToken: devAuthData.refreshToken,
+                expiresIn: devAuthData.expiresIn,
+            }
+        })
 
     } catch (error: any) {
         console.error('Login API error:', error)

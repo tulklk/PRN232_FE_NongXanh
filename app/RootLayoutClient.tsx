@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { UserProvider } from '@/contexts/UserContext'
 
 export default function RootLayoutClient({
   children,
@@ -15,14 +16,18 @@ export default function RootLayoutClient({
 
   // Hide Header/Footer for admin and staff pages
   if (isAdminPage || isStaffPage) {
-    return <>{children}</>
+    return (
+      <UserProvider>
+        {children}
+      </UserProvider>
+    )
   }
 
   return (
-    <>
+    <UserProvider>
       <Header />
       <main className="min-h-screen">{children}</main>
       <Footer />
-    </>
+    </UserProvider>
   )
 }
