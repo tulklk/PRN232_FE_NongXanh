@@ -1,20 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, QrCode, Cherry, Coffee, Star, Leaf, Sprout, LogOut } from 'lucide-react'
+import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, QrCode, Cherry, Leaf, Sprout, LogOut } from 'lucide-react'
 import LoginModal from '@/components/auth/LoginModal'
 import RegisterModal from '@/components/auth/RegisterModal'
 import SuccessPopup from '@/components/common/SuccessPopup'
 import { useUser } from '@/contexts/UserContext'
 import type { User as UserType, AuthTokens } from '@/contexts/UserContext'
+import { getCategories } from '@/lib/api/categories'
+import type { ApiCategory } from '@/lib/types/api'
 
 export default function Header() {
     const router = useRouter()
     const { user, isAuthenticated, login, logout } = useUser()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [categories, setCategories] = useState<ApiCategory[]>([])
     const [isLoginOpen, setIsLoginOpen] = useState(false)
     const [isRegisterOpen, setIsRegisterOpen] = useState(false)
     const [cartCount] = useState(1)
@@ -66,10 +69,11 @@ export default function Header() {
             const userName = (userData as UserType).displayName || 'bạn'
             setSuccessMessage(`Đăng nhập thành công!\nChào mừng ${userName}`)
             setShowSuccessPopup(true)
-            
-            // Navigate after popup
+
+            // Redirect: Admin -> /admin, User -> /account/profile
+            const redirectPath = (userData as UserType).role === 'Admin' ? '/admin' : '/account/profile'
             setTimeout(() => {
-                router.push('/account/profile')
+                router.push(redirectPath)
             }, 500)
         } catch (err: any) {
             setLoginError(err.message || 'Đăng nhập thất bại')
@@ -83,6 +87,27 @@ export default function Header() {
         setShowUserMenu(false)
         router.push('/')
     }
+
+    useEffect(() => {
+        getCategories()
+            .then(setCategories)
+            .catch(() => setCategories([]))
+    }, [])
+
+    const flattenCategories = (cats: ApiCategory[]): ApiCategory[] => {
+        const result: ApiCategory[] = []
+        for (const c of cats) {
+            if (!c.isDeleted) {
+                result.push(c)
+                if (c.children?.length) {
+                    result.push(...flattenCategories(c.children))
+                }
+            }
+        }
+        return result
+    }
+    const allCategories = flattenCategories(categories)
+    const topLevelCategories = categories.filter((c) => !c.isDeleted)
 
     return (
         <>
@@ -178,6 +203,15 @@ export default function Header() {
                                                 >
                                                     Đơn hàng
                                                 </Link>
+                                                {user.role === 'Admin' && (
+                                                    <Link
+                                                        href="/admin"
+                                                        onClick={() => setShowUserMenu(false)}
+                                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                    >
+                                                        Quản trị
+                                                    </Link>
+                                                )}
                                                 <button
                                                     onClick={handleLogout}
                                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
@@ -220,19 +254,53 @@ export default function Header() {
                 </div>
 
                 {/* Navigation bar - White background like Foodmap */}
-                <div className="bg-white border-b border-gray-200 shadow-sm">
+                <div className="bg-white border-b border-gray-200 shadow-sm relative">
                     <div className="max-w-[1400px] mx-auto px-8">
                         <nav className="flex items-center">
                             {/* Category Dropdown - Green background */}
-                            <button
-                                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                                className="flex items-center gap-2 bg-[#0A923C] text-white px-5 py-3 hover:bg-[#087a32] transition-colors"
-                            >
-                                <Menu size={20} />
-                                <span className="font-semibold text-sm">DANH MỤC SẢN PHẨM</span>
-                            </button>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    className="flex items-center gap-2 bg-[#0A923C] text-white px-5 py-3 hover:bg-[#087a32] transition-colors"
+                                >
+                                    <Menu size={20} />
+                                    <span className="font-semibold text-sm">DANH MỤC SẢN PHẨM</span>
+                                    <ChevronDown size={14} className={isMenuOpen ? 'rotate-180' : ''} />
+                                </button>
+                                {isMenuOpen && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-40"
+                                            onClick={() => setIsMenuOpen(false)}
+                                            aria-hidden
+                                        />
+                                        <div className="absolute left-0 top-full z-50 mt-0 w-64 bg-white border border-gray-200 shadow-lg py-2 max-h-[70vh] overflow-y-auto">
+                                            <Link
+                                                href="/products"
+                                                onClick={() => setIsMenuOpen(false)}
+                                                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#0A923C]"
+                                            >
+                                                Tất cả sản phẩm
+                                            </Link>
+                                            {allCategories.map((cat) => (
+                                                <Link
+                                                    key={cat.categoryId}
+                                                    href={`/products?category=${cat.categoryId}`}
+                                                    onClick={() => setIsMenuOpen(false)}
+                                                    className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#0A923C]"
+                                                >
+                                                    {cat.categoryName}
+                                                </Link>
+                                            ))}
+                                            {allCategories.length === 0 && (
+                                                <div className="px-4 py-3 text-sm text-gray-500">Đang tải...</div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
 
-                            {/* Navigation Links - spread evenly */}
+                            {/* Navigation Links - from API categories */}
                             <div className="flex items-center flex-1 justify-center">
                                 <Link
                                     href="/products"
@@ -244,40 +312,19 @@ export default function Header() {
                                     <span>ĐI CHỢ ONLINE</span>
                                     <ChevronDown size={14} className="text-gray-400" />
                                 </Link>
-
-                                <Link
-                                    href="/products?category=fruits"
-                                    className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
-                                >
-                                    <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                        <Cherry size={12} className="text-white" />
-                                    </div>
-                                    <span>TRÁI CÂY</span>
-                                    <ChevronDown size={14} className="text-gray-400" />
-                                </Link>
-
-                                <Link
-                                    href="/products?category=tea-coffee"
-                                    className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
-                                >
-                                    <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                        <Coffee size={12} className="text-white" />
-                                    </div>
-                                    <span>TRÀ - CÀ PHÊ</span>
-                                    <ChevronDown size={14} className="text-gray-400" />
-                                </Link>
-
-                                <Link
-                                    href="/products?category=specialties"
-                                    className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
-                                >
-                                    <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                        <Star size={12} className="text-white" />
-                                    </div>
-                                    <span>ĐẶC SẢN</span>
-                                    <ChevronDown size={14} className="text-gray-400" />
-                                </Link>
-
+                                {topLevelCategories.slice(0, 4).map((cat) => (
+                                    <Link
+                                        key={cat.categoryId}
+                                        href={`/products?category=${cat.categoryId}`}
+                                        className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
+                                    >
+                                        <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
+                                            <Cherry size={12} className="text-white" />
+                                        </div>
+                                        <span>{cat.categoryName.toUpperCase()}</span>
+                                        <ChevronDown size={14} className="text-gray-400" />
+                                    </Link>
+                                ))}
                                 <Link
                                     href="/agrishow"
                                     className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
@@ -288,7 +335,6 @@ export default function Header() {
                                     <span>AGRISHOW</span>
                                     <ChevronDown size={14} className="text-gray-400" />
                                 </Link>
-
                                 <Link
                                     href="/my-farm"
                                     className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"

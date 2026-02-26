@@ -9,6 +9,7 @@ export interface User {
   phoneNumber: string
   displayName: string
   provider: string
+  role?: string
   accessToken: string | null
 }
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   FolderTree,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LucideIcon } from 'lucide-react'
+import { useUser } from '@/contexts/UserContext'
 
 interface MenuItem {
   label: string
@@ -37,6 +38,13 @@ const menuItems: MenuItem[] = [
 
 export default function AdminSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout } = useUser()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/')
+  }
 
   return (
     <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-screen">
@@ -83,8 +91,10 @@ export default function AdminSidebar() {
       {/* User Info & Actions */}
       <div className="p-4 border-t border-gray-200">
         <div className="mb-4 p-3 bg-white rounded-lg">
-          <div className="font-semibold text-gray-900">Nông Xanh Shop</div>
-          <div className="text-sm text-gray-500">admin@nongxanh.vn</div>
+          <div className="font-semibold text-gray-900">
+            {user?.displayName || 'Nông Xanh Shop'}
+          </div>
+          <div className="text-sm text-gray-500">{user?.email || 'admin@nongxanh.vn'}</div>
         </div>
         <div className="space-y-2">
           <Link
@@ -94,7 +104,10 @@ export default function AdminSidebar() {
             <Home size={18} />
             <span className="text-sm">Quay về trang chủ</span>
           </Link>
-          <button className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
+          >
             <LogOut size={18} />
             <span className="text-sm">Đăng xuất</span>
           </button>

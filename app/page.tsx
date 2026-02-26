@@ -6,13 +6,22 @@ import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import ProductCard from '@/components/products/ProductCard'
 import HotDealCard from '@/components/products/HotDealCard'
-import { products } from '@/data/products'
 import { newsArticles } from '@/data/news'
+import { getProducts } from '@/lib/api/products'
+import type { Product } from '@/data/products'
 
 export default function HomePage() {
+  const [products, setProducts] = useState<Product[]>([])
+
+  useEffect(() => {
+    getProducts({ pageNumber: 1, pageSize: 20 })
+      .then((res) => setProducts(res.items))
+      .catch(() => setProducts([]))
+  }, [])
+
   const hotDeals = products.slice(0, 4)
   const tetProducts = products.slice(0, 10)
-  const fruitProducts = products.slice(2, 9)
+  const fruitProducts = products.slice(0, 7)
   
   // Countdown timer
   const [countdown, setCountdown] = useState({ hours: 1, minutes: 19, seconds: 33 })

@@ -3,6 +3,7 @@ export interface Product {
   name: string
   seller: string
   image: string
+  images?: string[]
   rating: number
   reviewCount: number
   salesCount: number

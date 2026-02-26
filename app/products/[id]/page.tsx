@@ -1,14 +1,14 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Phone, MessageCircle, Heart } from 'lucide-react'
+import { Phone, MessageCircle, Heart } from 'lucide-react'
 import ProductGrid from '@/components/products/ProductGrid'
 import RatingStars from '@/components/common/RatingStars'
 import QuantitySelector from '@/components/common/QuantitySelector'
 import ReviewCard from '@/components/reviews/ReviewCard'
-import { products } from '@/data/products'
 import { reviews } from '@/data/reviews'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
+import { getProductById, getProducts } from '@/lib/api/products'
 
 interface ProductDetailPageProps {
   params: Promise<{
@@ -18,7 +18,7 @@ interface ProductDetailPageProps {
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { id } = await params
-  const product = products.find((p) => p.id === id)
+  const product = await getProductById(id)
 
   if (!product) {
     notFound()
@@ -34,8 +34,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     ? calculateDiscount(product.originalPrice, product.currentPrice)
     : 0
 
-  const relatedProducts = products
-    .filter((p) => p.category === product.category && p.id !== product.id)
+  const relatedRes = await getProducts({
+    pageNumber: 1,
+    pageSize: 10,
+    categoryId: product.category,
+  })
+  const relatedProducts = relatedRes.items
+    .filter((p) => p.id !== product.id)
     .slice(0, 4)
 
   return (
@@ -66,19 +71,33 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 sizes="(max-width: 768px) 100vw, 40vw"
               />
             </div>
-            <div className="grid grid-cols-4 gap-1.5">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="relative aspect-square bg-gray-100 rounded cursor-pointer hover:ring-2 hover:ring-primary-green">
+            {(product.images?.length ?? 0) > 1 ? (
+              <div className="grid grid-cols-4 gap-1.5">
+                {product.images!.slice(0, 4).map((img, i) => (
+                  <div key={i} className="relative aspect-square bg-gray-100 rounded cursor-pointer hover:ring-2 hover:ring-primary-green">
+                    <Image
+                      src={img}
+                      alt={`${product.name} ${i + 1}`}
+                      fill
+                      className="object-cover rounded"
+                      sizes="(max-width: 768px) 25vw, 10vw"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-1.5">
+                <div className="relative aspect-square bg-gray-100 rounded cursor-pointer hover:ring-2 hover:ring-primary-green">
                   <Image
                     src={product.image}
-                    alt={`${product.name} ${i}`}
+                    alt={product.name}
                     fill
                     className="object-cover rounded"
                     sizes="(max-width: 768px) 25vw, 10vw"
                   />
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Product Info */}

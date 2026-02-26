@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, Eye, EyeOff } from 'lucide-react'
 
 interface LoginModalProps {
     isOpen: boolean
@@ -28,6 +28,7 @@ export default function LoginModal({
     const [password, setPassword] = useState('')
     const [otpMethod, setOtpMethod] = useState<'sms' | 'zalo'>('sms')
     const [rememberMe, setRememberMe] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
     const [modeTransition, setModeTransition] = useState(false)
 
@@ -107,16 +108,26 @@ export default function LoginModal({
                                             required
                                         />
                                     </div>
-                                    <div className="animate-scaleIn" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+                                    <div className="animate-scaleIn relative" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
                                         <input
-                                            type="password"
+                                            type={showPassword ? 'text' : 'password'}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             placeholder="Mật khẩu"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md"
+                                            className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md"
                                             disabled={loading}
                                             required
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+                                            tabIndex={-1}
+                                            disabled={loading}
+                                            aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                                        >
+                                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
                                     </div>
 
                                     <div className="animate-scaleIn" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>

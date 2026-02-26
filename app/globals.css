@@ -34,9 +34,16 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+html {
+  height: 100%;
 }
 
 body {
+  min-height: 100%;
   font-family: var(--body-font);
   font-size: var(--body-fs);
   line-height: var(--body-line-height);

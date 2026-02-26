@@ -50,8 +50,9 @@ export default function LoginPage() {
             // Use UserContext to store user data and tokens
             login(userData as User, tokens as AuthTokens)
 
-            // Redirect to account profile
-            router.push('/account/profile')
+            // Redirect: Admin -> /admin, User -> /account/profile
+            const redirectPath = (userData as User).role === 'Admin' ? '/admin' : '/account/profile'
+            router.push(redirectPath)
 
         } catch (err: any) {
             console.error('Login error:', err)

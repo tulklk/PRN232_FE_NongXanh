@@ -6,9 +6,9 @@ export async function POST(request: Request) {
     try {
         const { email, password } = await request.json()
 
-        // STEP 1: Lấy idToken từ DevAuth
-        const devAuthRes = await fetch(
-            `${API_BASE_URL}/api/DevAuth/firebase-token`,
+        // Gọi API login trực tiếp (hỗ trợ admin & user local)
+        const authRes = await fetch(
+            `${API_BASE_URL}/api/auth/login`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -16,44 +16,50 @@ export async function POST(request: Request) {
             }
         )
 
-        if (!devAuthRes.ok) {
-            return NextResponse.json({ error: 'Sai email hoặc mật khẩu' }, { status: 401 })
-        }
-
-        const devAuthData = await devAuthRes.json()
-        const idToken = devAuthData.idToken
-
-        if (!idToken) {
-            return NextResponse.json({ error: 'Không lấy được idToken' }, { status: 400 })
-        }
-
-        // STEP 2: Xác thực với backend
-        const authRes = await fetch(
-            `${API_BASE_URL}/api/Auth/firebase-login`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken }),
-            }
-        )
-
         if (!authRes.ok) {
-            return NextResponse.json({ error: 'Xác thực backend thất bại' }, { status: 401 })
+            const errData = await authRes.json().catch(() => ({}))
+            const message = (errData as { message?: string }).message || 'Sai email hoặc mật khẩu'
+            return NextResponse.json({ error: message }, { status: authRes.status })
         }
 
-        const authData = await authRes.json()
-        
-        // Return both user data and tokens
-        return NextResponse.json({
-            ...authData,
-            tokens: {
-                idToken: devAuthData.idToken,
-                refreshToken: devAuthData.refreshToken,
-                expiresIn: devAuthData.expiresIn,
+        const authData = (await authRes.json()) as {
+            accessToken?: string
+            user?: {
+                id: string
+                email?: string
+                phoneNumber?: string | null
+                displayName?: string
+                provider?: string
+                role?: string
             }
-        })
+        }
 
-    } catch (error: any) {
+        const { accessToken, user: apiUser } = authData
+        if (!accessToken || !apiUser) {
+            return NextResponse.json({ error: 'Phản hồi đăng nhập không hợp lệ' }, { status: 500 })
+        }
+
+        // Map sang format FE mong đợi
+        const userData = {
+            userId: apiUser.id,
+            firebaseUid: apiUser.id,
+            email: apiUser.email ?? '',
+            phoneNumber: apiUser.phoneNumber ?? '',
+            displayName: apiUser.displayName ?? '',
+            provider: apiUser.provider ?? 'Local',
+            role: apiUser.role ?? '',
+            accessToken,
+        }
+
+        return NextResponse.json({
+            ...userData,
+            tokens: {
+                idToken: accessToken,
+                refreshToken: '',
+                expiresIn: 3600,
+            },
+        })
+    } catch (error: unknown) {
         console.error('Login API error:', error)
         return NextResponse.json({ error: 'Đã có lỗi xảy ra' }, { status: 500 })
     }

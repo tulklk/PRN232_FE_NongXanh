@@ -1,32 +1,69 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { categories } from '@/data/categories'
 import { brands } from '@/data/brands'
 import { PRICE_RANGES } from '@/lib/constants'
+import { getCategories } from '@/lib/api/categories'
+import type { ApiCategory } from '@/lib/types/api'
 
 interface CategorySidebarProps {
   activeCategory?: string
 }
 
+function flattenCategories(cats: ApiCategory[]): ApiCategory[] {
+  const result: ApiCategory[] = []
+  for (const c of cats) {
+    if (!c.isDeleted) {
+      result.push(c)
+      if (c.children?.length) {
+        result.push(...flattenCategories(c.children))
+      }
+    }
+  }
+  return result
+}
+
 export default function CategorySidebar({ activeCategory }: CategorySidebarProps) {
+  const [categories, setCategories] = useState<ApiCategory[]>([])
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
+  }, [])
+
+  const allCategories = flattenCategories(categories)
+
   return (
     <aside className="w-64 space-y-6">
       {/* Categories */}
       <div>
         <h3 className="font-bold text-primary-green mb-3">TẤT CẢ SẢN PHẨM</h3>
         <ul className="space-y-2">
-          {categories.map((category) => (
-            <li key={category.id}>
+          <li>
+            <Link
+              href="/products"
+              className={`block px-3 py-2 rounded hover:bg-gray-100 ${
+                !activeCategory || activeCategory === 'all'
+                  ? 'bg-primary-green-light text-primary-green-dark font-semibold'
+                  : 'text-gray-700'
+              }`}
+            >
+              Tất cả
+            </Link>
+          </li>
+          {allCategories.map((category) => (
+            <li key={category.categoryId}>
               <Link
-                href={`/products?category=${category.slug}`}
+                href={`/products?category=${category.categoryId}`}
                 className={`block px-3 py-2 rounded hover:bg-gray-100 ${
-                  activeCategory === category.slug
+                  activeCategory === String(category.categoryId)
                     ? 'bg-primary-green-light text-primary-green-dark font-semibold'
                     : 'text-gray-700'
                 }`}
               >
-                {category.name}
+                {category.categoryName}
               </Link>
             </li>
           ))}
