@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Copy, Edit, Trash2, Loader2, X } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
@@ -45,7 +45,7 @@ export default function VouchersPage() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const fetchVouchers = async () => {
+  const fetchVouchers = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -56,11 +56,11 @@ export default function VouchersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   useEffect(() => {
     fetchVouchers()
-  }, [])
+  }, [fetchVouchers])
 
   const filteredVouchers = vouchers.filter((v) => {
     const matchesSearch =

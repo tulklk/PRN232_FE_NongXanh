@@ -267,7 +267,9 @@ export default function UsersPage() {
               setShowAddModal(false)
               setSubmitError(null)
             }}
-            onSubmit={handleCreate}
+            onSubmit={
+              handleCreate as (data: CreateUserInput | UpdateUserInput) => void
+            }
             loading={submitLoading}
             error={submitError}
           />,
@@ -354,7 +356,7 @@ interface UserFormModalProps {
   title: string
   initialData?: ApiUser
   onClose: () => void
-  onSubmit: (data: CreateUserInput & UpdateUserInput) => void
+  onSubmit: (data: CreateUserInput | UpdateUserInput) => void
   loading: boolean
   error: string | null
 }
