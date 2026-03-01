@@ -10,7 +10,7 @@ interface HotDealCardProps {
 
 export default function HotDealCard({ product }: HotDealCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300 group">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
       <Link href={`/products/${product.id}`}>
         <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
           <Image

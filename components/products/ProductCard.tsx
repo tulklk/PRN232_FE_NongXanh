@@ -16,7 +16,7 @@ export default function ProductCard({ product, showCart = true }: ProductCardPro
     : 0
 
   return (
-    <div className="bg-white rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden group">
+    <div className="bg-white rounded-lg shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-gray-100 overflow-hidden group">
       <Link href={`/products/${product.id}`}>
         <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
           <Image

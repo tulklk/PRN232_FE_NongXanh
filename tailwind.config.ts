@@ -112,6 +112,28 @@ const config: Config = {
             opacity: '0.7',
           },
         },
+        fadeInUp: {
+          '0%': {
+            opacity: '0',
+            transform: 'translateY(30px)',
+          },
+          '100%': {
+            opacity: '1',
+            transform: 'translateY(0)',
+          },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        gentlePulse: {
+          '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(10, 146, 60, 0.4)' },
+          '50%': { transform: 'scale(1.02)', boxShadow: '0 0 20px 4px rgba(10, 146, 60, 0.2)' },
+        },
       },
       animation: {
         slideUpFade: 'slideUpFade 0.3s ease-out',
@@ -122,6 +144,9 @@ const config: Config = {
         bounceIn: 'bounceIn 0.4s ease-out',
         float: 'float 3s ease-in-out infinite',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        fadeInUp: 'fadeInUp 0.6s ease-out forwards',
+        fadeIn: 'fadeIn 0.5s ease-out forwards',
+        gentlePulse: 'gentlePulse 2s ease-in-out infinite',
       },
     },
   },
