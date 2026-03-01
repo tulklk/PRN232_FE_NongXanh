@@ -1,9 +1,14 @@
+'use client'
+
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Package } from 'lucide-react'
 import ProductGrid from '@/components/products/ProductGrid'
 import { products } from '@/data/products'
 
 export default function PaymentSuccessPage() {
+  const searchParams = useSearchParams()
+  const orderId = searchParams.get('orderId')
   const similarProducts = products.slice(0, 5)
 
   return (
@@ -20,10 +25,15 @@ export default function PaymentSuccessPage() {
           <p className="text-gray-600 mb-8">
             Cảm ơn bạn đã mua sắm tại Nông Xanh. Đơn hàng của bạn đã được xác nhận và sẽ được xử
             lý sớm nhất.
+            {orderId && (
+              <span className="block mt-2 font-semibold text-gray-900">
+                Mã đơn hàng: #{orderId}
+              </span>
+            )}
           </p>
           <div className="flex gap-4 justify-center">
             <Link
-              href="/orders"
+              href="/account/orders"
               className="bg-primary-green text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors flex items-center gap-2"
             >
               <Package size={20} />

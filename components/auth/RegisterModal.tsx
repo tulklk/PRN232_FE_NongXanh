@@ -1,20 +1,26 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, ArrowLeft } from 'lucide-react'
+import type { User } from '@/contexts/UserContext'
+import type { AuthTokens } from '@/contexts/UserContext'
 
 interface RegisterModalProps {
     isOpen: boolean
     onClose: () => void
     onSwitchToLogin?: () => void
     onRegisterSuccess?: () => void
+    onEmailSent?: (email: string) => void
+    onVerifySuccess?: (userData: User, tokens: AuthTokens) => void
 }
 
-export default function RegisterModal({ 
-    isOpen, 
+export default function RegisterModal({
+    isOpen,
     onClose,
     onSwitchToLogin,
-    onRegisterSuccess
+    onRegisterSuccess,
+    onEmailSent,
+    onVerifySuccess,
 }: RegisterModalProps) {
     const [formData, setFormData] = useState({
         email: '',
@@ -26,6 +32,14 @@ export default function RegisterModal({
     const [errors, setErrors] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [step, setStep] = useState<'form' | 'otp'>('form')
+    const [otp, setOtp] = useState('')
+    const [otpError, setOtpError] = useState('')
+    const [pendingRegistration, setPendingRegistration] = useState<{
+        email: string
+        displayName: string
+        phoneNumber: string
+    } | null>(null)
 
     const validateForm = () => {
         const newErrors: Record<string, string> = {}
@@ -85,9 +99,6 @@ export default function RegisterModal({
 
         try {
             setLoading(true)
-
-            // Format phone number: loại bỏ khoảng trắng và ký tự đặc biệt, chỉ giữ số
-            // API route sẽ tự động format sang E.164
             const cleanedPhoneNumber = formData.phoneNumber.replace(/[\s\-()]/g, '')
 
             const res = await fetch('/api/register', {
@@ -96,29 +107,96 @@ export default function RegisterModal({
                 body: JSON.stringify({
                     email: formData.email,
                     password: formData.password,
+                    confirmPassword: formData.confirmPassword,
                     displayName: formData.displayName,
                     phoneNumber: cleanedPhoneNumber,
                 }),
             })
 
-            const data = await res.json()
+            const data = (await res.json()) as { error?: string; otpSent?: boolean; message?: string; email?: string }
 
             if (!res.ok) {
                 throw new Error(data.error || 'Đăng ký thất bại')
             }
 
-            // Close modal and switch to login
-            onClose()
-            if (onRegisterSuccess) {
-                onRegisterSuccess()
+            if (res.status === 202 && data.otpSent && data.email) {
+                setPendingRegistration({
+                    email: data.email,
+                    displayName: formData.displayName,
+                    phoneNumber: cleanedPhoneNumber,
+                })
+                setStep('otp')
+                setOtp('')
+                setOtpError('')
+                onEmailSent?.(data.email)
+                return
             }
-            // Don't call onSwitchToLogin here, let onRegisterSuccess handle it
-        } catch (err: any) {
+
+            onClose()
+            onRegisterSuccess?.()
+        } catch (err: unknown) {
             console.error('Register error:', err)
-            setError(err.message || 'Đăng ký thất bại')
+            setError(err instanceof Error ? err.message : 'Đăng ký thất bại')
         } finally {
             setLoading(false)
         }
+    }
+
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setOtpError('')
+        if (!otp.trim()) {
+            setOtpError('Vui lòng nhập mã OTP')
+            return
+        }
+        if (!pendingRegistration) return
+
+        try {
+            setLoading(true)
+            const res = await fetch('/api/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: pendingRegistration.email,
+                    otp: otp.trim(),
+                    displayName: pendingRegistration.displayName,
+                    phoneNumber: pendingRegistration.phoneNumber,
+                }),
+            })
+
+            const data = await res.json()
+            if (!res.ok) {
+                throw new Error(data.error || 'Mã OTP không hợp lệ')
+            }
+
+            const { tokens, ...userData } = data
+            if (tokens && tokens.idToken) {
+                onVerifySuccess?.(userData as User, tokens as AuthTokens)
+                onClose()
+            } else {
+                onRegisterSuccess?.()
+                onClose()
+            }
+        } catch (err: unknown) {
+            setOtpError(err instanceof Error ? err.message : 'Xác thực thất bại')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleBackToForm = () => {
+        setStep('form')
+        setPendingRegistration(null)
+        setOtp('')
+        setOtpError('')
+    }
+
+    const handleClose = () => {
+        setStep('form')
+        setPendingRegistration(null)
+        setOtp('')
+        setOtpError('')
+        onClose()
     }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,7 +220,7 @@ export default function RegisterModal({
         >
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden relative animate-slideUpFade will-change-transform">
                 <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="absolute top-4 right-4 z-10 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110 active:scale-95"
                     disabled={loading}
                 >
@@ -151,6 +229,51 @@ export default function RegisterModal({
 
                 <div className="grid grid-cols-1 md:grid-cols-2">
                     <div className="p-8 md:p-10">
+                        {step === 'otp' ? (
+                            <>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center animate-scaleIn">XÁC THỰC EMAIL</h2>
+                                <p className="text-sm text-gray-600 mb-4 text-center">
+                                    Chúng tôi đã gửi mã OTP đến <span className="font-semibold text-[#0A923C]">{pendingRegistration?.email}</span>. Vui lòng nhập mã để hoàn tất đăng ký.
+                                </p>
+                                {otpError && (
+                                    <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+                                        {otpError}
+                                    </div>
+                                )}
+                                <form onSubmit={handleVerifyOtp} className="space-y-4 mb-4">
+                                    <input
+                                        type="text"
+                                        value={otp}
+                                        onChange={(e) => {
+                                            setOtp(e.target.value)
+                                            setOtpError('')
+                                        }}
+                                        placeholder="Nhập mã OTP (6 số)"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm text-center tracking-[0.5em]"
+                                        disabled={loading}
+                                        maxLength={6}
+                                        autoComplete="one-time-code"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="w-full bg-[#0A923C] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#087a32] transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'ĐANG XÁC THỰC...' : 'XÁC THỰC'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleBackToForm}
+                                        className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-[#0A923C] py-2 text-sm"
+                                        disabled={loading}
+                                    >
+                                        <ArrowLeft size={16} />
+                                        Quay lại
+                                    </button>
+                                </form>
+                            </>
+                        ) : (
+                            <>
                         <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center animate-scaleIn">ĐĂNG KÝ</h2>
 
                         <div className="mb-4 animate-scaleIn" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
@@ -326,6 +449,8 @@ export default function RegisterModal({
                             Bằng cách tiếp tục, bạn đã chấp nhận{' '}
                             <button className="text-[#0A923C] hover:underline">Điều khoản sử dụng</button>
                         </p>
+                            </>
+                        )}
                     </div>
 
                     <div className="hidden md:flex bg-gradient-to-br from-green-50 via-white to-blue-50 items-center justify-center p-8 animate-scaleIn" style={{ animationDelay: '0.2s' }}>

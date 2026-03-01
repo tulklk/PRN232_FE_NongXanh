@@ -36,7 +36,7 @@ function formatPhoneToE164(phoneNumber: string): string {
 
 export async function POST(request: Request) {
     try {
-        const { email, password, displayName, phoneNumber } = await request.json()
+        const { email, password, confirmPassword, displayName, phoneNumber } = await request.json()
 
         // Validate required fields
         if (!email || !password || !displayName || !phoneNumber) {
@@ -46,35 +46,54 @@ export async function POST(request: Request) {
             )
         }
 
+        if (password !== confirmPassword) {
+            return NextResponse.json(
+                { error: 'Mật khẩu xác nhận không khớp' },
+                { status: 400 }
+            )
+        }
+
         // Format phone number to E.164 format before sending to backend
         const formattedPhoneNumber = formatPhoneToE164(phoneNumber)
 
         // Call backend register API
         const registerRes = await fetch(
-            `${API_BASE_URL}/api/Auth/register`,
+            `${API_BASE_URL}/api/auth/register`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    email, 
-                    password, 
-                    displayName, 
-                    phoneNumber: formattedPhoneNumber 
+                body: JSON.stringify({
+                    email,
+                    password,
+                    confirmPassword,
+                    displayName,
+                    phoneNumber: formattedPhoneNumber,
                 }),
             }
         )
 
+        const data = (await registerRes.json().catch(() => ({}))) as { message?: string; email?: string }
+
+        // 202 = OTP sent to email for verification
+        if (registerRes.status === 202) {
+            return NextResponse.json({
+                success: true,
+                otpSent: true,
+                message: data.message || 'Mã OTP đã được gửi đến email của bạn',
+                email: data.email || email,
+            }, { status: 202 })
+        }
+
         if (!registerRes.ok) {
-            const errorData = await registerRes.json().catch(() => ({}))
             return NextResponse.json(
-                { error: errorData.message || 'Đăng ký thất bại' },
+                { error: data.message || 'Đăng ký thất bại' },
                 { status: registerRes.status }
             )
         }
 
         return NextResponse.json({ success: true, message: 'Đăng ký thành công' })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Register API error:', error)
         return NextResponse.json(
             { error: 'Đã có lỗi xảy ra' },

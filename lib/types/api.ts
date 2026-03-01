@@ -102,3 +102,106 @@ export interface ApiUsersPagedResponse {
   pageSize: number
   totalPages?: number
 }
+
+// API Cart structure
+export interface ApiCartItem {
+  cartItemId: number
+  quantity: number
+  priceAtTime: number
+  subTotal: number
+  cartId: number
+  variantId: number
+  variantName?: string | null
+  productName?: string | null
+  imageUrl?: string | null
+}
+
+export interface ApiCart {
+  cartId: number
+  totalAmount: number
+  status?: string | null
+  userId: string
+  cartItems?: ApiCartItem[] | null
+}
+
+export interface AddCartItemRequest {
+  variantId: number
+  quantity: number
+}
+
+export interface UpdateCartItemRequest {
+  cartItemId: number
+  quantity: number
+}
+
+// API Order structure
+export interface ApiOrderDetail {
+  orderDetailId: number
+  quantity: number
+  price: number
+  subTotal: number
+  orderId: number
+  variantId: number
+  variantName?: string | null
+}
+
+export interface ApiOrder {
+  orderId: number
+  orderDate: string
+  totalAmount: number
+  shippingFee: number
+  discountAmount: number
+  finalAmount: number
+  shippingAddress?: string | null
+  status?: string | null
+  vnPayStatus?: string | null
+  userId: string
+  orderDetails?: ApiOrderDetail[] | null
+}
+
+export interface CreateOrderDetailRequest {
+  variantId: number
+  quantity: number
+}
+
+export interface CreateOrderRequest {
+  shippingFee?: number
+  shippingAddress?: string | null
+  userId?: string | null
+  orderDetails?: CreateOrderDetailRequest[] | null
+}
+
+export interface ApiOrdersPagedResponse {
+  items: ApiOrder[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages?: number
+}
+
+// API Payment structure
+export interface ApiPayment {
+  paymentId: number
+  paymentMethod?: string | null
+  paymentStatus?: string | null
+  paidAt?: string | null
+  orderId: number
+}
+
+export interface CreatePaymentRequest {
+  paymentMethod?: string | null
+  orderId: number
+}
+
+// API ProductVariant structure
+export interface ApiProductVariant {
+  variantId: number
+  variantName: string
+  price: number
+  stockQuantity: number
+  sku?: string | null
+  status?: string | null
+  productId: number
+  product?: ApiProduct | null
+  isDeleted?: boolean
+}

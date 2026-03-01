@@ -1,6 +1,8 @@
 import type { ApiProduct, ApiProductsResponse, ApiProductDetailResponse } from '@/lib/types/api'
 import type { Product } from '@/data/products'
 
+const BACKEND_URL = 'https://nongxanhbe-g6h9aadudccrgzbs.eastasia-01.azurewebsites.net'
+
 const getBase = () =>
   typeof window !== 'undefined'
     ? ''
@@ -49,7 +51,10 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
   const pageNumber = params?.pageNumber ?? 1
   const pageSize = params?.pageSize ?? 10
   const categoryId = params?.categoryId
-  let url = `${getBase()}/api/products?pageNumber=${pageNumber}&pageSize=${pageSize}`
+  const isServer = typeof window === 'undefined'
+  let url = isServer
+    ? `${BACKEND_URL}/api/Products?pageNumber=${pageNumber}&pageSize=${pageSize}`
+    : `${getBase()}/api/products?pageNumber=${pageNumber}&pageSize=${pageSize}`
   if (categoryId) {
     url += `&categoryId=${categoryId}`
   }
@@ -58,26 +63,32 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error((err as { error?: string }).error || 'Không thể tải sản phẩm')
   }
-  const json = (await res.json()) as ApiProductsResponse
+  const json = (await res.json()) as ApiProductsResponse & { items?: ApiProduct[] }
   const data = json.data
-  const items = (data?.items ?? []) as ApiProduct[]
+  const items = (data?.items ?? json.items ?? []) as ApiProduct[]
   const mapped = items.map(mapApiProductToProduct)
 
+  const rawData = data ?? json
   return {
     items: mapped,
-    totalCount: data?.totalCount,
-    pageNumber: data?.pageNumber ?? pageNumber,
-    pageSize: data?.pageSize ?? pageSize,
-    totalPages: data?.totalPages,
+    totalCount: rawData?.totalCount ?? data?.totalCount,
+    pageNumber: rawData?.pageNumber ?? data?.pageNumber ?? pageNumber,
+    pageSize: rawData?.pageSize ?? data?.pageSize ?? pageSize,
+    totalPages: rawData?.totalPages ?? data?.totalPages,
   }
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
-  const url = `${getBase()}/api/products/${id}`
-  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  const isServer = typeof window === 'undefined'
+  const url = isServer
+    ? `${BACKEND_URL}/api/Products/${id}`
+    : `${getBase()}/api/products/${id}`
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    cache: isServer ? 'no-store' : undefined,
+  })
   if (!res.ok) {
     if (res.status === 404) {
-      // Fallback: backend may not have GET /Products/{id}, try list + filter
       const list = await getProducts({ pageNumber: 1, pageSize: 100 })
       const found = list.items.find((p) => p.id === id)
       return found ?? null

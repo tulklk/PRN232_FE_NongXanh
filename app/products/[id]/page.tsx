@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Phone, MessageCircle, Heart } from 'lucide-react'
+import { Phone, MessageCircle } from 'lucide-react'
 import ProductGrid from '@/components/products/ProductGrid'
 import RatingStars from '@/components/common/RatingStars'
-import QuantitySelector from '@/components/common/QuantitySelector'
+import ProductDetailActions from '@/components/products/ProductDetailActions'
 import ReviewCard from '@/components/reviews/ReviewCard'
 import { reviews } from '@/data/reviews'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
@@ -146,41 +148,10 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </div>
             </div>
 
-            <div className="mb-4">
-              <p className="text-xs text-gray-500 mb-2">Đóng Gói:</p>
-              <div className="flex flex-wrap gap-2">
-                {['Combo 5 Gói', 'Combo 10 gói', 'Gói 70Gram', 'Combo 15 gói'].map((option, idx) => (
-                  <button
-                    key={option}
-                    className={`px-3 py-1.5 text-xs border rounded transition-colors ${
-                      idx === 3
-                        ? 'border-primary-green text-primary-green bg-green-50'
-                        : 'border-gray-300 text-gray-700 hover:border-primary-green'
-                    }`}
-                  >
-                    {idx === 3 && <span className="text-primary-green mr-1">✓</span>}
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <p className="text-xs text-gray-500 mb-2">Số lượng:</p>
-              <QuantitySelector defaultValue={1} />
-            </div>
-
-            <div className="flex gap-2">
-              <button className="flex-1 border border-primary-green text-primary-green py-2 px-4 rounded text-xs font-medium hover:bg-green-50 transition-colors flex items-center justify-center gap-1.5">
-                THÊM VÀO GIỎ HÀNG
-              </button>
-              <button className="flex-1 bg-primary-green text-white py-2 px-4 rounded text-xs font-medium hover:bg-primary-green-dark transition-colors">
-                MUA NGAY
-              </button>
-              <button className="p-2 border border-gray-300 rounded hover:border-red-400 hover:text-red-400 transition-colors">
-                <Heart size={16} />
-              </button>
-            </div>
+            <ProductDetailActions
+              productId={product.id}
+              productName={product.name}
+            />
           </div>
 
           {/* Contact Sidebar */}

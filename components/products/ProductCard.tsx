@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { ShoppingCart } from 'lucide-react'
 import RatingStars from '@/components/common/RatingStars'
+import AddToCartButton from '@/components/products/AddToCartButton'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
 import { Product } from '@/data/products'
 
@@ -65,9 +65,7 @@ export default function ProductCard({ product, showCart = true }: ProductCardPro
             )}
           </div>
           {showCart && (
-            <button className="p-1.5 bg-[#0A923C] text-white rounded-md hover:bg-[#087a32] transition-colors shadow-sm">
-              <ShoppingCart size={18} />
-            </button>
+            <AddToCartButton productId={product.id} />
           )}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { UserProvider } from '@/contexts/UserContext'
+import { CartProvider } from '@/contexts/CartContext'
 
 export default function RootLayoutClient({
   children,
@@ -18,16 +19,20 @@ export default function RootLayoutClient({
   if (isAdminPage || isStaffPage) {
     return (
       <UserProvider>
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
       </UserProvider>
     )
   }
 
   return (
     <UserProvider>
-      <Header />
-      <main className="min-h-screen">{children}</main>
-      <Footer />
+      <CartProvider>
+        <Header />
+        <main className="min-h-screen">{children}</main>
+        <Footer />
+      </CartProvider>
     </UserProvider>
   )
 }

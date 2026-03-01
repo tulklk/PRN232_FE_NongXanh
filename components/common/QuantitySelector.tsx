@@ -44,7 +44,7 @@ export default function QuantitySelector({
   }
 
   return (
-    <div className={`flex items-center border border-gray-300 rounded ${className}`}>
+    <div className={`inline-flex items-center border border-gray-300 rounded w-fit ${className}`}>
       <button
         onClick={handleDecrease}
         disabled={quantity <= min}
@@ -58,7 +58,7 @@ export default function QuantitySelector({
         onChange={handleChange}
         min={min}
         max={max}
-        className="w-16 text-center border-0 focus:outline-none focus:ring-0"
+        className="w-12 text-center border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
         onClick={handleIncrease}

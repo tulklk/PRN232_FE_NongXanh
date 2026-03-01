@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -8,7 +8,9 @@ import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, Q
 import LoginModal from '@/components/auth/LoginModal'
 import RegisterModal from '@/components/auth/RegisterModal'
 import SuccessPopup from '@/components/common/SuccessPopup'
+import CartPopup from '@/components/cart/CartPopup'
 import { useUser } from '@/contexts/UserContext'
+import { useCart } from '@/contexts/CartContext'
 import type { User as UserType, AuthTokens } from '@/contexts/UserContext'
 import { getCategories } from '@/lib/api/categories'
 import type { ApiCategory } from '@/lib/types/api'
@@ -20,8 +22,27 @@ export default function Header() {
     const [categories, setCategories] = useState<ApiCategory[]>([])
     const [isLoginOpen, setIsLoginOpen] = useState(false)
     const [isRegisterOpen, setIsRegisterOpen] = useState(false)
-    const [cartCount] = useState(1)
+    const { cart, cartCount, loading: cartLoading, updateItem, removeItem } = useCart()
     const [showUserMenu, setShowUserMenu] = useState(false)
+    const [showCartPopup, setShowCartPopup] = useState(false)
+    const cartPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const handleCartMouseEnter = () => {
+        if (cartPopupTimeoutRef.current) {
+            clearTimeout(cartPopupTimeoutRef.current)
+            cartPopupTimeoutRef.current = null
+        }
+        setShowCartPopup(true)
+    }
+    const handleCartMouseLeave = () => {
+        cartPopupTimeoutRef.current = setTimeout(() => setShowCartPopup(false), 150)
+    }
+
+    useEffect(() => {
+        return () => {
+            if (cartPopupTimeoutRef.current) clearTimeout(cartPopupTimeoutRef.current)
+        }
+    }, [])
   
     // Login states
     const [loginLoading, setLoginLoading] = useState(false)
@@ -240,14 +261,30 @@ export default function Header() {
                                 </div>
 
                                 {/* Cart */}
-                                <Link href="/cart" className="relative hover:text-yellow-300 transition-colors">
-                                    <ShoppingCart size={24} />
-                                    {cartCount > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                                            {cartCount}
-                                        </span>
+                                <div
+                                    className="relative"
+                                    onMouseEnter={handleCartMouseEnter}
+                                    onMouseLeave={handleCartMouseLeave}
+                                >
+                                    <Link href="/cart" className="relative hover:text-yellow-300 transition-colors inline-flex">
+                                        <ShoppingCart size={24} />
+                                        {cartCount > 0 && (
+                                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                                                {cartCount}
+                                            </span>
+                                        )}
+                                    </Link>
+                                    {showCartPopup && (
+                                        <CartPopup
+                                            items={cart?.cartItems ?? []}
+                                            totalAmount={cart?.totalAmount ?? 0}
+                                            loading={cartLoading}
+                                            onUpdateQuantity={updateItem}
+                                            onRemoveItem={removeItem}
+                                            onClose={() => setShowCartPopup(false)}
+                                        />
                                     )}
-                                </Link>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -261,11 +298,11 @@ export default function Header() {
                             <div className="relative">
                                 <button
                                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                                    className="flex items-center gap-2 bg-[#0A923C] text-white px-5 py-3 hover:bg-[#087a32] transition-colors"
+                                    className="flex items-center gap-2 bg-[#0A923C] text-white px-4 py-2.5 hover:bg-[#087a32] transition-colors"
                                 >
-                                    <Menu size={20} />
-                                    <span className="font-semibold text-sm">DANH MỤC SẢN PHẨM</span>
-                                    <ChevronDown size={14} className={isMenuOpen ? 'rotate-180' : ''} />
+                                    <Menu size={18} />
+                                    <span className="font-semibold text-xs">DANH MỤC SẢN PHẨM</span>
+                                    <ChevronDown size={12} className={isMenuOpen ? 'rotate-180' : ''} />
                                 </button>
                                 {isMenuOpen && (
                                     <>
@@ -304,43 +341,43 @@ export default function Header() {
                             <div className="flex items-center flex-1 justify-center">
                                 <Link
                                     href="/products"
-                                    className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                                 >
-                                    <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                        <ShoppingCart size={12} className="text-white" />
+                                    <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                                        <ShoppingCart size={10} className="text-white" />
                                     </div>
                                     <span>ĐI CHỢ ONLINE</span>
-                                    <ChevronDown size={14} className="text-gray-400" />
+                                    <ChevronDown size={12} className="text-gray-400" />
                                 </Link>
                                 {topLevelCategories.slice(0, 4).map((cat) => (
                                     <Link
                                         key={cat.categoryId}
                                         href={`/products?category=${cat.categoryId}`}
-                                        className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
+                                        className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                                     >
-                                        <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                            <Cherry size={12} className="text-white" />
+                                        <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                                            <Cherry size={10} className="text-white" />
                                         </div>
                                         <span>{cat.categoryName.toUpperCase()}</span>
-                                        <ChevronDown size={14} className="text-gray-400" />
+                                        <ChevronDown size={12} className="text-gray-400" />
                                     </Link>
                                 ))}
                                 <Link
                                     href="/agrishow"
-                                    className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                                 >
-                                    <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                        <Leaf size={12} className="text-white" />
+                                    <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                                        <Leaf size={10} className="text-white" />
                                     </div>
                                     <span>AGRISHOW</span>
-                                    <ChevronDown size={14} className="text-gray-400" />
+                                    <ChevronDown size={12} className="text-gray-400" />
                                 </Link>
                                 <Link
                                     href="/my-farm"
-                                    className="flex items-center gap-2 px-5 py-3 text-gray-700 hover:text-[#0A923C] transition-colors text-sm font-medium"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                                 >
-                                    <div className="w-6 h-6 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                        <Sprout size={12} className="text-white" />
+                                    <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                                        <Sprout size={10} className="text-white" />
                                     </div>
                                     <span>MY FARM</span>
                                 </Link>
@@ -372,15 +409,23 @@ export default function Header() {
                     setIsLoginOpen(true)
                 }}
                 onRegisterSuccess={() => {
-                    // Show success popup
                     setSuccessMessage('Đăng ký tài khoản thành công')
                     setShowSuccessPopup(true)
-                    
-                    // Close register modal and open login modal after popup
                     setTimeout(() => {
                         setIsRegisterOpen(false)
                         setIsLoginOpen(true)
                     }, 500)
+                }}
+                onEmailSent={(email) => {
+                    setSuccessMessage(`Email đã được gửi đến ${email} để xác thực tài khoản. Vui lòng kiểm tra hộp thư và nhập mã OTP.`)
+                    setShowSuccessPopup(true)
+                }}
+                onVerifySuccess={(userData, tokens) => {
+                    login(userData, tokens)
+                    setSuccessMessage(`Đăng ký thành công!\nChào mừng ${userData.displayName || 'bạn'}`)
+                    setShowSuccessPopup(true)
+                    setIsRegisterOpen(false)
+                    setTimeout(() => router.push('/'), 500)
                 }}
             />
 
