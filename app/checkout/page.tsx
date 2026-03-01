@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Truck, CreditCard, Wallet, Building2 } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
-import { DELIVERY_METHODS, PAYMENT_METHODS } from '@/lib/constants'
+import { formatCurrency, formatPhoneNumber, normalizePhoneNumber } from '@/lib/utils'
+import { FIXED_SHIPPING_FEE, PAYMENT_METHODS } from '@/lib/constants'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
 import { createOrder } from '@/lib/api/orders'
@@ -27,17 +27,29 @@ export default function CheckoutPage() {
     address: '',
     addressType: 'home',
   })
-  const [deliveryMethod, setDeliveryMethod] = useState(DELIVERY_METHODS[0].id)
   const [paymentMethod, setPaymentMethod] = useState('cod')
-  const [discountCodes, setDiscountCodes] = useState(['', '', ''])
+  const [discountCode, setDiscountCode] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const cartItems = cart?.cartItems ?? []
   const subtotal = cart?.totalAmount ?? 0
-  const selectedDelivery = DELIVERY_METHODS.find((m) => m.id === deliveryMethod)!
-  const shippingFee = selectedDelivery?.price ?? 0
+  const shippingFee = FIXED_SHIPPING_FEE
   const total = subtotal + shippingFee
+
+  const hasInitializedForm = useRef(false)
+  useEffect(() => {
+    if (user && isAuthenticated && !hasInitializedForm.current) {
+      hasInitializedForm.current = true
+      setFormData((prev) => ({
+        ...prev,
+        fullName: user.displayName ?? prev.fullName,
+        phone: formatPhoneNumber(user.phoneNumber ?? '') || prev.phone,
+        email: user.email ?? prev.email,
+      }))
+    }
+  }, [user, isAuthenticated])
 
   if (!isAuthenticated) {
     return (
@@ -80,7 +92,7 @@ export default function CheckoutPage() {
     try {
       const shippingAddress = [
         formData.fullName,
-        formData.phone,
+        normalizePhoneNumber(formData.phone) || formData.phone,
         formData.address,
         formData.ward,
         formData.district,
@@ -184,6 +196,10 @@ export default function CheckoutPage() {
                         required
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim()
+                          if (v) setFormData((prev) => ({ ...prev, phone: formatPhoneNumber(v) }))
+                        }}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
                       />
                     </div>
@@ -279,78 +295,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Delivery Method */}
-                <div className="bg-white rounded-lg p-6">
-                  <h2 className="text-xl font-bold mb-4">Hình thức giao hàng</h2>
-                  <div className="space-y-4">
-                    {DELIVERY_METHODS.map((method) => (
-                      <label
-                        key={method.id}
-                        className={`flex items-start p-4 border-2 rounded-lg cursor-pointer ${
-                          deliveryMethod === method.id
-                            ? 'border-primary-green bg-primary-green-light'
-                            : 'border-gray-200'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="delivery"
-                          value={method.id}
-                          checked={deliveryMethod === method.id}
-                          onChange={(e) => setDeliveryMethod(e.target.value)}
-                          className="mt-1 mr-4 text-primary-green focus:ring-primary-green"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-semibold">{formatCurrency(method.price)}</span>
-                            <span className="text-sm text-gray-600">{method.name}</span>
-                          </div>
-                          <p className="text-sm text-gray-500">
-                            Dự kiến giao: {new Date(Date.now() + method.estimatedDays * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex items-center">
-                    <input
-                      type="checkbox"
-                      id="freeShipping"
-                      className="mr-2 rounded border-gray-300 text-primary-green focus:ring-primary-green"
-                    />
-                    <label htmlFor="freeShipping" className="text-sm text-gray-600">
-                      Miễn phí vận chuyển (Đơn hàng trên 500.000đ)
-                    </label>
-                  </div>
-                </div>
-
-                {/* Cart Items */}
-                <div className="bg-white rounded-lg p-6">
-                  <h2 className="text-xl font-bold mb-4">Giỏ hàng của bạn</h2>
-                  {cartItems.map((item) => (
-                    <div key={item.cartItemId} className="flex items-center gap-4 pb-4 border-b border-gray-200 last:border-0">
-                      <div className="relative w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0">
-                        <Image
-                          src="/images/logo.png"
-                          alt={item.variantName ?? 'Sản phẩm'}
-                          fill
-                          className="object-cover rounded-lg"
-                          sizes="64px"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-sm">{item.variantName ?? 'Sản phẩm'}</h3>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-sm text-gray-600">Số lượng: {item.quantity}</span>
-                          <span className="font-semibold text-primary-green">
-                            {formatCurrency(item.subTotal)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
                 {/* Payment Method */}
                 <div className="bg-white rounded-lg p-6">
                   <h2 className="text-xl font-bold mb-4">Hình thức thanh toán</h2>
@@ -389,34 +333,48 @@ export default function CheckoutPage() {
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-lg p-6 sticky top-4">
                   <h2 className="text-lg font-bold mb-4">Mã giảm giá</h2>
-                  <div className="space-y-2 mb-4">
-                    {discountCodes.map((code, index) => (
-                      <div key={index} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={code}
-                          onChange={(e) => {
-                            const newCodes = [...discountCodes]
-                            newCodes[index] = e.target.value
-                            setDiscountCodes(newCodes)
-                          }}
-                          placeholder="Nhập mã giảm giá"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-green"
-                        />
-                        <button
-                          type="button"
-                          className="bg-primary-green text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-green-dark"
-                        >
-                          ÁP DỤNG
-                        </button>
-                      </div>
-                    ))}
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={discountCode}
+                      onChange={(e) => setDiscountCode(e.target.value)}
+                      placeholder="Nhập mã giảm giá"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-green"
+                    />
+                    <button
+                      type="button"
+                      className="bg-primary-green text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-green-dark"
+                    >
+                      ÁP DỤNG
+                    </button>
                   </div>
 
                   <div className="border-t border-gray-200 pt-4">
                     <h2 className="text-lg font-bold mb-4">Thông tin đơn hàng</h2>
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between">
+                    <div className="space-y-3 mb-4">
+                      {cartItems.map((item) => (
+                        <div key={item.cartItemId} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
+                          <div className="relative w-12 h-12 bg-gray-100 rounded-lg flex-shrink-0">
+                            <Image
+                              src="/images/logo.png"
+                              alt={item.variantName ?? 'Sản phẩm'}
+                              fill
+                              className="object-cover rounded-lg"
+                              sizes="48px"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-sm truncate">{item.variantName ?? 'Sản phẩm'}</h3>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-xs text-gray-500">Số lượng: {item.quantity}</span>
+                              <span className="font-semibold text-primary-green text-sm">
+                                {formatCurrency(item.subTotal)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-2">
                         <span className="text-gray-600">Tạm tính:</span>
                         <span className="font-semibold">{formatCurrency(subtotal)}</span>
                       </div>
@@ -438,7 +396,8 @@ export default function CheckoutPage() {
                       <label className="flex items-start cursor-pointer">
                         <input
                           type="checkbox"
-                          required
+                          checked={agreedToTerms}
+                          onChange={(e) => setAgreedToTerms(e.target.checked)}
                           className="mt-1 mr-2 rounded border-gray-300 text-primary-green focus:ring-primary-green"
                         />
                         <span className="text-sm text-gray-600">
@@ -449,7 +408,7 @@ export default function CheckoutPage() {
 
                     <button
                       type="submit"
-                      disabled={submitting}
+                      disabled={submitting || !agreedToTerms}
                       className="w-full bg-primary-green text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submitting ? 'ĐANG XỬ LÝ...' : 'ĐẶT HÀNG'}

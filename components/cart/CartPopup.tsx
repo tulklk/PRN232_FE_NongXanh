@@ -98,22 +98,22 @@ export default function CartPopup({
                     </button>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center border border-gray-300 rounded text-sm">
+                    <div className="inline-flex items-center border border-gray-300 rounded text-sm bg-white">
                       <button
                         type="button"
                         onClick={() => handleQtyChange(item.cartItemId, -1)}
                         disabled={(localQuantities[item.cartItemId] ?? item.quantity) <= 1}
-                        className="p-1.5 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-1.5 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700"
                       >
                         <Minus size={12} />
                       </button>
-                      <span className="px-2 min-w-[1.5rem] text-center">
+                      <span className="px-3 py-1 min-w-[2rem] text-center font-medium text-gray-900 bg-gray-50 border-x border-gray-200">
                         {localQuantities[item.cartItemId] ?? item.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleQtyChange(item.cartItemId, 1)}
-                        className="p-1.5 hover:bg-gray-100"
+                        className="p-1.5 hover:bg-gray-100 text-gray-700"
                       >
                         <Plus size={12} />
                       </button>

@@ -15,7 +15,7 @@ import {
 } from '@/lib/api/users'
 import { useUser } from '@/contexts/UserContext'
 import type { ApiUser } from '@/lib/types/api'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatPhoneNumber, normalizePhoneNumber } from '@/lib/utils'
 
 function getRoleDisplay(role?: string | null): string {
   const r = (role ?? '').toLowerCase()
@@ -213,7 +213,7 @@ export default function UsersPage() {
                     </td>
                     <td className="py-3 px-4">
                       <span className="text-gray-600">
-                        {user.phoneNumber ?? 'N/A'}
+                        {user.phoneNumber ? formatPhoneNumber(user.phoneNumber) : 'N/A'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -374,18 +374,27 @@ function UserFormModal({
     initialData?.displayName ?? ''
   )
   const [phoneNumber, setPhoneNumber] = useState(
-    initialData?.phoneNumber ?? ''
+    initialData?.phoneNumber ? formatPhoneNumber(initialData.phoneNumber) : ''
   )
   const [provider, setProvider] = useState(initialData?.provider ?? 'Email')
   const [isActive, setIsActive] = useState(initialData?.isActive ?? true)
 
+  useEffect(() => {
+    if (initialData) {
+      setPhoneNumber(formatPhoneNumber(initialData.phoneNumber || '') || initialData.phoneNumber || '')
+    } else {
+      setPhoneNumber('')
+    }
+  }, [initialData])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const normalizedPhone = normalizePhoneNumber(phoneNumber) || undefined
     if (initialData) {
       onSubmit({
         email: email.trim() || undefined,
         displayName: displayName.trim() || undefined,
-        phoneNumber: phoneNumber.trim() || undefined,
+        phoneNumber: normalizedPhone,
         isActive,
       })
     } else {
@@ -393,7 +402,7 @@ function UserFormModal({
       onSubmit({
         email: email.trim() || undefined,
         displayName: displayName.trim() || undefined,
-        phoneNumber: phoneNumber.trim() || undefined,
+        phoneNumber: normalizedPhone,
         provider: provider.trim(),
         isActive,
       })
@@ -461,10 +470,14 @@ function UserFormModal({
               Số điện thoại
             </label>
             <input
-              type="text"
+              type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="0901234567"
+              onBlur={(e) => {
+                const v = e.target.value.trim()
+                if (v) setPhoneNumber(formatPhoneNumber(v))
+              }}
+              placeholder="0906 337 965"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
               disabled={loading}
             />

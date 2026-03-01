@@ -100,6 +100,9 @@ export async function addCartItem(
   }
   const raw = (await res.json()) as ApiCart | { data?: ApiCart }
   const cart = (raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw) as ApiCart
+  if (cart?.cartItems?.length) {
+    return await enrichCartItems(cart)
+  }
   return cart
 }
 
@@ -121,6 +124,9 @@ export async function updateCartItem(
   }
   const raw = (await res.json()) as ApiCart | { data?: ApiCart }
   const cart = (raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw) as ApiCart
+  if (cart?.cartItems?.length) {
+    return await enrichCartItems(cart)
+  }
   return cart
 }
 

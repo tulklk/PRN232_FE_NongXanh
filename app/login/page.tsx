@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import LoginModal from '@/components/auth/LoginModal'
 import { useUser } from '@/contexts/UserContext'
 import type { User, AuthTokens } from '@/contexts/UserContext'
 
 export default function LoginPage() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const returnUrl = searchParams.get('from')
     const { login } = useUser()
     const [isOpen, setIsOpen] = useState(true)
     const [loading, setLoading] = useState(false)
@@ -50,8 +52,13 @@ export default function LoginPage() {
             // Use UserContext to store user data and tokens
             login(userData as User, tokens as AuthTokens)
 
-            // Redirect: Admin -> /admin, User -> /account/profile
-            const redirectPath = (userData as User).role === 'Admin' ? '/admin' : '/account/profile'
+            // Redirect: Admin -> /admin, User with returnUrl -> returnUrl, else -> /account/profile
+            const redirectPath =
+                (userData as User).role === 'Admin'
+                    ? '/admin'
+                    : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
+                      ? returnUrl
+                      : '/account/profile'
             router.push(redirectPath)
 
         } catch (err: any) {

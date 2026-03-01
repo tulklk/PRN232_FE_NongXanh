@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, ArrowLeft } from 'lucide-react'
+import { formatPhoneNumber } from '@/lib/utils'
 import type { User } from '@/contexts/UserContext'
 import type { AuthTokens } from '@/contexts/UserContext'
 
@@ -334,7 +335,11 @@ export default function RegisterModal({
                                     name="phoneNumber"
                                     value={formData.phoneNumber}
                                     onChange={handleChange}
-                                    placeholder="Số điện thoại"
+                                    onBlur={(e) => {
+                                        const v = e.target.value.trim()
+                                        if (v) setFormData((prev) => ({ ...prev, phoneNumber: formatPhoneNumber(v) }))
+                                    }}
+                                    placeholder="0906 337 965"
                                     className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md ${
                                         errors.phoneNumber ? 'border-red-500 animate-shake' : 'border-gray-300'
                                     }`}

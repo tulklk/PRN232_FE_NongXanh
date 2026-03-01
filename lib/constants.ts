@@ -58,20 +58,7 @@ export const PRICE_RANGES = [
   { min: 500000, max: 1000000, label: '500.000 - 1 triệu đồng' },
 ]
 
-export const DELIVERY_METHODS = [
-  {
-    id: 'standard',
-    name: 'Giao hàng tiêu chuẩn',
-    price: 35000,
-    estimatedDays: 3,
-  },
-  {
-    id: 'fast',
-    name: 'Giao hàng nhanh',
-    price: 45000,
-    estimatedDays: 1,
-  },
-]
+export const FIXED_SHIPPING_FEE = 35000
 
 export const PAYMENT_METHODS = [
   { id: 'cod', name: 'Thanh toán khi nhận hàng (COD)', icon: 'truck' },

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import QuantitySelector from '@/components/common/QuantitySelector'
+import SuccessPopup from '@/components/common/SuccessPopup'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
 import { getProductVariants } from '@/lib/api/productVariants'
@@ -44,7 +45,7 @@ export default function ProductDetailActions({
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
-      setError('Vui lòng đăng nhập để thêm vào giỏ')
+      router.push(`/login?from=${encodeURIComponent(`/products/${productId}`)}`)
       return
     }
     const vid = selectedVariantId ?? variants[0]?.variantId
@@ -65,7 +66,7 @@ export default function ProductDetailActions({
 
   const handleBuyNow = async () => {
     if (!isAuthenticated) {
-      router.push('/login')
+      router.push(`/login?from=${encodeURIComponent(`/products/${productId}`)}`)
       return
     }
     const vid = selectedVariantId ?? variants[0]?.variantId
@@ -119,9 +120,13 @@ export default function ProductDetailActions({
       {error && (
         <p className="text-sm text-red-500 mb-2">{error}</p>
       )}
-      {addSuccess && (
-        <p className="text-sm text-green-600 mb-2">Đã thêm vào giỏ hàng!</p>
-      )}
+
+      <SuccessPopup
+        message="Đã thêm vào giỏ hàng thành công!"
+        isOpen={addSuccess}
+        onClose={() => setAddSuccess(false)}
+        duration={2000}
+      />
 
       <div className="flex gap-2">
         <button

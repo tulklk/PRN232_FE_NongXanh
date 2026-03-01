@@ -58,7 +58,10 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
   if (categoryId) {
     url += `&categoryId=${categoryId}`
   }
-  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    ...(typeof window === 'undefined' && { next: { revalidate: 60 } }),
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error((err as { error?: string }).error || 'Không thể tải sản phẩm')

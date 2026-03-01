@@ -13,6 +13,7 @@ export async function GET() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/Categories`, {
             headers: { Accept: 'application/json' },
+            next: { revalidate: 60 },
         })
 
         if (!res.ok) {

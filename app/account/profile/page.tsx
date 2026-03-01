@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useUser } from '@/contexts/UserContext'
+import { formatPhoneNumber } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -31,7 +32,7 @@ export default function ProfilePage() {
       setFormData((prev) => ({
         ...prev,
         displayName: user.displayName || '',
-        phoneNumber: user.phoneNumber || '',
+        phoneNumber: formatPhoneNumber(user.phoneNumber || '') || user.phoneNumber || '',
         email: user.email || '',
       }))
     }
@@ -98,7 +99,11 @@ export default function ProfilePage() {
                 type="tel"
                 value={formData.phoneNumber}
                 onChange={(e) => setFormData((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                placeholder="Nhập số điện thoại"
+                onBlur={(e) => {
+                  const v = e.target.value.trim()
+                  if (v) setFormData((prev) => ({ ...prev, phoneNumber: formatPhoneNumber(v) }))
+                }}
+                placeholder="0906 337 965"
                 className="flex-1 border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
               />
               <button

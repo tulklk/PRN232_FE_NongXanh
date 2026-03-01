@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
 
     const res = await fetch(url, {
       headers: getAuthHeaders(request),
+      next: { revalidate: 60 },
     })
 
     if (!res.ok) {
