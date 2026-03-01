@@ -40,7 +40,11 @@ export async function getCart(token: string): Promise<ApiCart | null> {
     )
   }
   const raw = (await res.json()) as ApiCart | { data?: ApiCart }
-  const cart = (raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw) ?? null
+  const extracted =
+    raw && typeof raw === 'object' && 'data' in raw
+      ? (raw as { data?: ApiCart }).data
+      : (raw as ApiCart)
+  const cart = (extracted ?? null) as ApiCart | null
   if (cart?.cartItems?.length) {
     return await enrichCartItems(cart)
   }
