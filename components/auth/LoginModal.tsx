@@ -2,33 +2,123 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { useGoogleLogin } from '@react-oauth/google'
 import { X, Eye, EyeOff } from 'lucide-react'
+import type { User, AuthTokens } from '@/contexts/UserContext'
 
 interface LoginModalProps {
     isOpen: boolean
     onClose: () => void
-    onLogin: (email: string, password: string) => void  
-    loading: boolean  
+    onLogin: (email: string, password: string) => void
+    onGoogleSuccess?: (user: User, tokens: AuthTokens) => void
+    onGoogleError?: (message: string) => void
+    loading: boolean
     error: string
     onSwitchToRegister?: () => void
 }
 
-export default function LoginModal({ 
-    isOpen, 
+function GoogleLoginButtonImpl({
+    disabled,
+    onSuccess,
+    onError,
+    onLoadingChange,
+}: {
+    disabled: boolean
+    onSuccess: (user: User, tokens: AuthTokens) => void
+    onError: (msg: string) => void
+    onLoadingChange: (loading: boolean) => void
+}) {
+    const loginWithGoogle = useGoogleLogin({
+        flow: 'auth-code',
+        scope: 'openid email profile',
+        state:
+            typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        onSuccess: async (codeResponse) => {
+            onLoadingChange(true)
+            try {
+                const redirectUri =
+                    typeof window !== 'undefined' ? window.location.origin : ''
+                const state =
+                    codeResponse.state && codeResponse.state.length > 0
+                        ? codeResponse.state
+                        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+                const res = await fetch('/api/auth/google/callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: codeResponse.code,
+                        state,
+                        redirectUri,
+                    }),
+                })
+                const data = await res.json()
+                if (!res.ok) {
+                    onError(data.error || 'Đăng nhập Google thất bại')
+                    return
+                }
+                const { tokens, ...userData } = data
+                if (!tokens?.idToken) {
+                    onError('Phản hồi đăng nhập không hợp lệ')
+                    return
+                }
+                onSuccess(userData as User, tokens as AuthTokens)
+            } catch (err) {
+                onError(
+                    err instanceof Error ? err.message : 'Đăng nhập Google thất bại'
+                )
+            } finally {
+                onLoadingChange(false)
+            }
+        },
+        onError: () => {
+            onError('Đăng nhập Google thất bại')
+            onLoadingChange(false)
+        },
+    })
+
+    return (
+        <button
+            type="button"
+            onClick={() => loginWithGoogle()}
+            disabled={disabled}
+            className="flex items-center justify-center gap-2 bg-[#EA4335] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#d93325] transition-all duration-200 disabled:opacity-50 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100"
+        >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            GOOGLE
+        </button>
+    )
+}
+
+const hasGoogleAuth = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
+export default function LoginModal({
+    isOpen,
     onClose,
     onLogin,
+    onGoogleSuccess,
+    onGoogleError,
     loading,
     error,
-    onSwitchToRegister
+    onSwitchToRegister,
 }: LoginModalProps) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [rememberMe, setRememberMe] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [isExiting, setIsExiting] = useState(false)
+    const [googleLoading, setGoogleLoading] = useState(false)
+
+    const isLoading = loading || googleLoading
 
     const handleClose = (switchToRegister?: boolean) => {
-        if (isExiting || loading) return
+        if (isExiting || isLoading) return
         setIsExiting(true)
         setTimeout(() => {
             if (switchToRegister && onSwitchToRegister) {
@@ -66,7 +156,7 @@ export default function LoginModal({
                 <button
                     onClick={() => handleClose()}
                     className="absolute top-4 right-4 z-10 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110 active:scale-95"
-                    disabled={loading}
+                    disabled={isLoading}
                 >
                     <X size={24} />
                 </button>
@@ -101,7 +191,7 @@ export default function LoginModal({
                                             onChange={(e) => setEmail(e.target.value)}
                                             placeholder="Email hoặc số điện thoại"
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md"
-                                            disabled={loading}
+                                            disabled={isLoading}
                                             required
                                         />
                                     </div>
@@ -112,7 +202,7 @@ export default function LoginModal({
                                             onChange={(e) => setPassword(e.target.value)}
                                             placeholder="Mật khẩu"
                                             className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md"
-                                            disabled={loading}
+                                            disabled={isLoading}
                                             required
                                         />
                                         <button
@@ -120,7 +210,7 @@ export default function LoginModal({
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
                                             tabIndex={-1}
-                                            disabled={loading}
+                                            disabled={isLoading}
                                             aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                                         >
                                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -131,9 +221,9 @@ export default function LoginModal({
                                         <button 
                                             type="submit"
                                             className="w-full bg-[#0A923C] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#087a32] transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100"
-                                            disabled={loading}
+                                            disabled={isLoading}
                                         >
-                                            {loading ? (
+                                            {isLoading ? (
                                                 <span className="flex items-center justify-center gap-2">
                                                     <span className="animate-pulse">ĐANG ĐĂNG NHẬP...</span>
                                                 </span>
@@ -149,7 +239,7 @@ export default function LoginModal({
                                             checked={rememberMe}
                                             onChange={(e) => setRememberMe(e.target.checked)}
                                             className="w-4 h-4 text-[#0A923C] border-gray-300 rounded focus:ring-[#0A923C]"
-                                            disabled={loading}
+                                            disabled={isLoading}
                                         />
                                         <span className="ml-2 text-sm text-gray-600">Nhớ đến tôi</span>
                                     </label>
@@ -162,12 +252,12 @@ export default function LoginModal({
                                             type="button"
                                             onClick={() => handleClose(true)}
                                             className="text-[#0A923C] font-semibold hover:underline"
-                                            disabled={loading}
+                                            disabled={isLoading}
                                         >
                                             Đăng ký
                                         </button>
                                     </p>
-                                    <button type="button" className="text-[#0A923C] text-sm hover:underline mt-1" disabled={loading}>Quên mật khẩu?</button>
+                                    <button type="button" className="text-[#0A923C] text-sm hover:underline mt-1" disabled={isLoading}>Quên mật khẩu?</button>
                                 </div>
                         </div>
 
@@ -181,21 +271,30 @@ export default function LoginModal({
                         </div>
 
                         <div className="flex gap-3 justify-center mb-4">
-                            <button className="flex items-center justify-center gap-2 bg-[#1877F2] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#166fe5] transition-all duration-200 disabled:opacity-50 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100" disabled={loading}>
+                            <button className="flex items-center justify-center gap-2 bg-[#1877F2] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#166fe5] transition-all duration-200 disabled:opacity-50 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100" disabled={isLoading}>
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                                 </svg>
                                 FACEBOOK
                             </button>
-                            <button className="flex items-center justify-center gap-2 bg-[#EA4335] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#d93325] transition-all duration-200 disabled:opacity-50 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100" disabled={loading}>
-                                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                                </svg>
-                                GOOGLE
-                            </button>
+                            {hasGoogleAuth && onGoogleSuccess ? (
+                                <GoogleLoginButtonImpl
+                                    disabled={isLoading}
+                                    onSuccess={onGoogleSuccess}
+                                    onError={(msg) => onGoogleError?.(msg)}
+                                    onLoadingChange={setGoogleLoading}
+                                />
+                            ) : (
+                                <button className="flex items-center justify-center gap-2 bg-[#EA4335] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#d93325] transition-all duration-200 disabled:opacity-50 cursor-not-allowed" disabled>
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                                    </svg>
+                                    GOOGLE
+                                </button>
+                            )}
                         </div>
 
                         <p className="text-xs text-gray-500 text-center">

@@ -415,10 +415,20 @@ export default function Header() {
             </header>
 
             {/* Login Modal */}
-            <LoginModal 
-                isOpen={isLoginOpen} 
+            <LoginModal
+                isOpen={isLoginOpen}
                 onClose={() => setIsLoginOpen(false)}
                 onLogin={handleLogin}
+                onGoogleSuccess={(userData, tokens) => {
+                    login(userData, tokens)
+                    setIsLoginOpen(false)
+                    const userName = userData.displayName || 'bạn'
+                    setSuccessMessage(`Đăng nhập thành công!\nChào mừng ${userName}`)
+                    setShowSuccessPopup(true)
+                    const redirectPath = userData.role === 'Admin' ? '/admin' : '/account/profile'
+                    setTimeout(() => router.push(redirectPath), 500)
+                }}
+                onGoogleError={setLoginError}
                 loading={loginLoading}
                 error={loginError}
                 onSwitchToRegister={() => {

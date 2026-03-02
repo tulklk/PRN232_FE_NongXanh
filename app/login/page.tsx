@@ -69,12 +69,25 @@ export default function LoginPage() {
         }
     }
 
+    const handleGoogleSuccess = (userData: User, tokens: AuthTokens) => {
+        login(userData, tokens)
+        const redirectPath =
+            userData.role === 'Admin'
+                ? '/admin'
+                : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
+                  ? returnUrl
+                  : '/account/profile'
+        router.push(redirectPath)
+    }
+
     return (
         <div className="min-h-screen bg-gray-100">
             <LoginModal
                 isOpen={isOpen}
                 onClose={handleClose}
                 onLogin={handleLogin}
+                onGoogleSuccess={handleGoogleSuccess}
+                onGoogleError={setError}
                 loading={loading}
                 error={error}
             />
