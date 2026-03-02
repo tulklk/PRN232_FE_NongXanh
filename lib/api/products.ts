@@ -83,12 +83,9 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
 
 export async function getProductById(id: string): Promise<Product | null> {
   const isServer = typeof window === 'undefined'
-  const base = isServer
-    ? process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-    : getBase()
-  const url = `${base}/api/products/${id}`
+  const url = isServer
+    ? `${BACKEND_URL}/api/Products/${id}`
+    : `${getBase()}/api/products/${id}`
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     cache: isServer ? 'no-store' : undefined,
