@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { X, ArrowLeft } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
 import type { User } from '@/contexts/UserContext'
@@ -185,6 +186,12 @@ export default function RegisterModal({
         }
     }
 
+    const [isExiting, setIsExiting] = useState(false)
+
+    useEffect(() => {
+        if (isOpen) setIsExiting(false)
+    }, [isOpen])
+
     const handleBackToForm = () => {
         setStep('form')
         setPendingRegistration(null)
@@ -192,12 +199,20 @@ export default function RegisterModal({
         setOtpError('')
     }
 
-    const handleClose = () => {
-        setStep('form')
-        setPendingRegistration(null)
-        setOtp('')
-        setOtpError('')
-        onClose()
+    const handleClose = (switchToLogin?: boolean) => {
+        if (isExiting || loading) return
+        setIsExiting(true)
+        setTimeout(() => {
+            setStep('form')
+            setPendingRegistration(null)
+            setOtp('')
+            setOtpError('')
+            if (switchToLogin && onSwitchToLogin) {
+                onSwitchToLogin()
+            } else {
+                onClose()
+            }
+        }, 300)
     }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,15 +228,19 @@ export default function RegisterModal({
 
     return (
         <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300"
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${
+                isExiting ? 'animate-fadeOut' : 'animate-in fade-in duration-300'
+            }`}
             style={{ 
                 background: 'rgba(0, 0, 0, 0.5)',
                 backdropFilter: 'blur(4px)'
             }}
         >
-            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden relative animate-slideUpFade will-change-transform">
+            <div className={`bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden relative will-change-transform ${
+                isExiting ? 'animate-slideDownFade' : 'animate-slideUpFade'
+            }`}>
                 <button
-                    onClick={handleClose}
+                    onClick={() => handleClose()}
                     className="absolute top-4 right-4 z-10 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110 active:scale-95"
                     disabled={loading}
                 >
@@ -409,12 +428,7 @@ export default function RegisterModal({
                                 Đã có tài khoản?{' '}
                                 <button 
                                     type="button"
-                                    onClick={() => {
-                                        onClose()
-                                        if (onSwitchToLogin) {
-                                            onSwitchToLogin()
-                                        }
-                                    }}
+                                    onClick={() => handleClose(true)}
                                     className="text-[#0A923C] font-semibold hover:underline"
                                     disabled={loading}
                                 >
@@ -458,41 +472,15 @@ export default function RegisterModal({
                         )}
                     </div>
 
-                    <div className="hidden md:flex bg-gradient-to-br from-green-50 via-white to-blue-50 items-center justify-center p-8 animate-scaleIn" style={{ animationDelay: '0.2s' }}>
-                        <div className="text-center max-w-xs">
-                            <div className="mb-6 relative">
-                                <div className="w-full aspect-square bg-gradient-to-br from-green-100 to-yellow-50 rounded-2xl flex items-center justify-center overflow-hidden">
-                                    <div className="relative w-48 h-48">
-                                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-40 h-32 bg-white rounded-t-xl shadow-lg">
-                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-48 h-8 bg-[#0A923C] rounded-lg"></div>
-                                            <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-2">
-                                                <div className="w-4 h-4 bg-yellow-400 rounded-full animate-float" style={{ animationDelay: '0s' }}></div>
-                                                <div className="w-4 h-4 bg-orange-400 rounded-full animate-float" style={{ animationDelay: '0.2s' }}></div>
-                                                <div className="w-4 h-4 bg-red-400 rounded-full animate-float" style={{ animationDelay: '0.4s' }}></div>
-                                            </div>
-                                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3">
-                                                <div className="w-8 h-10 bg-green-200 rounded animate-float" style={{ animationDelay: '0.1s' }}></div>
-                                                <div className="w-8 h-10 bg-yellow-200 rounded animate-float" style={{ animationDelay: '0.3s' }}></div>
-                                                <div className="w-8 h-10 bg-orange-200 rounded animate-float" style={{ animationDelay: '0.5s' }}></div>
-                                            </div>
-                                        </div>
-                                        <div className="absolute bottom-0 left-2 w-8 h-16 bg-blue-400 rounded-t-full animate-float" style={{ animationDelay: '0.2s' }}></div>
-                                        <div className="absolute bottom-0 right-2 w-8 h-14 bg-pink-400 rounded-t-full animate-float" style={{ animationDelay: '0.4s' }}></div>
-                                        <div className="absolute top-4 left-0 w-6 h-6 bg-green-500 rounded-full animate-float" style={{ animationDelay: '0.1s' }}></div>
-                                        <div className="absolute top-8 right-0 w-8 h-8 bg-green-600 rounded-full animate-float" style={{ animationDelay: '0.3s' }}></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Mua sắm tại</h3>
-                            <h3 className="text-2xl font-bold text-[#0A923C] mb-2">nongxanh</h3>
-                            <p className="text-[#0A923C] font-medium mb-6">Siêu ưu đãi mỗi ngày</p>
-
-                            <div className="space-y-1 text-sm font-semibold text-gray-600">
-                                <p>KNOW YOUR FARMER</p>
-                                <p>KNOW YOUR FOOD____</p>
-                            </div>
-                        </div>
+                    <div className="hidden md:flex items-center justify-center p-0 overflow-hidden">
+                        <Image
+                            src="/images/login%20img.jpg"
+                            alt="Mua sắm tại nongxanh - Siêu ưu đãi mỗi ngày"
+                            width={500}
+                            height={600}
+                            className="w-full h-full object-cover min-h-[400px]"
+                            priority
+                        />
                     </div>
                 </div>
             </div>

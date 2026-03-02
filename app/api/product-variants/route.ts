@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 const API_BASE_URL =
   'https://nongxanhbe-g6h9aadudccrgzbs.eastasia-01.azurewebsites.net'
 
+export const dynamic = 'force-dynamic'
+
 function getAuthHeaders(request: NextRequest): Record<string, string> {
   const auth = request.headers.get('Authorization')
   const headers: Record<string, string> = {

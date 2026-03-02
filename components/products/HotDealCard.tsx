@@ -38,7 +38,6 @@ export default function HotDealCard({ product }: HotDealCardProps) {
           <RatingStars rating={product.rating} size={14} />
           <span className="text-xs text-gray-500">({product.reviewCount})</span>
         </div>
-        <p className="text-xs text-gray-500 mb-2">Còn lại ??? sản phẩm</p>
         <div className="mb-3">
           <p className="text-lg font-bold text-[#0A923C]">
             {formatCurrency(product.currentPrice)}

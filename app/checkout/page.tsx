@@ -129,7 +129,8 @@ export default function CheckoutPage() {
       }
 
       await clearCart()
-      router.push(`/checkout/success?orderId=${order.orderId}`)
+      const orderNumber = order.orderNumber ?? String(order.orderId)
+      router.push(`/checkout/success?orderId=${order.orderId}&orderNumber=${encodeURIComponent(orderNumber)}`)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể tạo đơn hàng'
@@ -352,19 +353,23 @@ export default function CheckoutPage() {
                   <div className="border-t border-gray-200 pt-4">
                     <h2 className="text-lg font-bold mb-4">Thông tin đơn hàng</h2>
                     <div className="space-y-3 mb-4">
-                      {cartItems.map((item) => (
+                      {cartItems.map((item) => {
+                        const displayName = [item.productName, item.variantName].filter(Boolean).join(' - ') || 'Sản phẩm'
+                        const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
+                        return (
                         <div key={item.cartItemId} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
-                          <div className="relative w-12 h-12 bg-gray-100 rounded-lg flex-shrink-0">
+                          <div className="relative w-12 h-12 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                             <Image
-                              src="/images/logo.png"
-                              alt={item.variantName ?? 'Sản phẩm'}
+                              src={imageSrc}
+                              alt={displayName}
                               fill
                               className="object-cover rounded-lg"
                               sizes="48px"
+                              unoptimized={imageSrc.startsWith('http')}
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm truncate">{item.variantName ?? 'Sản phẩm'}</h3>
+                            <h3 className="font-medium text-sm truncate">{displayName}</h3>
                             <div className="flex items-center justify-between mt-0.5">
                               <span className="text-xs text-gray-500">Số lượng: {item.quantity}</span>
                               <span className="font-semibold text-primary-green text-sm">
@@ -373,7 +378,8 @@ export default function CheckoutPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                       <div className="flex justify-between pt-2">
                         <span className="text-gray-600">Tạm tính:</span>
                         <span className="font-semibold">{formatCurrency(subtotal)}</span>

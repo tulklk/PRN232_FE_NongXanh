@@ -92,19 +92,21 @@ export default function CartPage() {
               <div className="space-y-4">
                 {items.map((item) => {
                   const displayName =
-                    item.variantName || item.productName || 'Sản phẩm'
+                    [item.productName, item.variantName].filter(Boolean).join(' - ') || 'Sản phẩm'
+                  const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
                   return (
                   <div
                     key={item.cartItemId}
                     className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg"
                   >
-                    <div className="relative w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0">
+                    <div className="relative w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                       <Image
-                        src="/images/logo.png"
+                        src={imageSrc}
                         alt={displayName}
                         fill
                         className="object-cover rounded-lg"
                         sizes="80px"
+                        unoptimized={imageSrc.startsWith('http')}
                       />
                     </div>
                     <div className="flex-1">

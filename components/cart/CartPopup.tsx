@@ -17,7 +17,14 @@ interface CartPopupProps {
 }
 
 function getDisplayName(item: ApiCartItem): string {
-  return item.variantName || item.productName || 'Sản phẩm'
+  const p = item.productName || ''
+  const v = item.variantName || ''
+  if (p && v) return `${p} - ${v}`
+  return p || v || 'Sản phẩm'
+}
+
+function getImageSrc(item: ApiCartItem): string {
+  return item.imageUrl && item.imageUrl.startsWith('http') ? item.imageUrl : '/images/logo.png'
 }
 
 export default function CartPopup({
@@ -74,13 +81,14 @@ export default function CartPopup({
                 key={item.cartItemId}
                 className="flex gap-3 py-2 border-b border-gray-100 last:border-0"
               >
-                <div className="relative w-14 h-14 bg-gray-100 rounded flex-shrink-0">
+                <div className="relative w-14 h-14 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
                   <Image
-                    src="/images/logo.png"
+                    src={getImageSrc(item)}
                     alt={getDisplayName(item)}
                     fill
                     className="object-cover rounded"
                     sizes="56px"
+                    unoptimized={getImageSrc(item).startsWith('http')}
                   />
                 </div>
                 <div className="flex-1 min-w-0">

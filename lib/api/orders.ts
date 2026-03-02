@@ -41,13 +41,15 @@ export async function getOrders(
       (err as { error?: string }).error || 'Không thể tải danh sách đơn hàng'
     )
   }
-  const json = (await res.json()) as ApiOrdersPagedResponse
-  if (json?.items) return json
+  const json = (await res.json()) as { data?: ApiOrdersPagedResponse } & ApiOrdersPagedResponse
+  const data = json?.data ?? json
+  const items = (data?.items ?? json?.items ?? []) as ApiOrder[]
   return {
-    items: Array.isArray(json) ? json : [],
-    totalCount: 0,
-    pageNumber,
-    pageSize,
+    items,
+    totalCount: data?.totalCount ?? items.length,
+    pageNumber: data?.pageNumber ?? pageNumber,
+    pageSize: data?.pageSize ?? pageSize,
+    totalPages: data?.totalPages,
   }
 }
 
@@ -65,7 +67,9 @@ export async function getOrderById(
       (err as { error?: string }).error || 'Không thể tải đơn hàng'
     )
   }
-  return (await res.json()) as ApiOrder
+  const json = (await res.json()) as { data?: ApiOrder } & ApiOrder
+  const order = (json?.data ?? json) as ApiOrder
+  return order
 }
 
 export async function createOrder(
@@ -83,5 +87,7 @@ export async function createOrder(
       (err as { error?: string }).error || 'Không thể tạo đơn hàng'
     )
   }
-  return (await res.json()) as ApiOrder
+  const json = (await res.json()) as { data?: ApiOrder } & ApiOrder
+  const order = (json?.data ?? json) as ApiOrder
+  return order
 }

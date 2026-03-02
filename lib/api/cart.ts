@@ -1,6 +1,7 @@
 import type {
   ApiCart,
   ApiCartItem,
+  ApiProduct,
   AddCartItemRequest,
   UpdateCartItemRequest,
 } from '@/lib/types/api'
@@ -51,25 +52,77 @@ export async function getCart(token: string): Promise<ApiCart | null> {
   return cart
 }
 
+function getProductImageUrl(product: { productImages?: Array<{ imageUrl?: string; isPrimary?: boolean }> } | null | undefined): string | null {
+  if (!product?.productImages?.length) return null
+  const primary = product.productImages.find((i) => i.isPrimary)
+  return primary?.imageUrl || product.productImages[0]?.imageUrl || null
+}
+
+async function fetchProductById(productId: string): Promise<ApiProduct | null> {
+  try {
+    const res = await fetch(`${getBase()}/api/products/${productId}`)
+    if (!res.ok) return null
+    const raw = (await res.json()) as ApiProduct | { data?: ApiProduct }
+    const p = (raw && typeof raw === 'object' && 'data' in raw ? (raw as { data?: ApiProduct }).data : raw) as ApiProduct
+    return p?.productId != null ? p : null
+  } catch {
+    return null
+  }
+}
+
+async function fetchProductsMap(): Promise<Map<string, ApiProduct>> {
+  const base = getBase()
+  const res = await fetch(`${base}/api/products?pageNumber=1&pageSize=200`)
+  if (!res.ok) return new Map()
+  const raw = (await res.json()) as Record<string, unknown>
+  let list: ApiProduct[] = []
+  const items = (raw?.items ?? (raw?.data as Record<string, unknown>)?.items ?? (Array.isArray(raw?.data) ? raw.data : null)) as unknown
+  if (Array.isArray(items)) list = items
+  const map = new Map<string, ApiProduct>()
+  for (const p of list) {
+    if (p?.productId != null) map.set(String(p.productId), p)
+  }
+  return map
+}
+
 async function enrichCartItems(cart: ApiCart): Promise<ApiCart> {
-  const needsEnrichment = cart.cartItems!.some((i) => !i.variantName && i.variantId)
+  const needsEnrichment = cart.cartItems!.some(
+    (i) => i.variantId && (!i.variantName || !i.productName || !i.imageUrl)
+  )
   if (!needsEnrichment) return cart
 
   try {
-    const variants = await getProductVariants()
-    const variantMap = new Map(variants.map((v) => [v.variantId, v]))
+    const [variants, productsMap] = await Promise.all([
+      getProductVariants(),
+      fetchProductsMap(),
+    ])
+    const variantMap = new Map(variants.map((v) => [String(v.variantId), v]))
+    const productIdSet = new Set<string>()
+    for (const item of cart.cartItems!) {
+      const v = variantMap.get(String(item.variantId))
+      if (v?.productId != null) productIdSet.add(String(v.productId))
+    }
+    const missingIds = Array.from(productIdSet).filter((id) => !productsMap.has(id))
+    if (missingIds.length > 0) {
+      const extras = await Promise.all(missingIds.map((id) => fetchProductById(id)))
+      extras.forEach((p) => {
+        if (p?.productId != null) productsMap.set(String(p.productId), p)
+      })
+    }
     const enrichedItems: ApiCartItem[] = cart.cartItems!.map((item) => {
-      if (!item.variantName && item.variantId) {
-        const v = variantMap.get(item.variantId)
-        if (v) {
-          return {
-            ...item,
-            variantName: v.variantName,
-            productName: v.product?.productName ?? item.productName,
-          }
-        }
+      const key = String(item.variantId)
+      const v = variantMap.get(key)
+      const productId = v?.productId != null ? String(v.productId) : null
+      const product = v?.product ?? (productId ? productsMap.get(productId) : null)
+      const productName = product?.productName ?? v?.product?.productName ?? item.productName
+      const variantName = v?.variantName ?? item.variantName
+      const imageUrl = getProductImageUrl(product ?? v?.product) ?? item.imageUrl
+      return {
+        ...item,
+        variantName,
+        productName: productName || item.productName,
+        imageUrl: imageUrl || item.imageUrl,
       }
-      return item
     })
     const computedTotal =
       enrichedItems.reduce((sum, i) => sum + (i.subTotal ?? i.priceAtTime * i.quantity), 0)

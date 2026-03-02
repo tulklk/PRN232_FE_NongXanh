@@ -126,6 +126,10 @@ const config: Config = {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
         },
+        fadeOut: {
+          '0%': { opacity: '1' },
+          '100%': { opacity: '0' },
+        },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
@@ -138,7 +142,8 @@ const config: Config = {
       animation: {
         slideUpFade: 'slideUpFade 0.3s ease-out',
         slideRightFade: 'slideRightFade 0.3s ease-out',
-        slideDownFade: 'slideDownFade 0.2s ease-in',
+        slideDownFade: 'slideDownFade 0.3s ease-in forwards',
+        fadeOut: 'fadeOut 0.3s ease-in forwards',
         scaleIn: 'scaleIn 0.3s ease-out',
         shake: 'shake 0.5s ease',
         bounceIn: 'bounceIn 0.4s ease-out',

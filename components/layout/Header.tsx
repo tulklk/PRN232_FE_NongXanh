@@ -26,6 +26,30 @@ export default function Header() {
     const [showUserMenu, setShowUserMenu] = useState(false)
     const [showCartPopup, setShowCartPopup] = useState(false)
     const cartPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const categoryMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const userMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const handleCategoryMenuEnter = () => {
+        if (categoryMenuTimeoutRef.current) {
+            clearTimeout(categoryMenuTimeoutRef.current)
+            categoryMenuTimeoutRef.current = null
+        }
+        setIsMenuOpen(true)
+    }
+    const handleCategoryMenuLeave = () => {
+        categoryMenuTimeoutRef.current = setTimeout(() => setIsMenuOpen(false), 150)
+    }
+
+    const handleUserMenuEnter = () => {
+        if (userMenuTimeoutRef.current) {
+            clearTimeout(userMenuTimeoutRef.current)
+            userMenuTimeoutRef.current = null
+        }
+        setShowUserMenu(true)
+    }
+    const handleUserMenuLeave = () => {
+        userMenuTimeoutRef.current = setTimeout(() => setShowUserMenu(false), 150)
+    }
 
     const handleCartMouseEnter = () => {
         if (cartPopupTimeoutRef.current) {
@@ -41,6 +65,8 @@ export default function Header() {
     useEffect(() => {
         return () => {
             if (cartPopupTimeoutRef.current) clearTimeout(cartPopupTimeoutRef.current)
+            if (categoryMenuTimeoutRef.current) clearTimeout(categoryMenuTimeoutRef.current)
+            if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current)
         }
     }, [])
   
@@ -198,11 +224,15 @@ export default function Header() {
                                     <span className="text-sm hidden lg:inline">Thông báo của tôi</span>
                                 </Link>
 
-                                {/* User */}
+                                {/* User - mở menu khi hover */}
                                 {isAuthenticated && user ? (
-                                    <div className="relative">
+                                    <div
+                                        className="relative"
+                                        onMouseEnter={handleUserMenuEnter}
+                                        onMouseLeave={handleUserMenuLeave}
+                                    >
                                         <button
-                                            onClick={() => setShowUserMenu(!showUserMenu)}
+                                            type="button"
                                             className="flex items-center gap-2 hover:text-yellow-300 transition-colors"
                                         >
                                             <User size={20} />
@@ -294,10 +324,14 @@ export default function Header() {
                 <div className="bg-white border-b border-gray-200 shadow-sm relative">
                     <div className="max-w-[1400px] mx-auto px-8">
                         <nav className="flex items-center">
-                            {/* Category Dropdown - Green background */}
-                            <div className="relative">
+                            {/* Category Dropdown - Green background, mở khi hover */}
+                            <div
+                                className="relative"
+                                onMouseEnter={handleCategoryMenuEnter}
+                                onMouseLeave={handleCategoryMenuLeave}
+                            >
                                 <button
-                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    type="button"
                                     className="flex items-center gap-2 bg-[#0A923C] text-white px-4 py-2.5 hover:bg-[#087a32] transition-colors"
                                 >
                                     <Menu size={18} />
@@ -305,13 +339,7 @@ export default function Header() {
                                     <ChevronDown size={12} className={isMenuOpen ? 'rotate-180' : ''} />
                                 </button>
                                 {isMenuOpen && (
-                                    <>
-                                        <div
-                                            className="fixed inset-0 z-40"
-                                            onClick={() => setIsMenuOpen(false)}
-                                            aria-hidden
-                                        />
-                                        <div className="absolute left-0 top-full z-50 mt-0 w-64 bg-white border border-gray-200 shadow-lg py-2 max-h-[70vh] overflow-y-auto">
+                                    <div className="absolute left-0 top-full z-50 mt-0 w-64 bg-white border border-gray-200 shadow-lg py-2 max-h-[70vh] overflow-y-auto">
                                             <Link
                                                 href="/products"
                                                 onClick={() => setIsMenuOpen(false)}
@@ -333,7 +361,6 @@ export default function Header() {
                                                 <div className="px-4 py-3 text-sm text-gray-500">Đang tải...</div>
                                             )}
                                         </div>
-                                    </>
                                 )}
                             </div>
 

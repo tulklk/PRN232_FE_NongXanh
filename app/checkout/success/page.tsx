@@ -9,6 +9,8 @@ import { products } from '@/data/products'
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
+  const orderNumber = searchParams.get('orderNumber')
+  const displayCode = orderNumber || orderId
   const similarProducts = products.slice(0, 5)
 
   return (
@@ -25,9 +27,9 @@ export default function PaymentSuccessPage() {
           <p className="text-gray-600 mb-8">
             Cảm ơn bạn đã mua sắm tại Nông Xanh. Đơn hàng của bạn đã được xác nhận và sẽ được xử
             lý sớm nhất.
-            {orderId && (
+            {displayCode && (
               <span className="block mt-2 font-semibold text-gray-900">
-                Mã đơn hàng: #{orderId}
+                Mã đơn hàng: #{displayCode}
               </span>
             )}
           </p>

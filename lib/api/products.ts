@@ -83,27 +83,42 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
 
 export async function getProductById(id: string): Promise<Product | null> {
   const isServer = typeof window === 'undefined'
-  const url = isServer
-    ? `${BACKEND_URL}/api/Products/${id}`
-    : `${getBase()}/api/products/${id}`
+  const base = isServer
+    ? process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+    : getBase()
+  const url = `${base}/api/products/${id}`
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     cache: isServer ? 'no-store' : undefined,
   })
   if (!res.ok) {
     if (res.status === 404) {
-      const list = await getProducts({ pageNumber: 1, pageSize: 100 })
-      const found = list.items.find((p) => p.id === id)
-      return found ?? null
+      try {
+        const list = await getProducts({ pageNumber: 1, pageSize: 100 })
+        const found = list.items.find((p) => p.id === id)
+        return found ?? null
+      } catch {
+        return null
+      }
     }
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((err as { error?: string }).error || 'Không thể tải chi tiết sản phẩm')
+    const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    console.warn('[getProductById]', res.status, id, err)
+    return null
   }
-  const json = (await res.json()) as ApiProductDetailResponse | ApiProduct
-  const apiProduct =
-    json && typeof json === 'object' && 'data' in json
-      ? (json as ApiProductDetailResponse).data
-      : (json as ApiProduct)
+  const json = (await res.json()) as ApiProductDetailResponse | ApiProduct | Record<string, unknown>
+  const raw = json && typeof json === 'object'
+  const wrapped = raw && ('data' in json || 'Data' in json)
+  const data = wrapped
+    ? ((json as { data?: ApiProduct; Data?: ApiProduct }).data ??
+       (json as { data?: ApiProduct; Data?: ApiProduct }).Data)
+    : null
+  const direct =
+    raw &&
+    ('productId' in json || 'ProductId' in json) &&
+    (json as ApiProduct)
+  const apiProduct = (data ?? direct ?? null) as ApiProduct | null
   if (!apiProduct || !apiProduct.productId) return null
   return mapApiProductToProduct(apiProduct)
 }

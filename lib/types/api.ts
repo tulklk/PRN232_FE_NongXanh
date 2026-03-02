@@ -143,10 +143,14 @@ export interface ApiOrderDetail {
   orderId: number
   variantId: number
   variantName?: string | null
+  productId?: string | number | null
+  productName?: string | null
+  productImageUrl?: string | null
 }
 
 export interface ApiOrder {
-  orderId: number
+  orderId: number | string
+  orderNumber?: string | null
   orderDate: string
   totalAmount: number
   shippingFee: number
@@ -190,7 +194,7 @@ export interface ApiPayment {
 
 export interface CreatePaymentRequest {
   paymentMethod?: string | null
-  orderId: number
+  orderId: number | string
 }
 
 // API ProductVariant structure

@@ -86,7 +86,7 @@ export default function OrdersPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="font-semibold text-gray-900">
-                  Đơn hàng #{order.orderId}
+                  Đơn hàng #{order.orderNumber ?? order.orderId}
                 </span>
                 <span className="mx-2 text-gray-400">|</span>
                 <span className="text-sm text-gray-600">
@@ -104,11 +104,6 @@ export default function OrdersPage() {
                 )}
               </div>
             </div>
-            {order.shippingAddress && (
-              <p className="text-sm text-gray-500 mt-2 truncate">
-                {order.shippingAddress}
-              </p>
-            )}
           </Link>
         ))}
       </div>

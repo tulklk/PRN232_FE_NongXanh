@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { getOrderById } from '@/lib/api/orders'
@@ -68,7 +69,7 @@ export default function OrderDetailPage() {
       </Link>
 
       <h2 className="text-lg font-bold text-gray-900 mb-4">
-        Đơn hàng #{order.orderId}
+        Đơn hàng #{order.orderNumber ?? order.orderId}
       </h2>
 
       <div className="space-y-4 mb-6">
@@ -90,21 +91,43 @@ export default function OrderDetailPage() {
 
       <div className="border-t border-gray-200 pt-4">
         <h3 className="font-semibold text-gray-900 mb-3">Chi tiết sản phẩm</h3>
-        <div className="space-y-2">
-          {order.orderDetails?.map((detail) => (
-            <div
-              key={detail.orderDetailId}
-              className="flex justify-between items-center py-2 border-b border-gray-100"
-            >
-              <div>
-                <span className="font-medium">{detail.variantName ?? 'Sản phẩm'}</span>
-                <span className="text-gray-500 text-sm ml-2">x{detail.quantity}</span>
+        <div className="space-y-3">
+          {order.orderDetails?.map((detail) => {
+            const raw = detail as unknown as Record<string, unknown>
+            const imageUrl =
+              (raw.productImageUrl ?? raw.ProductImageUrl ?? raw.imageUrl ?? raw.ImageUrl) as
+              | string
+              | undefined
+            const productName =
+              (raw.productName ?? raw.ProductName ?? detail.variantName ?? 'Sản phẩm') as string
+            const imageSrc = imageUrl?.startsWith('http') ? imageUrl : '/images/logo.png'
+            return (
+              <div
+                key={detail.orderDetailId}
+                className="flex gap-3 items-center py-3 border-b border-gray-100"
+              >
+                <div className="relative w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                  <Image
+                    src={imageSrc}
+                    alt={productName}
+                    fill
+                    className="object-cover rounded-lg"
+                    sizes="56px"
+                    unoptimized={imageSrc.startsWith('http')}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900">{productName}</p>
+                  <p className="text-sm text-gray-500">
+                    {detail.variantName && `${detail.variantName} • `}x{detail.quantity}
+                  </p>
+                </div>
+                <span className="font-semibold text-primary-green flex-shrink-0">
+                  {formatCurrency(detail.subTotal)}
+                </span>
               </div>
-              <span className="font-semibold text-primary-green">
-                {formatCurrency(detail.subTotal)}
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="mt-4 space-y-2 text-sm">
