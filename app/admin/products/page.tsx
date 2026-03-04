@@ -423,7 +423,7 @@ interface ProductFormModalProps {
   categories: ApiCategory[]
   providers: ApiProvider[]
   onClose: () => void
-  onSubmit: (data: CreateProductInput | UpdateProductInput) => void
+  onSubmit: (data: CreateProductInput) => void | Promise<void>
   loading: boolean
   error: string | null
 }
@@ -458,7 +458,7 @@ function ProductFormModal({
     e.preventDefault()
     if (!name.trim()) return
 
-    const payload: CreateProductInput | UpdateProductInput = {
+    const payload: CreateProductInput = {
       name: name.trim(),
       description: description.trim() || null,
       origin: origin.trim() || null,
