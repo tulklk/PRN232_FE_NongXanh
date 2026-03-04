@@ -1,4 +1,8 @@
-import type { ApiProduct, ApiProductsResponse, ApiProductDetailResponse } from '@/lib/types/api'
+import type {
+  ApiProduct,
+  ApiProductsResponse,
+  ApiProductDetailResponse,
+} from '@/lib/types/api'
 import type { Product } from '@/data/products'
 
 const BACKEND_URL = 'https://nongxanhbe-g6h9aadudccrgzbs.eastasia-01.azurewebsites.net'
@@ -9,6 +13,21 @@ const getBase = () =>
     : process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000'
+
+function getHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
+function getJsonHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
 
 function mapApiProductToProduct(api: ApiProduct): Product {
   const primaryImage = api.productImages?.find((i) => i.isPrimary)
@@ -118,4 +137,174 @@ export async function getProductById(id: string): Promise<Product | null> {
   const apiProduct = (data ?? direct ?? null) as ApiProduct | null
   if (!apiProduct || !apiProduct.productId) return null
   return mapApiProductToProduct(apiProduct)
+}
+
+export interface CreateProductInput {
+  name: string
+  description?: string | null
+  origin?: string | null
+  unit?: string | null
+  basePrice: number
+  isOrganic?: boolean
+  status?: string | null
+  categoryId?: string | null
+  providerId?: string | null
+}
+
+export interface UpdateProductInput {
+  name?: string
+  description?: string | null
+  origin?: string | null
+  unit?: string | null
+  basePrice?: number
+  isOrganic?: boolean | null
+  status?: string | null
+  categoryId?: string | null
+  providerId?: string | null
+}
+
+export async function getAdminProducts(
+  pageNumber = 1,
+  pageSize = 50,
+  categoryId?: string,
+  token?: string
+): Promise<ApiProduct[]> {
+  const search = new URLSearchParams({
+    pageNumber: String(pageNumber),
+    pageSize: String(pageSize),
+  })
+  if (categoryId) search.set('categoryId', categoryId)
+
+  const res = await fetch(`${getBase()}/api/products?${search.toString()}`, {
+    headers: getHeaders(token),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error((err as { error?: string }).error || 'Không thể tải sản phẩm')
+  }
+
+  const json = (await res.json()) as
+    | ApiProductsResponse
+    | (ApiProductsResponse & { items?: ApiProduct[] })
+    | { items?: ApiProduct[] }
+    | ApiProduct[]
+
+  const anyJson = json as any
+  const data = (anyJson?.data ?? anyJson) as
+    | ApiProductsResponse['data']
+    | { items?: ApiProduct[] }
+    | ApiProduct[]
+    | undefined
+
+  if (Array.isArray((data as any)?.items)) {
+    return ((data as any).items || []) as ApiProduct[]
+  }
+  if (Array.isArray((anyJson as any).items)) {
+    return ((anyJson as any).items || []) as ApiProduct[]
+  }
+  if (Array.isArray(data)) return data as ApiProduct[]
+  if (Array.isArray(json)) return json as ApiProduct[]
+
+  return []
+}
+
+export async function createProduct(
+  data: CreateProductInput,
+  token?: string
+): Promise<ApiProduct> {
+  const body = {
+    name: data.name,
+    description: data.description ?? null,
+    origin: data.origin ?? null,
+    unit: data.unit ?? null,
+    basePrice: data.basePrice,
+    isOrganic: data.isOrganic ?? false,
+    status: data.status ?? null,
+    categoryId: data.categoryId ?? null,
+    providerId: data.providerId ?? null,
+  }
+
+  const res = await fetch(`${getBase()}/api/products`, {
+    method: 'POST',
+    headers: getJsonHeaders(token),
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({
+      error: res.statusText,
+      message: res.statusText,
+    }))
+    throw new Error(
+      (err as { message?: string }).message ||
+        (err as { error?: string }).error ||
+        'Không thể tạo sản phẩm'
+    )
+  }
+
+  const json = (await res.json()) as { data?: ApiProduct } | ApiProduct
+  if (json && typeof json === 'object' && 'data' in json) {
+    return (json as { data?: ApiProduct }).data as ApiProduct
+  }
+  return json as ApiProduct
+}
+
+export async function updateProduct(
+  id: string,
+  data: UpdateProductInput,
+  token?: string
+): Promise<ApiProduct> {
+  const body: Record<string, unknown> = {}
+  if (data.name !== undefined) body.name = data.name
+  if (data.description !== undefined) body.description = data.description
+  if (data.origin !== undefined) body.origin = data.origin
+  if (data.unit !== undefined) body.unit = data.unit
+  if (data.basePrice !== undefined) body.basePrice = data.basePrice
+  if (data.isOrganic !== undefined) body.isOrganic = data.isOrganic
+  if (data.status !== undefined) body.status = data.status
+  if (data.categoryId !== undefined) body.categoryId = data.categoryId
+  if (data.providerId !== undefined) body.providerId = data.providerId
+
+  const res = await fetch(`${getBase()}/api/products/${id}`, {
+    method: 'PUT',
+    headers: getJsonHeaders(token),
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({
+      error: res.statusText,
+      message: res.statusText,
+    }))
+    throw new Error(
+      (err as { message?: string }).message ||
+        (err as { error?: string }).error ||
+        'Không thể cập nhật sản phẩm'
+    )
+  }
+
+  const json = (await res.json()) as { data?: ApiProduct } | ApiProduct
+  if (json && typeof json === 'object' && 'data' in json) {
+    return (json as { data?: ApiProduct }).data as ApiProduct
+  }
+  return json as ApiProduct
+}
+
+export async function deleteProduct(id: string, token?: string): Promise<void> {
+  const res = await fetch(`${getBase()}/api/products/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(token),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({
+      error: res.statusText,
+      message: res.statusText,
+    }))
+    throw new Error(
+      (err as { message?: string }).message ||
+        (err as { error?: string }).error ||
+        'Không thể xóa sản phẩm'
+    )
+  }
 }

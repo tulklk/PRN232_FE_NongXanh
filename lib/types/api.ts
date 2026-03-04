@@ -103,6 +103,26 @@ export interface ApiUsersPagedResponse {
   totalPages?: number
 }
 
+// API Provider structure
+export interface ApiProvider {
+  providerId: number
+  providerName: string
+  description?: string | null
+  phoneNumber?: string | null
+  email?: string | null
+  address?: string | null
+  status?: string | null
+  createdAt?: string | null
+}
+
+export interface ApiProvidersPagedResponse {
+  items: ApiProvider[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages?: number
+}
+
 // API Cart structure
 export interface ApiCartItem {
   cartItemId: number

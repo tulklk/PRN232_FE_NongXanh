@@ -4,9 +4,7 @@ const API_BASE_URL = 'https://nongxanhbe-g6h9aadudccrgzbs.eastasia-01.azurewebsi
 
 function getAuthHeaders(request: NextRequest): Record<string, string> {
   const auth = request.headers.get('Authorization')
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
+  const headers: Record<string, string> = { Accept: 'application/json' }
   if (auth) headers['Authorization'] = auth
   return headers
 }
@@ -27,15 +25,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-
-    const res = await fetch(`${API_BASE_URL}/api/Products/${id}`, {
-      headers: getAuthHeaders(request),
-    })
+    const headers = getAuthHeaders(request)
+    const res = await fetch(`${API_BASE_URL}/api/Providers/${id}`, { headers })
 
     if (!res.ok) {
       if (res.status === 404) {
         return NextResponse.json(
-          { error: 'Không tìm thấy sản phẩm' },
+          { error: 'Không tìm thấy nhà cung cấp' },
           { status: 404 }
         )
       }
@@ -44,7 +40,7 @@ export async function GET(
         {
           error:
             (errorData as { message?: string }).message ||
-            'Không thể tải chi tiết sản phẩm',
+            'Không thể tải thông tin nhà cung cấp',
         },
         { status: res.status }
       )
@@ -53,9 +49,9 @@ export async function GET(
     const data = await res.json()
     return NextResponse.json(data)
   } catch (error: unknown) {
-    console.error('Product detail API error:', error)
+    console.error('Provider GET error:', error)
     return NextResponse.json(
-      { error: 'Đã có lỗi xảy ra khi tải chi tiết sản phẩm' },
+      { error: 'Đã có lỗi xảy ra khi tải thông tin nhà cung cấp' },
       { status: 500 }
     )
   }
@@ -68,9 +64,10 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
-    const res = await fetch(`${API_BASE_URL}/api/Products/${id}`, {
+    const headers = getJsonHeaders(request)
+    const res = await fetch(`${API_BASE_URL}/api/Providers/${id}`, {
       method: 'PUT',
-      headers: getJsonHeaders(request),
+      headers,
       body: JSON.stringify(body),
     })
 
@@ -80,7 +77,7 @@ export async function PUT(
         {
           error:
             (errorData as { message?: string }).message ||
-            'Không thể cập nhật sản phẩm',
+            'Không thể cập nhật nhà cung cấp',
         },
         { status: res.status }
       )
@@ -89,9 +86,9 @@ export async function PUT(
     const data = await res.json()
     return NextResponse.json(data)
   } catch (error: unknown) {
-    console.error('Product PUT error:', error)
+    console.error('Provider PUT error:', error)
     return NextResponse.json(
-      { error: 'Đã có lỗi xảy ra khi cập nhật sản phẩm' },
+      { error: 'Đã có lỗi xảy ra khi cập nhật nhà cung cấp' },
       { status: 500 }
     )
   }
@@ -103,9 +100,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const res = await fetch(`${API_BASE_URL}/api/Products/${id}`, {
+    const headers = getAuthHeaders(request)
+    const res = await fetch(`${API_BASE_URL}/api/Providers/${id}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(request),
+      headers,
     })
 
     if (!res.ok) {
@@ -114,7 +112,7 @@ export async function DELETE(
         {
           error:
             (errorData as { message?: string }).message ||
-            'Không thể xóa sản phẩm',
+            'Không thể xóa nhà cung cấp',
         },
         { status: res.status }
       )
@@ -123,10 +121,11 @@ export async function DELETE(
     const data = await res.json().catch(() => ({}))
     return NextResponse.json(data)
   } catch (error: unknown) {
-    console.error('Product DELETE error:', error)
+    console.error('Provider DELETE error:', error)
     return NextResponse.json(
-      { error: 'Đã có lỗi xảy ra khi xóa sản phẩm' },
+      { error: 'Đã có lỗi xảy ra khi xóa nhà cung cấp' },
       { status: 500 }
     )
   }
 }
+

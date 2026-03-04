@@ -81,16 +81,18 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            <LoginModal
-                isOpen={isOpen}
-                onClose={handleClose}
-                onLogin={handleLogin}
-                onGoogleSuccess={handleGoogleSuccess}
-                onGoogleError={setError}
-                loading={loading}
-                error={error}
-            />
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+            <div className="w-full max-w-md">
+                <LoginModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onLogin={handleLogin}
+                    onGoogleSuccess={handleGoogleSuccess}
+                    onGoogleError={setError}
+                    loading={loading}
+                    error={error}
+                />
+            </div>
         </div>
     )
 } 

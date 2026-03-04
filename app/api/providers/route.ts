@@ -2,18 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const API_BASE_URL = 'https://nongxanhbe-g6h9aadudccrgzbs.eastasia-01.azurewebsites.net'
 
-export const dynamic = 'force-dynamic'
-
 function getAuthHeaders(request: NextRequest): Record<string, string> {
-  const auth = request.headers.get('Authorization')
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-  if (auth) headers['Authorization'] = auth
-  return headers
-}
-
-function getJsonHeaders(request: NextRequest): Record<string, string> {
   const auth = request.headers.get('Authorization')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -26,17 +15,12 @@ function getJsonHeaders(request: NextRequest): Record<string, string> {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const pageNumber = searchParams.get('pageNumber') || '1'
-    const pageSize = searchParams.get('pageSize') || '10'
-    const categoryId = searchParams.get('categoryId')
+    const pageNumber = searchParams.get('pageNumber') ?? '1'
+    const pageSize = searchParams.get('pageSize') ?? '100'
+    const url = `${API_BASE_URL}/api/Providers?pageNumber=${pageNumber}&pageSize=${pageSize}`
 
-    let url = `${API_BASE_URL}/api/Products?pageNumber=${pageNumber}&pageSize=${pageSize}`
-    if (categoryId) {
-      url += `&categoryId=${categoryId}`
-    }
     const res = await fetch(url, {
       headers: getAuthHeaders(request),
-      cache: 'no-store',
     })
 
     if (!res.ok) {
@@ -45,7 +29,7 @@ export async function GET(request: NextRequest) {
         {
           error:
             (errorData as { message?: string }).message ||
-            'Không thể tải sản phẩm',
+            'Không thể tải danh sách nhà cung cấp',
         },
         { status: res.status }
       )
@@ -54,9 +38,9 @@ export async function GET(request: NextRequest) {
     const data = await res.json()
     return NextResponse.json(data)
   } catch (error: unknown) {
-    console.error('Products API error:', error)
+    console.error('Providers API error:', error)
     return NextResponse.json(
-      { error: 'Đã có lỗi xảy ra khi tải sản phẩm' },
+      { error: 'Đã có lỗi xảy ra khi tải danh sách nhà cung cấp' },
       { status: 500 }
     )
   }
@@ -65,9 +49,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const res = await fetch(`${API_BASE_URL}/api/Products`, {
+    const headers = getAuthHeaders(request)
+    const res = await fetch(`${API_BASE_URL}/api/Providers`, {
       method: 'POST',
-      headers: getJsonHeaders(request),
+      headers,
       body: JSON.stringify(body),
     })
 
@@ -77,7 +62,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             (errorData as { message?: string }).message ||
-            'Không thể tạo sản phẩm',
+            'Không thể tạo nhà cung cấp',
         },
         { status: res.status }
       )
@@ -86,10 +71,11 @@ export async function POST(request: NextRequest) {
     const data = await res.json()
     return NextResponse.json(data)
   } catch (error: unknown) {
-    console.error('Products POST error:', error)
+    console.error('Providers POST error:', error)
     return NextResponse.json(
-      { error: 'Đã có lỗi xảy ra khi tạo sản phẩm' },
+      { error: 'Đã có lỗi xảy ra khi tạo nhà cung cấp' },
       { status: 500 }
     )
   }
 }
+

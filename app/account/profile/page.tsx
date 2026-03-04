@@ -40,10 +40,10 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[200px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A923C] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Đang tải...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#0A923C] mx-auto" />
+          <p className="mt-3 text-gray-600 text-sm">Đang tải...</p>
         </div>
       </div>
     )
@@ -70,12 +70,12 @@ export default function ProfilePage() {
       </div>
 
       {/* Profile Form */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-6">Thông tin tài khoản</h2>
 
         <form className="space-y-6">
           {/* Name */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
               Tên <span className="text-red-500">*</span>
             </label>
@@ -90,7 +90,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Phone */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
               Số điện thoại <span className="text-red-500">*</span>
             </label>
@@ -116,7 +116,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Email */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">Email</label>
             <div className="md:col-span-3">
               <input
@@ -129,7 +129,7 @@ export default function ProfilePage() {
           </div>
 
           {/* City */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
               Thành phố <span className="text-red-500">*</span>
             </label>
@@ -148,7 +148,7 @@ export default function ProfilePage() {
           </div>
 
           {/* District */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
               Quận huyện <span className="text-red-500">*</span>
             </label>
@@ -164,7 +164,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Ward */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
               Phường/Xã <span className="text-red-500">*</span>
             </label>
@@ -180,7 +180,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Address */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
               Địa chỉ <span className="text-red-500">*</span>
             </label>
@@ -196,7 +196,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Gender */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">Giới tính</label>
             <div className="md:col-span-3 flex gap-6">
               <label className="flex items-center gap-2.5 text-sm">

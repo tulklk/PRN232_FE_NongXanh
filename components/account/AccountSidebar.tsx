@@ -14,6 +14,7 @@ import {
   LogOut,
   Share2,
 } from 'lucide-react'
+import { useUser } from '@/contexts/UserContext'
 
 const menuItems = [
   { href: '/account/profile', label: 'Thông tin của tôi', icon: User },
@@ -28,18 +29,22 @@ const menuItems = [
 
 export default function AccountSidebar() {
   const pathname = usePathname()
+  const { user } = useUser()
+
+  const displayName = user?.displayName || 'Khách hàng'
+  const email = user?.email || ''
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
       {/* User Info */}
-      <div className="mb-6 pb-6 border-b border-gray-100">
+      <div className="mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-100">
         <p className="text-sm text-gray-500">Tài khoản</p>
-        <p className="text-lg font-bold text-[#0A923C]">Thành Tú</p>
-        <p className="text-sm text-gray-500 mt-1.5">tulkik32@gmail.com</p>
+        <p className="text-lg font-bold text-[#0A923C]">{displayName}</p>
+        {email && <p className="text-sm text-gray-500 mt-1.5">{email}</p>}
       </div>
 
       {/* Menu Items */}
-      <nav className="space-y-2">
+      <nav className="space-y-1.5 sm:space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href

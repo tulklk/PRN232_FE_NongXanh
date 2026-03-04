@@ -58,7 +58,7 @@ export default function CartPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="max-w-[1400px] mx-auto px-8 py-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
         <Link
           href="/products"
           className="inline-flex items-center gap-2 text-primary-green hover:underline mb-6"
@@ -73,9 +73,9 @@ export default function CartPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Cart Items */}
-          <div className="lg:col-span-2 bg-white rounded-lg p-6">
+          <div className="lg:col-span-2 bg-white rounded-lg p-4 sm:p-6">
             <h2 className="font-semibold mb-6">
               Giỏ hàng ({items.length} sản phẩm)
             </h2>
@@ -97,7 +97,7 @@ export default function CartPage() {
                   return (
                   <div
                     key={item.cartItemId}
-                    className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg"
+                    className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-4 border border-gray-200 rounded-lg"
                   >
                     <div className="relative w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                       <Image
@@ -109,15 +109,15 @@ export default function CartPage() {
                         unoptimized={imageSrc.startsWith('http')}
                       />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">
+                    <div className="flex-1 w-full">
+                      <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">
                         {displayName}
                       </h3>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-lg font-bold text-primary-green">
                           {formatCurrency(item.priceAtTime)}
                         </span>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           <QuantitySelector
                             defaultValue={item.quantity}
                             onChange={(qty) => updateItem(item.cartItemId, qty)}
@@ -142,7 +142,7 @@ export default function CartPage() {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg p-6 sticky top-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 lg:sticky lg:top-4">
               <h2 className="text-lg font-bold mb-4">Thông tin đơn hàng</h2>
 
               <div className="mb-4">

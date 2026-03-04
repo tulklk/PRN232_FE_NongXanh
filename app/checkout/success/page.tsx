@@ -15,9 +15,9 @@ export default function PaymentSuccessPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="max-w-[1400px] mx-auto px-8 py-12">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8 sm:py-12">
         {/* Success Message */}
-        <div className="max-w-2xl mx-auto bg-white rounded-lg border-4 border-blue-500 p-12 text-center mb-12">
+        <div className="max-w-2xl mx-auto bg-white rounded-lg border-4 border-blue-500 p-8 sm:p-12 text-center mb-10 sm:mb-12">
           <div className="flex justify-center mb-6">
             <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle size={48} className="text-green-500" />
@@ -33,7 +33,7 @@ export default function PaymentSuccessPage() {
               </span>
             )}
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <Link
               href="/account/orders"
               className="bg-primary-green text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors flex items-center gap-2"
@@ -52,8 +52,8 @@ export default function PaymentSuccessPage() {
 
         {/* Similar Products */}
         <section>
-          <div className="bg-primary-green text-white py-4 px-6 rounded-t-lg">
-            <h2 className="text-xl font-bold">CÁC SẢN PHẨM TƯƠNG TỰ</h2>
+          <div className="bg-primary-green text-white py-3 sm:py-4 px-4 sm:px-6 rounded-t-lg">
+            <h2 className="text-lg sm:text-xl font-bold">CÁC SẢN PHẨM TƯƠNG TỰ</h2>
           </div>
           <div className="bg-white rounded-b-lg p-6">
             <ProductGrid products={similarProducts} columns={5} />

@@ -39,10 +39,11 @@ export async function getProductVariants(
     list = obj.data ?? obj.items ?? []
   }
   if (productId != null && list.length > 0) {
-    const pid = typeof productId === 'string' ? Number(productId) : productId
-    if (!Number.isNaN(pid)) {
-      list = list.filter((v) => v.productId === pid)
-    }
+    const pidStr = String(productId)
+    list = list.filter((v) => {
+      const vPid = v.productId
+      return String(vPid) === pidStr || vPid === productId
+    })
   }
   return list
 }

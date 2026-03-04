@@ -11,6 +11,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
 import { createOrder } from '@/lib/api/orders'
 import { createPayment } from '@/lib/api/payments'
+import { getProvinces, getWardsByProvince, type Province, type Ward } from '@/lib/api/provinces'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -22,11 +23,14 @@ export default function CheckoutPage() {
     phone: '',
     email: '',
     province: '',
-    district: '',
     ward: '',
     address: '',
     addressType: 'home',
   })
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [wards, setWards] = useState<Ward[]>([])
+  const [loadingProvinces, setLoadingProvinces] = useState(true)
+  const [loadingWards, setLoadingWards] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [discountCode, setDiscountCode] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
@@ -50,6 +54,44 @@ export default function CheckoutPage() {
       }))
     }
   }, [user, isAuthenticated])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoadingProvinces(true)
+    getProvinces()
+      .then((data) => {
+        if (!cancelled) setProvinces(data)
+      })
+      .catch(() => {
+        if (!cancelled) setProvinces([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingProvinces(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!formData.province) {
+      setWards([])
+      setFormData((prev) => ({ ...prev, ward: '' }))
+      return
+    }
+    let cancelled = false
+    setLoadingWards(true)
+    setFormData((prev) => ({ ...prev, ward: '' }))
+    getWardsByProvince(Number(formData.province))
+      .then((data) => {
+        if (!cancelled) setWards(data)
+      })
+      .catch(() => {
+        if (!cancelled) setWards([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWards(false)
+      })
+    return () => { cancelled = true }
+  }, [formData.province])
 
   if (!isAuthenticated) {
     return (
@@ -90,13 +132,14 @@ export default function CheckoutPage() {
     setSubmitError(null)
 
     try {
+      const provinceName = provinces.find((p) => String(p.code) === formData.province)?.name ?? formData.province
+      const wardName = wards.find((w) => String(w.code) === formData.ward)?.name ?? formData.ward
       const shippingAddress = [
         formData.fullName,
         normalizePhoneNumber(formData.phone) || formData.phone,
         formData.address,
-        formData.ward,
-        formData.district,
-        formData.province,
+        wardName,
+        provinceName,
       ]
         .filter(Boolean)
         .join(', ')
@@ -142,7 +185,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="max-w-[1400px] mx-auto px-8 py-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
         <Link
           href="/cart"
           className="inline-flex items-center gap-2 text-primary-green hover:underline mb-6"
@@ -158,7 +201,7 @@ export default function CheckoutPage() {
         )}
 
         {cartItems.length === 0 ? (
-          <div className="bg-white rounded-lg p-12 text-center">
+          <div className="bg-white rounded-lg p-8 sm:p-12 text-center">
             <p className="text-gray-600 mb-4">Giỏ hàng trống</p>
             <Link
               href="/products"
@@ -169,11 +212,11 @@ export default function CheckoutPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
               {/* Left Column */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Shipping Information */}
-                <div className="bg-white rounded-lg p-6">
+                <div className="bg-white rounded-lg p-4 sm:p-6">
                   <h2 className="text-xl font-bold mb-4">Thông tin nhận hàng</h2>
                   <p className="text-sm text-gray-600 mb-6">
                     Đăng nhập để nhận được thông báo về tình trạng đơn hàng
@@ -217,31 +260,24 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold mb-2">Tỉnh/Thành phố</label>
                       <select
                         required
                         value={formData.province}
                         onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
+                        disabled={loadingProvinces}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green disabled:opacity-60"
                       >
-                        <option value="">Chọn tỉnh/thành</option>
-                        <option value="hcm">TP. Hồ Chí Minh</option>
-                        <option value="hn">Hà Nội</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Quận/Huyện</label>
-                      <select
-                        required
-                        value={formData.district}
-                        onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
-                      >
-                        <option value="">Chọn quận/huyện</option>
-                        <option value="q1">Quận 1</option>
-                        <option value="q2">Quận 2</option>
+                        <option value="">
+                          {loadingProvinces ? 'Đang tải...' : 'Chọn tỉnh/thành'}
+                        </option>
+                        {provinces.map((p) => (
+                          <option key={p.code} value={String(p.code)}>
+                            {p.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -250,11 +286,21 @@ export default function CheckoutPage() {
                         required
                         value={formData.ward}
                         onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
+                        disabled={!formData.province || loadingWards}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green disabled:opacity-60"
                       >
-                        <option value="">Chọn phường/xã</option>
-                        <option value="p1">Phường 1</option>
-                        <option value="p2">Phường 2</option>
+                        <option value="">
+                          {!formData.province
+                            ? 'Chọn tỉnh trước'
+                            : loadingWards
+                              ? 'Đang tải...'
+                              : 'Chọn phường/xã'}
+                        </option>
+                        {wards.map((w) => (
+                          <option key={w.code} value={String(w.code)}>
+                            {w.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -297,7 +343,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Payment Method */}
-                <div className="bg-white rounded-lg p-6">
+                <div className="bg-white rounded-lg p-4 sm:p-6">
                   <h2 className="text-xl font-bold mb-4">Hình thức thanh toán</h2>
                   <div className="space-y-3">
                     {PAYMENT_METHODS.map((method) => (
@@ -332,7 +378,7 @@ export default function CheckoutPage() {
 
               {/* Right Column - Order Summary */}
               <div className="lg:col-span-1">
-                <div className="bg-white rounded-lg p-6 sticky top-4">
+                <div className="bg-white rounded-lg p-4 sm:p-6 lg:sticky lg:top-4">
                   <h2 className="text-lg font-bold mb-4">Mã giảm giá</h2>
                   <div className="flex gap-2 mb-4">
                     <input

@@ -9,6 +9,21 @@ import { newsArticles } from '@/data/news'
 import { SORT_OPTIONS } from '@/lib/constants'
 import { getProducts } from '@/lib/api/products'
 import type { Product } from '@/data/products'
+import { getCategories } from '@/lib/api/categories'
+import type { ApiCategory } from '@/lib/types/api'
+
+function flattenCategories(cats: ApiCategory[]): ApiCategory[] {
+  const result: ApiCategory[] = []
+  for (const c of cats) {
+    if (!c.isDeleted) {
+      result.push(c)
+      if (c.children?.length) {
+        result.push(...flattenCategories(c.children))
+      }
+    }
+  }
+  return result
+}
 
 function ProductsContent() {
   const searchParams = useSearchParams()
@@ -18,7 +33,18 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true)
   const [pageNumber, setPageNumber] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [categories, setCategories] = useState<ApiCategory[]>([])
   const pageSize = 12
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
+  }, [])
+
+  useEffect(() => {
+    setPageNumber(1)
+  }, [category])
 
   useEffect(() => {
     setLoading(true)
@@ -34,6 +60,20 @@ function ProductsContent() {
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
   }, [category, pageNumber])
+
+  const allCategories = useMemo(
+    () => flattenCategories(categories),
+    [categories]
+  )
+
+  const activeCategoryObj =
+    category !== 'all'
+      ? allCategories.find((c) => String(c.categoryId) === category)
+      : null
+
+  const pageTitle =
+    activeCategoryObj?.categoryName?.toUpperCase() ??
+    (category === 'all' ? 'TẤT CẢ SẢN PHẨM' : 'SẢN PHẨM')
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products]
@@ -56,20 +96,37 @@ function ProductsContent() {
 
   return (
     <div className="bg-white min-h-screen">
-      <div className="max-w-[1400px] mx-auto px-8 py-8">
-        <div className="flex gap-6">
-          {/* Sidebar */}
-          <CategorySidebar activeCategory={category} />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Sidebar (desktop) */}
+          <div className="hidden md:block">
+            <CategorySidebar activeCategory={category} />
+          </div>
 
           {/* Main Content */}
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-primary-green mb-6">
-              TRÁI CÂY TƯƠI NGON
+            {/* Mobile category / filter bar */}
+            <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
+              <h1 className="text-xl font-bold text-primary-green">
+                {pageTitle}
+              </h1>
+              <button
+                type="button"
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white flex items-center gap-2"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              >
+                Bộ lọc
+              </button>
+            </div>
+
+            {/* Desktop page title */}
+            <h1 className="hidden lg:block text-3xl font-bold text-primary-green mb-6">
+              {pageTitle}
             </h1>
 
             {/* Sort Options */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-4 md:mb-6">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
                 {SORT_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -84,11 +141,11 @@ function ProductsContent() {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <input
                   type="text"
                   placeholder="Tìm kiếm..."
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
+                  className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green text-sm"
                 />
               </div>
             </div>

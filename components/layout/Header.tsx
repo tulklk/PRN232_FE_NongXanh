@@ -19,6 +19,7 @@ export default function Header() {
     const router = useRouter()
     const { user, isAuthenticated, login, logout } = useUser()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [categorySubmenuHovered, setCategorySubmenuHovered] = useState<number | null>(null)
     const [categories, setCategories] = useState<ApiCategory[]>([])
     const [isLoginOpen, setIsLoginOpen] = useState(false)
     const [isRegisterOpen, setIsRegisterOpen] = useState(false)
@@ -26,18 +27,14 @@ export default function Header() {
     const [showUserMenu, setShowUserMenu] = useState(false)
     const [showCartPopup, setShowCartPopup] = useState(false)
     const cartPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const categoryMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const userMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const handleCategoryMenuEnter = () => {
-        if (categoryMenuTimeoutRef.current) {
-            clearTimeout(categoryMenuTimeoutRef.current)
-            categoryMenuTimeoutRef.current = null
-        }
         setIsMenuOpen(true)
     }
     const handleCategoryMenuLeave = () => {
-        categoryMenuTimeoutRef.current = setTimeout(() => setIsMenuOpen(false), 150)
+        setIsMenuOpen(false)
+        setCategorySubmenuHovered(null)
     }
 
     const handleUserMenuEnter = () => {
@@ -65,7 +62,6 @@ export default function Header() {
     useEffect(() => {
         return () => {
             if (cartPopupTimeoutRef.current) clearTimeout(cartPopupTimeoutRef.current)
-            if (categoryMenuTimeoutRef.current) clearTimeout(categoryMenuTimeoutRef.current)
             if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current)
         }
     }, [])
@@ -137,24 +133,41 @@ export default function Header() {
 
     useEffect(() => {
         getCategories()
-            .then(setCategories)
-            .catch(() => setCategories([]))
+            .then((data) => {
+                console.log('[Header] getCategories success, count =', data.length)
+                setCategories(data)
+            })
+            .catch((err) => {
+                console.error('[Header] getCategories error', err)
+                setCategories([])
+            })
     }, [])
 
-    const flattenCategories = (cats: ApiCategory[]): ApiCategory[] => {
-        const result: ApiCategory[] = []
-        for (const c of cats) {
-            if (!c.isDeleted) {
-                result.push(c)
-                if (c.children?.length) {
-                    result.push(...flattenCategories(c.children))
-                }
-            }
+    // Debug trạng thái dropdown
+    useEffect(() => {
+        console.log('[Header] isMenuOpen =', isMenuOpen)
+    }, [isMenuOpen])
+
+    // Logic riêng cho header:
+    // - Xác định danh mục cha bằng parentId null/undefined
+    // - Tự build danh sách con từ mảng phẳng dựa trên parentId
+    const activeCategories = categories.filter((c) => !c.isDeleted)
+    const topLevelCategories = activeCategories.filter(
+        (c) => c.parentId === null || c.parentId === undefined || c.parentId === 0
+    )
+
+    const buildChildrenForCategory = (parent: ApiCategory) => {
+        // Ưu tiên children nếu API có sẵn
+        if (parent.children && parent.children.length > 0) {
+            return parent.children.filter((c) => !c.isDeleted)
         }
-        return result
+        // Nếu không, tự lấy theo parentId từ list phẳng (so sánh dạng string để tránh lệch kiểu)
+        const parentKey = String(parent.categoryId)
+        return activeCategories.filter((c) => {
+            if (c.parentId === null || c.parentId === undefined) return false
+            return String(c.parentId) === parentKey && !c.isDeleted
+        })
     }
-    const allCategories = flattenCategories(categories)
-    const topLevelCategories = categories.filter((c) => !c.isDeleted)
 
     return (
         <>
@@ -186,8 +199,8 @@ export default function Header() {
 
                 {/* Main header - Green */}
                 <div className="bg-[#0A923C] text-white">
-                    <div className="max-w-[1400px] mx-auto px-8 py-3">
-                        <div className="flex items-center gap-8">
+                    <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-8">
                             {/* Logo */}
                             <Link href="/" className="flex items-center flex-shrink-0">
                                 <div className="relative w-44 h-12">
@@ -203,7 +216,7 @@ export default function Header() {
                             </Link>
 
                             {/* Search bar */}
-                            <div className="flex-1 max-w-2xl">
+                            <div className="w-full md:flex-1 md:max-w-2xl">
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -217,7 +230,7 @@ export default function Header() {
                             </div>
 
                             {/* Right side actions */}
-                            <div className="flex items-center gap-6 flex-shrink-0">
+                            <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 flex-shrink-0 w-full md:w-auto">
                                 {/* Notifications */}
                                 <Link href="/notifications" className="flex items-center gap-2 hover:text-yellow-300 transition-colors">
                                     <Bell size={20} />
@@ -322,8 +335,8 @@ export default function Header() {
 
                 {/* Navigation bar - White background like Foodmap */}
                 <div className="bg-white border-b border-gray-200 shadow-sm relative">
-                    <div className="max-w-[1400px] mx-auto px-8">
-                        <nav className="flex items-center">
+                    <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
+                        <nav className="flex items-center gap-2">
                             {/* Category Dropdown - Green background, mở khi hover */}
                             <div
                                 className="relative"
@@ -333,39 +346,99 @@ export default function Header() {
                                 <button
                                     type="button"
                                     className="flex items-center gap-2 bg-[#0A923C] text-white px-4 py-2.5 hover:bg-[#087a32] transition-colors"
+                                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                                    onMouseEnter={handleCategoryMenuEnter}
                                 >
                                     <Menu size={18} />
                                     <span className="font-semibold text-xs">DANH MỤC SẢN PHẨM</span>
                                     <ChevronDown size={12} className={isMenuOpen ? 'rotate-180' : ''} />
                                 </button>
                                 {isMenuOpen && (
-                                    <div className="absolute left-0 top-full z-50 mt-0 w-64 bg-white border border-gray-200 shadow-lg py-2 max-h-[70vh] overflow-y-auto">
-                                            <Link
-                                                href="/products"
-                                                onClick={() => setIsMenuOpen(false)}
-                                                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#0A923C]"
-                                            >
-                                                Tất cả sản phẩm
-                                            </Link>
-                                            {allCategories.map((cat) => (
+                                    <div className="absolute left-0 top-full z-50 mt-0 bg-white border border-gray-200 shadow-lg max-h-[70vh]">
+                                        <div className="flex">
+                                            {/* Cột danh mục cha */}
+                                            <div className="w-64 py-2 max-h-[70vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                                                 <Link
-                                                    key={cat.categoryId}
-                                                    href={`/products?category=${cat.categoryId}`}
+                                                    href="/products"
                                                     onClick={() => setIsMenuOpen(false)}
                                                     className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#0A923C]"
                                                 >
-                                                    {cat.categoryName}
+                                                    Tất cả sản phẩm
                                                 </Link>
-                                            ))}
-                                            {allCategories.length === 0 && (
-                                                <div className="px-4 py-3 text-sm text-gray-500">Đang tải...</div>
+                                                {topLevelCategories.map((cat) => {
+                                                    const children = buildChildrenForCategory(cat)
+                                                    const hasChildren = children.length > 0
+                                                    const isActiveParent = categorySubmenuHovered === cat.categoryId
+
+                                                    return (
+                                                        <button
+                                                            key={cat.categoryId}
+                                                            type="button"
+                                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 ${
+                                                                isActiveParent ? 'bg-gray-100 text-[#0A923C]' : 'text-gray-700'
+                                                            }`}
+                                                            onMouseEnter={() => {
+                                                                console.log('[Header] hover parent category', {
+                                                                    categoryId: cat.categoryId,
+                                                                    name: cat.categoryName,
+                                                                    hasChildren,
+                                                                    childCount: children.length,
+                                                                })
+                                                                setCategorySubmenuHovered(cat.categoryId)
+                                                            }}
+                                                            onClick={() => {
+                                                                // Nếu không có con thì đi thẳng tới trang category
+                                                                if (!hasChildren) {
+                                                                    setIsMenuOpen(false)
+                                                                    router.push(`/products?category=${cat.categoryId}`)
+                                                                }
+                                                            }}
+                                                        >
+                                                            {cat.categoryName}
+                                                        </button>
+                                                    )
+                                                })}
+                                                {topLevelCategories.length === 0 && (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">Đang tải...</div>
+                                                )}
+                                            </div>
+
+                                            {/* Cột danh mục con */}
+                                            {categorySubmenuHovered !== null && (
+                                                <div className="min-w-[220px] border-l border-gray-200 py-2 px-2 bg-white">
+                                                    {(() => {
+                                                        const parent = topLevelCategories.find(
+                                                            (c) => c.categoryId === categorySubmenuHovered
+                                                        )
+                                                        if (!parent) return null
+                                                        const children = buildChildrenForCategory(parent)
+                                                        if (!children.length) {
+                                                            return (
+                                                                <div className="px-2 py-1 text-xs text-gray-400">
+                                                                    Không có danh mục con
+                                                                </div>
+                                                            )
+                                                        }
+                                                        return children.map((child) => (
+                                                            <Link
+                                                                key={child.categoryId}
+                                                                href={`/products?category=${child.categoryId}`}
+                                                                onClick={() => setIsMenuOpen(false)}
+                                                                className="block px-3 py-1.5 text-sm text-gray-700 rounded hover:bg-gray-100 hover:text-[#0A923C]"
+                                                            >
+                                                                {child.categoryName}
+                                                            </Link>
+                                                        ))
+                                                    })()}
+                                                </div>
                                             )}
                                         </div>
+                                    </div>
                                 )}
                             </div>
 
                             {/* Navigation Links - from API categories */}
-                            <div className="flex items-center flex-1 justify-center">
+                            <div className="flex items-center flex-1 justify-center overflow-x-auto">
                                 <Link
                                     href="/products"
                                     className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"

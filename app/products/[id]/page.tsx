@@ -47,7 +47,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   return (
     <div className="bg-white min-h-screen">
-      <div className="max-w-[1400px] mx-auto px-8 py-5">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-4 sm:py-5">
         {/* Breadcrumbs */}
         <nav className="text-xs text-gray-600 mb-4">
           <Link href="/" className="hover:text-primary-green">
@@ -104,8 +104,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
           {/* Product Info */}
           <div className="lg:col-span-5">
-            <h1 className="text-lg font-bold text-gray-900 mb-2">{product.name}</h1>
-            <div className="flex items-center gap-3 mb-3 text-xs">
+            <h1 className="text-base sm:text-lg font-bold text-gray-900 mb-2">{product.name}</h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 text-xs">
               <RatingStars rating={averageRating} size={14} showNumber />
               <span className="text-gray-400">|</span>
               <Link href="#reviews" className="text-primary-green hover:underline">
@@ -138,12 +138,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             </div>
 
             <div className="space-y-2.5 text-xs mb-4">
-              <div className="flex">
-                <span className="text-gray-500 w-28">Vận chuyển đến:</span>
+              <div className="flex flex-wrap gap-1">
+                <span className="text-gray-500 w-28 shrink-0">Vận chuyển đến:</span>
                 <Link href="#" className="text-primary-green hover:underline">Quận 1 - Tp. HCM &gt;</Link>
               </div>
-              <div className="flex">
-                <span className="text-gray-500 w-28">Phí vận chuyển:</span>
+              <div className="flex flex-wrap gap-1">
+                <span className="text-gray-500 w-28 shrink-0">Phí vận chuyển:</span>
                 <span className="text-primary-green font-medium">35.000 ₫</span>
               </div>
             </div>

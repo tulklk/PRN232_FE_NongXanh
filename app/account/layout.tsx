@@ -6,8 +6,8 @@ export default function AccountLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-gray-100 min-h-screen py-6">
-      <div className="max-w-[1400px] mx-auto px-8">
+    <div className="bg-gray-100 min-h-screen py-4 sm:py-6">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-6">
           <span className="hover:text-[#0A923C] cursor-pointer">Trang chủ</span>
@@ -15,7 +15,7 @@ export default function AccountLayout({
           <span className="hover:text-[#0A923C] cursor-pointer">Tài khoản của tôi</span>
         </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <AccountSidebar />

@@ -17,7 +17,7 @@ const addresses = [
 
 export default function AddressesPage() {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-5">
+    <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5">
       <h2 className="text-base font-bold text-gray-900 mb-5">Sổ địa chỉ</h2>
 
       {/* Add New Button */}

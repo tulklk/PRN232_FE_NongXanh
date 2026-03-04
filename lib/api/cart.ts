@@ -86,10 +86,7 @@ async function fetchProductsMap(): Promise<Map<string, ApiProduct>> {
 }
 
 async function enrichCartItems(cart: ApiCart): Promise<ApiCart> {
-  const needsEnrichment = cart.cartItems!.some(
-    (i) => i.variantId && (!i.variantName || !i.productName || !i.imageUrl)
-  )
-  if (!needsEnrichment) return cart
+  if (!cart.cartItems?.length) return cart
 
   try {
     const [variants, productsMap] = await Promise.all([

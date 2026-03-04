@@ -12,6 +12,7 @@ import {
   Ticket,
   BarChart3,
   Users,
+  Truck,
   Home,
   LogOut,
 } from 'lucide-react'
@@ -33,6 +34,7 @@ const menuItems: MenuItem[] = [
   { label: 'News', href: '/admin/news', icon: Newspaper },
   { label: 'Vouchers', href: '/admin/vouchers', icon: Ticket },
   { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
+  { label: 'Providers', href: '/admin/providers', icon: Truck },
   { label: 'Users', href: '/admin/users', icon: Users },
 ]
 
