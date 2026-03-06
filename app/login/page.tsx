@@ -42,23 +42,26 @@ export default function LoginPage() {
                 throw new Error(data.error || 'Đăng nhập thất bại')
             }
 
-            // Extract user data and tokens
             const { tokens, ...userData } = data
-            
+
             if (!tokens || !tokens.idToken) {
                 throw new Error('Không nhận được tokens từ server')
             }
 
-            // Use UserContext to store user data and tokens
             login(userData as User, tokens as AuthTokens)
 
-            // Redirect: Admin -> /admin, User with returnUrl -> returnUrl, else -> /account/profile
+            // 🔹 Chỉ thêm Staff, giữ nguyên logic cũ
+            const role = (userData as User).role
+
             const redirectPath =
-                (userData as User).role === 'Admin'
+                role === 'Admin'
                     ? '/admin'
-                    : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
-                      ? returnUrl
-                      : '/account/profile'
+                    : role === 'Staff'
+                        ? '/staff'
+                        : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
+                            ? returnUrl
+                            : '/account/profile'
+
             router.push(redirectPath)
 
         } catch (err: any) {
@@ -71,12 +74,16 @@ export default function LoginPage() {
 
     const handleGoogleSuccess = (userData: User, tokens: AuthTokens) => {
         login(userData, tokens)
+
         const redirectPath =
             userData.role === 'Admin'
                 ? '/admin'
-                : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
-                  ? returnUrl
-                  : '/account/profile'
+                : userData.role === 'Staff'
+                    ? '/staff'
+                    : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
+                        ? returnUrl
+                        : '/account/profile'
+
         router.push(redirectPath)
     }
 
@@ -95,4 +102,4 @@ export default function LoginPage() {
             </div>
         </div>
     )
-} 
+}
