@@ -56,7 +56,7 @@ export default function LoginPage() {
             const redirectPath =
                 role === 'Admin'
                     ? '/admin'
-                    : role === 'Staff'
+                    : (role?.toLowerCase() === 'staff')
                         ? '/staff'
                         : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
                             ? returnUrl
@@ -78,7 +78,7 @@ export default function LoginPage() {
         const redirectPath =
             userData.role === 'Admin'
                 ? '/admin'
-                : userData.role === 'Staff'
+                : (userData.role?.toLowerCase() === 'staff')
                     ? '/staff'
                     : returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')
                         ? returnUrl

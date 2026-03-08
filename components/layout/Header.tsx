@@ -113,8 +113,10 @@ export default function Header() {
             setSuccessMessage(`Đăng nhập thành công!\nChào mừng ${userName}`)
             setShowSuccessPopup(true)
 
-            // Redirect: Admin -> /admin, User -> /account/profile
-            const redirectPath = (userData as UserType).role === 'Admin' ? '/admin' : '/account/profile'
+            // Redirect: Admin -> /admin, Staff -> /staff, User -> /account/profile
+            const role = (userData as UserType).role
+            const redirectPath =
+                role === 'Admin' ? '/admin' : (role?.toLowerCase() === 'staff') ? '/staff' : '/account/profile'
             setTimeout(() => {
                 router.push(redirectPath)
             }, 500)
@@ -133,20 +135,9 @@ export default function Header() {
 
     useEffect(() => {
         getCategories()
-            .then((data) => {
-                console.log('[Header] getCategories success, count =', data.length)
-                setCategories(data)
-            })
-            .catch((err) => {
-                console.error('[Header] getCategories error', err)
-                setCategories([])
-            })
+            .then(setCategories)
+            .catch(() => setCategories([]))
     }, [])
-
-    // Debug trạng thái dropdown
-    useEffect(() => {
-        console.log('[Header] isMenuOpen =', isMenuOpen)
-    }, [isMenuOpen])
 
     // Logic riêng cho header:
     // - Xác định danh mục cha bằng parentId null/undefined
@@ -378,12 +369,6 @@ export default function Header() {
                                                                 isActiveParent ? 'bg-gray-100 text-[#0A923C]' : 'text-gray-700'
                                                             }`}
                                                             onMouseEnter={() => {
-                                                                console.log('[Header] hover parent category', {
-                                                                    categoryId: cat.categoryId,
-                                                                    name: cat.categoryName,
-                                                                    hasChildren,
-                                                                    childCount: children.length,
-                                                                })
                                                                 setCategorySubmenuHovered(cat.categoryId)
                                                             }}
                                                             onClick={() => {
@@ -498,7 +483,8 @@ export default function Header() {
                     const userName = userData.displayName || 'bạn'
                     setSuccessMessage(`Đăng nhập thành công!\nChào mừng ${userName}`)
                     setShowSuccessPopup(true)
-                    const redirectPath = userData.role === 'Admin' ? '/admin' : '/account/profile'
+                    const redirectPath =
+                        userData.role === 'Admin' ? '/admin' : (userData.role?.toLowerCase() === 'staff') ? '/staff' : '/account/profile'
                     setTimeout(() => router.push(redirectPath), 500)
                 }}
                 onGoogleError={setLoginError}

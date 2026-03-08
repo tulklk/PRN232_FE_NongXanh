@@ -10,7 +10,7 @@ import { FIXED_SHIPPING_FEE, PAYMENT_METHODS } from '@/lib/constants'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
 import { createOrder } from '@/lib/api/orders'
-import { createPayment } from '@/lib/api/payments'
+import { createPayment, createVNPayPaymentUrl } from '@/lib/api/payments'
 import { getProvinces, getWardsByProvince, type Province, type Ward } from '@/lib/api/provinces'
 
 export default function CheckoutPage() {
@@ -159,8 +159,20 @@ export default function CheckoutPage() {
         tokens.idToken
       )
 
-      const isOnlinePayment =
-        paymentMethod !== 'cod' && paymentMethod !== 'bank'
+      if (paymentMethod === 'bank') {
+        const { paymentUrl } = await createVNPayPaymentUrl(
+          {
+            orderId: String(order.orderId),
+            clientIp: '',
+          },
+          tokens.idToken
+        )
+        await clearCart()
+        window.location.href = paymentUrl
+        return
+      }
+
+      const isOnlinePayment = paymentMethod !== 'cod'
       if (isOnlinePayment) {
         await createPayment(
           {

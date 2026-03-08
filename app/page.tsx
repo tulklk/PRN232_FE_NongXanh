@@ -6,7 +6,7 @@ export const revalidate = 60
 export default async function HomePage() {
   let products: Awaited<ReturnType<typeof getProducts>>['items'] = []
   try {
-    const res = await getProducts({ pageNumber: 1, pageSize: 20 })
+    const res = await getProducts({ pageNumber: 1, pageSize: 24 })
     products = res.items
   } catch {
     products = []

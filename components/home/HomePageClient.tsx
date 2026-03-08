@@ -15,7 +15,13 @@ interface HomePageClientProps {
 }
 
 export default function HomePageClient({ products }: HomePageClientProps) {
-  const hotDeals = products.slice(0, 4)
+  const [activeTab, setActiveTab] = useState<'new' | 'bestseller'>('new')
+  const newProducts = products.slice(0, 8)
+  const bestsellerProducts = [...products]
+    .sort((a, b) => (b.salesCount ?? 0) - (a.salesCount ?? 0))
+    .slice(0, 8)
+  const tabProducts = activeTab === 'new' ? newProducts : bestsellerProducts
+
   const tetProducts = products.slice(0, 10)
   const fruitProducts = products.slice(0, 7)
 
@@ -26,32 +32,6 @@ export default function HomePageClient({ products }: HomePageClientProps) {
   ]
 
   const [currentIndex, setCurrentIndex] = useState(0)
-
-  const [countdown, setCountdown] = useState({ hours: 1, minutes: 19, seconds: 33 })
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        let { hours, minutes, seconds } = prev
-        seconds--
-        if (seconds < 0) {
-          seconds = 59
-          minutes--
-        }
-        if (minutes < 0) {
-          minutes = 59
-          hours--
-        }
-        if (hours < 0) {
-          hours = 23
-        }
-        return { hours, minutes, seconds }
-      })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formatTime = (n: number) => n.toString().padStart(2, '0')
 
   const hotDealsInView = useInView({ threshold: 0.1 })
   const tetSectionInView = useInView({ threshold: 0.1 })
@@ -123,44 +103,57 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                 <p className="text-sm text-gray-800 line-clamp-2">Tuyển sỉ quà Tết 2026 cùng Foodmap - Đồng...</p>
               </div>
             </div>
-            <div className="bg-white rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 flex-1 flex" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
-              <div className="relative bg-red-600 text-white p-4 w-full h-full flex flex-col justify-center">
-                <p className="text-base font-bold">HỒNG TREO GIÓ 500G</p>
-                <p className="text-sm mt-1">TẶNG HỘP 150G</p>
-                <p className="text-3xl font-bold mt-3 text-center">giá 269K</p>
-              </div>
+            <div className="relative rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 flex-1 min-h-[140px]" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
+              <Image
+                src="/images/homepage/homeimg1.jpg"
+                alt="Hồng treo gió 500G - Tặng hộp 150G - giá 269K"
+                fill
+                className="object-contain"
+                sizes="(max-width: 1024px) 100vw, 400px"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Hot Deals Section */}
+      {/* New & Bestseller Tabs Section */}
       <section ref={hotDealsInView.ref} className="bg-white py-4 sm:py-6">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
           <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 transition-all duration-700 ${hotDealsInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
             <div className="flex items-center gap-2">
-              <div className="bg-[#0A923C] text-white px-6 py-3 rounded-full flex items-center gap-2 animate-gentlePulse">
-                <span className="text-xl">⚡</span>
-                <span className="font-bold text-lg">GIÁ SỐC HÔM NAY</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('new')}
+                className={`px-6 py-3 rounded-lg font-bold text-lg transition-colors ${
+                  activeTab === 'new'
+                    ? 'bg-[#0A923C] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                SẢN PHẨM MỚI
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('bestseller')}
+                className={`px-6 py-3 rounded-lg font-bold text-lg transition-colors ${
+                  activeTab === 'bestseller'
+                    ? 'bg-[#0A923C] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                BÁN CHẠY NHẤT
+              </button>
             </div>
-            <div className="flex items-center gap-3 sm:gap-4 text-sm sm:text-base">
-              <span className="text-gray-600">Bắt đầu sau</span>
-              <div className="flex items-center gap-1">
-                <span className="bg-[#0A923C] text-white px-3 py-2 rounded font-mono font-bold text-lg transition-transform duration-200 hover:scale-110">{formatTime(countdown.hours)}</span>
-                <span className="text-[#0A923C] font-bold text-xl animate-pulse">:</span>
-                <span className="bg-[#0A923C] text-white px-3 py-2 rounded font-mono font-bold text-lg transition-transform duration-200 hover:scale-110">{formatTime(countdown.minutes)}</span>
-                <span className="text-[#0A923C] font-bold text-xl animate-pulse">:</span>
-                <span className="bg-[#0A923C] text-white px-3 py-2 rounded font-mono font-bold text-lg transition-transform duration-200 hover:scale-110">{formatTime(countdown.seconds)}</span>
-              </div>
-              <Link href="/products?sort=hot-deals" className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1">
-                Xem tất cả <ChevronRight size={16} />
-              </Link>
-            </div>
+            <Link
+              href={activeTab === 'new' ? '/products?sort=newest' : '/products?sort=bestseller'}
+              className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm sm:text-base"
+            >
+              Xem tất cả <ChevronRight size={16} />
+            </Link>
           </div>
           <div className="relative">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {hotDeals.map((product, i) => (
+              {tabProducts.map((product, i) => (
                 <div
                   key={product.id}
                   className={`transition-all duration-500 ${hotDealsInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
@@ -195,13 +188,14 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className={`relative rounded-2xl overflow-hidden bg-gradient-to-r from-amber-100 via-orange-50 to-amber-100 h-[150px] mb-6 transition-all duration-600 delay-150 ${tetSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-4xl font-bold text-amber-700">TUYỂN CHỌN</h3>
-                <p className="text-3xl font-bold text-amber-600">HƯƠNG VỊ NGÀY TẾT</p>
-              </div>
-            </div>
+          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-6 transition-all duration-600 delay-150 ${tetSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+            <Image
+              src="/images/homepage/homeimg3.jpg"
+              alt="Tuyển chọn hương vị ngày Tết"
+              fill
+              className="object-contain"
+              sizes="(max-width: 1400px) 100vw, 1400px"
+            />
           </div>
           <div className="relative">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -239,12 +233,14 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className={`relative rounded-[40px] overflow-hidden bg-[#0A923C] h-[120px] mb-6 transition-all duration-600 delay-150 ${fruitsSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <h3 className="text-4xl font-bold text-white tracking-wider">TRÁI CÂY TƯƠI NGON</h3>
-            </div>
-            <div className="absolute left-10 top-1/2 -translate-y-1/2 text-6xl opacity-20 animate-float">🍃</div>
-            <div className="absolute right-10 top-1/2 -translate-y-1/2 text-6xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🍃</div>
+          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-6 transition-all duration-600 delay-150 ${fruitsSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+            <Image
+              src="/images/homepage/homeimg4.png"
+              alt="Trái cây tươi ngon"
+              fill
+              className="object-contain"
+              sizes="(max-width: 1400px) 100vw, 1400px"
+            />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {fruitProducts.map((product, i) => (

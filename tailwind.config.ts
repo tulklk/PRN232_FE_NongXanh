@@ -20,7 +20,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Be Vietnam Pro', 'sans-serif'],
+        sans: ['var(--font-be-vietnam-pro)', 'Be Vietnam Pro', 'sans-serif'],
       },
       fontSize: {
         body: '11px',

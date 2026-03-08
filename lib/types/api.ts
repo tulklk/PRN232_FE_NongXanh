@@ -180,6 +180,7 @@ export interface ApiOrder {
   status?: string | null
   vnPayStatus?: string | null
   userId: string
+  displayName?: string | null
   orderDetails?: ApiOrderDetail[] | null
 }
 

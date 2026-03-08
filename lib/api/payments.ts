@@ -78,3 +78,42 @@ export async function updatePaymentStatus(
     )
   }
 }
+
+/** Request body theo BE: POST /api/Payments/vnpay/create-url (orderId, clientIp) */
+export interface CreateVNPayUrlRequest {
+  orderId: string
+  clientIp?: string
+}
+
+/** Response BE có thể wrap trong data: { orderId?, paymentId?, paymentUrl? } */
+interface CreateVNPayUrlResponse {
+  success?: boolean
+  message?: string
+  data?: { orderId?: string; paymentId?: string; paymentUrl?: string }
+  paymentUrl?: string
+  url?: string
+}
+
+export async function createVNPayPaymentUrl(
+  data: CreateVNPayUrlRequest,
+  token: string
+): Promise<{ paymentUrl: string }> {
+  const res = await fetch(`${getBase()}/api/payments/vnpay/create-url`, {
+    method: 'POST',
+    headers: getJsonHeaders(token),
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(
+      (err as { error?: string }).error || 'Không thể tạo URL thanh toán VNPay'
+    )
+  }
+  const json = (await res.json()) as CreateVNPayUrlResponse
+  const paymentUrl =
+    json.data?.paymentUrl ?? json.paymentUrl ?? json.url
+  if (!paymentUrl || typeof paymentUrl !== 'string') {
+    throw new Error('Backend không trả về URL thanh toán VNPay')
+  }
+  return { paymentUrl }
+}

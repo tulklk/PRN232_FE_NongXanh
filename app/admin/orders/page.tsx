@@ -28,7 +28,9 @@ export default function OrdersPage() {
   const filteredOrders = orders.filter(
     (order) =>
       String(order.orderId).includes(searchQuery) ||
+      String(order.orderNumber ?? '').includes(searchQuery) ||
       order.userId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(order.finalAmount).includes(searchQuery) ||
       (order.shippingAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
   )
@@ -92,7 +94,7 @@ export default function OrdersPage() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 font-semibold text-gray-900">Mã đơn hàng</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">Khách hàng (userId)</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-900">Khách hàng</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-900">Tổng tiền</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-900">Trạng thái</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-900">Thanh toán</th>
@@ -104,17 +106,12 @@ export default function OrdersPage() {
                 {filteredOrders.map((order) => (
                   <tr key={order.orderId} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">
-                      <span className="font-medium text-gray-900">#{order.orderId}</span>
+                      <span className="font-medium text-gray-900">#{order.orderNumber ?? order.orderId}</span>
                     </td>
                     <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{order.userId}</div>
-                        {order.shippingAddress && (
-                          <div className="text-sm text-gray-500 truncate max-w-[200px]">
-                            {order.shippingAddress}
-                          </div>
-                        )}
-                      </div>
+                      <span className="font-medium text-gray-900">
+                        {order.displayName ?? order.userId}
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className="font-semibold text-gray-900">
@@ -134,11 +131,7 @@ export default function OrdersPage() {
                       </StatusBadge>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-gray-600">
-                        {formatDate(order.orderDate)
-                          .replace(/\//g, ' tháng ')
-                          .replace(/(\d{2})\/(\d{4})/, '$1, $2')}
-                      </span>
+                      <span className="text-gray-600">{formatDate(order.orderDate)}</span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end">

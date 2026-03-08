@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { MapPin, Phone, Mail, FileText, Building2, Warehouse, QrCode } from 'lucide-react'
+import { MapPin, Phone, Mail, FileText, Building2, Warehouse } from 'lucide-react'
 import { ACCOUNT_LINKS, INFO_LINKS, SUPPORT_LINKS, COMPANY_INFO } from '@/lib/constants'
 
 export default function Footer() {
@@ -11,7 +11,7 @@ export default function Footer() {
       
       <div className="bg-gray-100 py-8">
         <div className="max-w-[1400px] mx-auto px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Company Info */}
             <div className="lg:col-span-2">
               <div className="mb-4">
@@ -102,74 +102,6 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Connect & App Downloads */}
-            <div>
-              <h3 className="font-bold text-gray-900 mb-4 text-sm">KẾT NỐI VỚI NÔNG XANH</h3>
-              
-              {/* Connection Card */}
-              <div className="bg-white rounded-md p-3 mb-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="relative w-11 h-11">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Nông Xanh"
-                      fill
-                      className="object-contain"
-                      sizes="44px"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-base font-bold text-[#0A923C]">NongXanh</p>
-                    <p className="text-[10px] text-gray-500">15.310 người theo dõi</p>
-                  </div>
-                </div>
-                <p className="text-[10px] text-gray-600 mb-2">
-                  Hãy là người đầu tiên trong số bạn bè của bạn thích nội dung này nay
-                </p>
-              </div>
-
-              {/* Certifications */}
-              <div className="flex gap-2 mb-4">
-                <div className="bg-white rounded-md p-2 flex items-center gap-2 shadow-sm">
-                  <div className="w-6 h-6 bg-[#0A923C] rounded flex items-center justify-center">
-                    <span className="text-white text-[10px]">✓</span>
-                  </div>
-                  <span className="text-[10px] text-gray-600">ĐÃ THÔNG BÁO<br/>BỘ CÔNG THƯƠNG</span>
-                </div>
-                <div className="bg-white rounded-md p-2 flex items-center gap-2 shadow-sm">
-                  <div className="w-6 h-6 bg-red-500 rounded flex items-center justify-center">
-                    <span className="text-white text-[10px]">▶</span>
-                  </div>
-                  <span className="text-[10px] text-gray-600">Food Channel<br/>YouTube</span>
-                </div>
-              </div>
-
-              <h3 className="font-bold text-gray-900 mb-4 text-sm">TẢI ỨNG DỤNG TRÊN ĐIỆN THOẠI</h3>
-              <div className="flex gap-3">
-                {/* QR Code */}
-                <div className="w-16 h-16 bg-white rounded-md shadow-sm flex items-center justify-center">
-                  <QrCode size={40} className="text-gray-400" />
-                </div>
-                
-                {/* App Store Buttons */}
-                <div className="flex flex-col gap-2">
-                  <button className="bg-black text-white py-1.5 px-3 rounded-md text-[10px] hover:bg-gray-800 flex items-center gap-2">
-                    <span className="text-sm">🍎</span>
-                    <div className="text-left">
-                      <div className="text-[8px] opacity-80">Tải về trên</div>
-                      <div className="font-semibold text-[10px]">App Store</div>
-                    </div>
-                  </button>
-                  <button className="bg-black text-white py-1.5 px-3 rounded-md text-[10px] hover:bg-gray-800 flex items-center gap-2">
-                    <span className="text-sm">▶️</span>
-                    <div className="text-left">
-                      <div className="text-[8px] opacity-80">TẢI VỀ TRÊN</div>
-                      <div className="font-semibold text-[10px]">Google Play</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

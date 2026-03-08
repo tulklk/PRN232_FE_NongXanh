@@ -28,6 +28,7 @@ function flattenCategories(cats: ApiCategory[]): ApiCategory[] {
 function ProductsContent() {
   const searchParams = useSearchParams()
   const category = searchParams.get('category') || 'all'
+  const sortParam = searchParams.get('sort')
   const [sortBy, setSortBy] = useState('newest')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +36,12 @@ function ProductsContent() {
   const [totalPages, setTotalPages] = useState(1)
   const [categories, setCategories] = useState<ApiCategory[]>([])
   const pageSize = 12
+
+  useEffect(() => {
+    if (sortParam === 'bestseller' || sortParam === 'price-low' || sortParam === 'price-high' || sortParam === 'newest') {
+      setSortBy(sortParam)
+    }
+  }, [sortParam])
 
   useEffect(() => {
     getCategories()
