@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { getOrderById } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
-export default function OrderDetailPage() {
+export default function AdminOrderDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
@@ -26,7 +25,11 @@ export default function OrderDetailPage() {
     }
     getOrderById(id, tokens.idToken)
       .then(setOrder)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Không thể tải đơn hàng'))
+      .catch((err) =>
+        setError(
+          err instanceof Error ? err.message : 'Không thể tải đơn hàng'
+        )
+      )
       .finally(() => setLoading(false))
   }, [isAuthenticated, tokens?.idToken, id])
 
@@ -46,9 +49,11 @@ export default function OrderDetailPage() {
   if (error || !order) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-5">
-        <p className="text-center py-14 text-red-600">{error ?? 'Không tìm thấy đơn hàng'}</p>
+        <p className="text-center py-14 text-red-600">
+          {error ?? 'Không tìm thấy đơn hàng'}
+        </p>
         <Link
-          href="/account/orders"
+          href="/admin/orders"
           className="inline-flex items-center gap-2 text-primary-green hover:underline"
         >
           <ArrowLeft size={16} />
@@ -61,11 +66,11 @@ export default function OrderDetailPage() {
   return (
     <div className="bg-white rounded-lg shadow-sm p-5">
       <Link
-        href="/account/orders"
+        href="/admin/orders"
         className="inline-flex items-center gap-2 text-primary-green hover:underline mb-6"
       >
         <ArrowLeft size={20} />
-        Quay lại đơn hàng
+        Quay lại danh sách đơn hàng
       </Link>
 
       <h2 className="text-lg font-bold text-gray-900 mb-4">
@@ -81,9 +86,14 @@ export default function OrderDetailPage() {
           <span className="text-gray-500">Trạng thái:</span>
           <span className="font-medium">{order.status ?? '—'}</span>
         </div>
-        {(order.customerDisplayName || order.displayName || order.customerEmail || order.customerPhoneNumber) && (
+        {(order.customerDisplayName ||
+          order.displayName ||
+          order.customerEmail ||
+          order.customerPhoneNumber) && (
           <div className="text-sm">
-            <h3 className="font-semibold text-gray-900 mb-1">Thông tin khách hàng</h3>
+            <h3 className="font-semibold text-gray-900 mb-1">
+              Thông tin khách hàng
+            </h3>
             {(order.customerDisplayName || order.displayName) && (
               <div className="flex justify-between">
                 <span className="text-gray-500 mr-2">Họ tên:</span>
@@ -95,13 +105,17 @@ export default function OrderDetailPage() {
             {order.customerEmail && (
               <div className="flex justify-between">
                 <span className="text-gray-500 mr-2">Email:</span>
-                <span className="font-medium break-all">{order.customerEmail}</span>
+                <span className="font-medium break-all">
+                  {order.customerEmail}
+                </span>
               </div>
             )}
             {order.customerPhoneNumber && (
               <div className="flex justify-between">
                 <span className="text-gray-500 mr-2">Số điện thoại:</span>
-                <span className="font-medium">{order.customerPhoneNumber}</span>
+                <span className="font-medium">
+                  {order.customerPhoneNumber}
+                </span>
               </div>
             )}
           </div>
@@ -120,31 +134,36 @@ export default function OrderDetailPage() {
           {order.orderDetails?.map((detail) => {
             const raw = detail as unknown as Record<string, unknown>
             const imageUrl =
-              (raw.productImageUrl ?? raw.ProductImageUrl ?? raw.imageUrl ?? raw.ImageUrl) as
-              | string
-              | undefined
-            const productName =
-              (raw.productName ?? raw.ProductName ?? detail.variantName ?? 'Sản phẩm') as string
-            const imageSrc = imageUrl?.startsWith('http') ? imageUrl : '/images/logo.png'
+              (raw.productImageUrl ??
+                raw.ProductImageUrl ??
+                raw.imageUrl ??
+                raw.ImageUrl) as string | undefined
+            const productName = (raw.productName ??
+              raw.ProductName ??
+              detail.variantName ??
+              'Sản phẩm') as string
+            const imageSrc =
+              imageUrl && imageUrl.startsWith('http')
+                ? imageUrl
+                : '/images/logo.png'
+
             return (
               <div
                 key={detail.orderDetailId}
                 className="flex gap-3 items-center py-3 border-b border-gray-100"
               >
                 <div className="relative w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
-                  <Image
+                  <img
                     src={imageSrc}
                     alt={productName}
-                    fill
-                    className="object-cover rounded-lg"
-                    sizes="56px"
-                    unoptimized={imageSrc.startsWith('http')}
+                    className="w-full h-full object-cover rounded-lg"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{productName}</p>
                   <p className="text-sm text-gray-500">
-                    {detail.variantName && `${detail.variantName} • `}x{detail.quantity}
+                    {detail.variantName && `${detail.variantName} • `}x
+                    {detail.quantity}
                   </p>
                 </div>
                 <span className="font-semibold text-primary-green flex-shrink-0">
@@ -167,7 +186,9 @@ export default function OrderDetailPage() {
           {order.discountAmount > 0 && (
             <div className="flex justify-between">
               <span className="text-gray-500">Giảm giá:</span>
-              <span className="text-red-500">-{formatCurrency(order.discountAmount)}</span>
+              <span className="text-red-500">
+                -{formatCurrency(order.discountAmount)}
+              </span>
             </div>
           )}
           <div className="flex justify-between font-bold text-base pt-2">
@@ -181,3 +202,4 @@ export default function OrderDetailPage() {
     </div>
   )
 }
+

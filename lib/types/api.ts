@@ -181,6 +181,9 @@ export interface ApiOrder {
   vnPayStatus?: string | null
   userId: string
   displayName?: string | null
+  customerDisplayName?: string | null
+  customerEmail?: string | null
+  customerPhoneNumber?: string | null
   orderDetails?: ApiOrderDetail[] | null
 }
 
@@ -199,6 +202,30 @@ export interface CreateOrderRequest {
 
 export interface ApiOrdersPagedResponse {
   items: ApiOrder[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages?: number
+}
+
+// API Blog structure
+export interface ApiBlog {
+  blogId: string
+  title: string
+  content?: string | null
+  description?: string | null
+  thumbnailUrl?: string | null
+  url?: string | null
+  source?: string | null
+  status?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  authorId?: string | null
+  authorName?: string | null
+}
+
+export interface ApiBlogsPagedResponse {
+  items: ApiBlog[]
   totalCount: number
   pageNumber: number
   pageSize: number

@@ -29,6 +29,7 @@ function ProductsContent() {
   const searchParams = useSearchParams()
   const category = searchParams.get('category') || 'all'
   const sortParam = searchParams.get('sort')
+  const keyword = searchParams.get('q')?.trim() ?? ''
   const [sortBy, setSortBy] = useState('newest')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,6 +85,18 @@ function ProductsContent() {
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products]
+
+    if (keyword) {
+      const lower = keyword.toLowerCase()
+      filtered = filtered.filter((p) => {
+        const nameMatch = p.name.toLowerCase().includes(lower)
+        const descMatch = p.description
+          ? p.description.toLowerCase().includes(lower)
+          : false
+        return nameMatch || descMatch
+      })
+    }
+
     switch (sortBy) {
       case 'bestseller':
         filtered.sort((a, b) => b.salesCount - a.salesCount)
@@ -99,7 +112,7 @@ function ProductsContent() {
         break
     }
     return filtered
-  }, [products, sortBy])
+  }, [products, sortBy, keyword])
 
   return (
     <div className="bg-white min-h-screen">
@@ -127,9 +140,15 @@ function ProductsContent() {
             </div>
 
             {/* Desktop page title */}
-            <h1 className="hidden lg:block text-3xl font-bold text-primary-green mb-6">
+            <h1 className="hidden lg:block text-3xl font-bold text-primary-green mb-2">
               {pageTitle}
             </h1>
+            {keyword && (
+              <p className="mb-4 text-sm text-gray-600">
+                Kết quả tìm kiếm cho "<span className="font-medium">{keyword}</span>" ({filteredAndSortedProducts.length}{' '}
+                sản phẩm)
+              </p>
+            )}
 
             {/* Sort Options */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-4 md:mb-6">

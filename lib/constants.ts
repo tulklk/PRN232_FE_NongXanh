@@ -4,8 +4,8 @@ export const NAVIGATION_LINKS = [
   { label: 'TRÁI CÂY', href: '/products?category=fruits' },
   { label: 'TRÀ - CÀ PHÊ', href: '/products?category=tea-coffee' },
   { label: 'ĐẶC SẢN', href: '/products?category=specialties' },
-  { label: 'AGRISHOW', href: '/agrishow' },
-  { label: 'MY FARM', href: '/my-farm' },
+  { label: 'Tin tức', href: '/news' },
+  { label: 'Liên hệ', href: '/contact' },
 ]
 
 export const ACCOUNT_LINKS = [
@@ -22,7 +22,7 @@ export const INFO_LINKS = [
   { label: 'Tuyển dụng', href: '/careers' },
   { label: 'Dự án Nông sản Việt', href: '/projects' },
   { label: 'Nông Xanh CSR', href: '/csr' },
-  { label: 'My Farm', href: '/my-farm' },
+  { label: 'Liên hệ', href: '/contact' },
 ]
 
 export const SUPPORT_LINKS = [

@@ -25,15 +25,20 @@ export default function OrdersPage() {
       .finally(() => setLoading(false))
   }, [isAuthenticated, tokens?.idToken])
 
-  const filteredOrders = orders.filter(
-    (order) =>
-      String(order.orderId).includes(searchQuery) ||
-      String(order.orderNumber ?? '').includes(searchQuery) ||
-      order.userId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(order.finalAmount).includes(searchQuery) ||
-      (order.shippingAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-  )
+  const filteredOrders = orders.filter((order) => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+
+    return (
+      String(order.orderId).includes(q) ||
+      String(order.orderNumber ?? '').toLowerCase().includes(q) ||
+      order.userId?.toLowerCase().includes(q) ||
+      order.displayName?.toLowerCase().includes(q) ||
+      order.customerDisplayName?.toLowerCase().includes(q) ||
+      String(order.finalAmount).includes(q) ||
+      (order.shippingAddress?.toLowerCase().includes(q) ?? false)
+    )
+  })
 
   const getStatusLabel = (status?: string | null) => {
     const labels: Record<string, string> = {
@@ -110,7 +115,9 @@ export default function OrdersPage() {
                     </td>
                     <td className="py-3 px-4">
                       <span className="font-medium text-gray-900">
-                        {order.displayName ?? order.userId}
+                        {order.customerDisplayName ??
+                          order.displayName ??
+                          order.userId}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -136,7 +143,7 @@ export default function OrdersPage() {
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end">
                         <a
-                          href={`/account/orders/${order.orderId}`}
+                          href={`/admin/orders/${order.orderId}`}
                           className="px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-colors text-sm font-semibold"
                         >
                           Xem

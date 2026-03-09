@@ -29,18 +29,31 @@ function getJsonHeaders(token?: string): Record<string, string> {
   return headers
 }
 
+function normalizeImageUrl(url?: string | null): string | null {
+  if (!url) return null
+  const trimmed = url.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'string') return null
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
+  if (trimmed.startsWith('/')) return trimmed
+  return null
+}
+
 function mapApiProductToProduct(api: ApiProduct): Product {
   const primaryImage = api.productImages?.find((i) => i.isPrimary)
-  const imageUrl =
-    primaryImage?.imageUrl || api.productImages?.[0]?.imageUrl || '/images/logo.png'
-  const images = api.productImages?.map((i) => i.imageUrl).filter(Boolean)
+  const primaryUrl = normalizeImageUrl(primaryImage?.imageUrl)
+  const fallbackUrl = normalizeImageUrl(api.productImages?.[0]?.imageUrl)
+  const imageUrl = primaryUrl || fallbackUrl || '/images/logo.png'
+  const images =
+    api.productImages
+      ?.map((i) => normalizeImageUrl(i.imageUrl))
+      .filter((u): u is string => Boolean(u)) ?? []
 
   return {
     id: String(api.productId),
     name: api.productName,
     seller: api.provider ?? 'Nông Xanh',
     image: imageUrl,
-    images: images && images.length > 0 ? images : undefined,
+    images: images.length > 0 ? images : undefined,
     rating: api.rating ?? 0,
     reviewCount: api.reviewCount ?? 0,
     salesCount: api.salesCount ?? 0,
@@ -137,6 +150,32 @@ export async function getProductById(id: string): Promise<Product | null> {
   const apiProduct = (data ?? direct ?? null) as ApiProduct | null
   if (!apiProduct || !apiProduct.productId) return null
   return mapApiProductToProduct(apiProduct)
+}
+
+export async function searchProducts(
+  keyword: string,
+  limit = 10
+): Promise<Product[]> {
+  const trimmed = keyword.trim()
+  if (!trimmed) return []
+
+  try {
+    const res = await getProducts({ pageNumber: 1, pageSize: 200 })
+    const lower = trimmed.toLowerCase()
+
+    const filtered = res.items.filter((p) => {
+      const nameMatch = p.name.toLowerCase().includes(lower)
+      const descMatch = p.description
+        ? p.description.toLowerCase().includes(lower)
+        : false
+      return nameMatch || descMatch
+    })
+
+    return filtered.slice(0, limit)
+  } catch (error) {
+    console.warn('[searchProducts] error', error)
+    return []
+  }
 }
 
 export interface CreateProductInput {

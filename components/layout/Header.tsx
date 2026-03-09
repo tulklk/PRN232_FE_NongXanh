@@ -14,6 +14,9 @@ import { useCart } from '@/contexts/CartContext'
 import type { User as UserType, AuthTokens } from '@/contexts/UserContext'
 import { getCategories } from '@/lib/api/categories'
 import type { ApiCategory } from '@/lib/types/api'
+import { searchProducts } from '@/lib/api/products'
+import type { Product } from '@/data/products'
+import { formatCurrency } from '@/lib/utils'
 
 export default function Header() {
     const router = useRouter()
@@ -28,6 +31,8 @@ export default function Header() {
     const [showCartPopup, setShowCartPopup] = useState(false)
     const cartPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const userMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const searchWrapperRef = useRef<HTMLDivElement | null>(null)
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const handleCategoryMenuEnter = () => {
         setIsMenuOpen(true)
@@ -63,6 +68,7 @@ export default function Header() {
         return () => {
             if (cartPopupTimeoutRef.current) clearTimeout(cartPopupTimeoutRef.current)
             if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current)
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
         }
     }, [])
   
@@ -73,6 +79,12 @@ export default function Header() {
     // Success popup states
     const [showSuccessPopup, setShowSuccessPopup] = useState(false)
     const [successMessage, setSuccessMessage] = useState('')
+
+    // Search states
+    const [searchTerm, setSearchTerm] = useState('')
+    const [searchResults, setSearchResults] = useState<Product[]>([])
+    const [searchLoading, setSearchLoading] = useState(false)
+    const [showSuggestions, setShowSuggestions] = useState(false)
 
     const handleLogin = async (email: string, password: string) => {
         try {
@@ -132,6 +144,66 @@ export default function Header() {
         setShowUserMenu(false)
         router.push('/')
     }
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value
+        setSearchTerm(value)
+
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current)
+            searchTimeoutRef.current = null
+        }
+
+        const trimmed = value.trim()
+        if (!trimmed || trimmed.length < 1) {
+            setShowSuggestions(false)
+            setSearchResults([])
+            setSearchLoading(false)
+            return
+        }
+
+        searchTimeoutRef.current = setTimeout(async () => {
+            setSearchLoading(true)
+            try {
+                const results = await searchProducts(trimmed, 8)
+                setSearchResults(results)
+                setShowSuggestions(true)
+            } catch (error) {
+                console.warn('[Header] search error', error)
+                setSearchResults([])
+                setShowSuggestions(true)
+            } finally {
+                setSearchLoading(false)
+            }
+        }, 300)
+    }
+
+    const triggerFullSearch = () => {
+        const query = searchTerm.trim()
+        if (!query) return
+        router.push(`/products?q=${encodeURIComponent(query)}`)
+        setShowSuggestions(false)
+    }
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            triggerFullSearch()
+        }
+    }
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchWrapperRef.current && !searchWrapperRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [])
 
     useEffect(() => {
         getCategories()
@@ -208,15 +280,63 @@ export default function Header() {
 
                             {/* Search bar */}
                             <div className="w-full md:flex-1 md:max-w-2xl">
-                                <div className="relative">
+                                <div className="relative" ref={searchWrapperRef}>
                                     <input
                                         type="text"
                                         placeholder="Nhập nội dung tìm kiếm"
                                         className="w-full px-4 py-2.5 pr-12 text-gray-900 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
+                                        value={searchTerm}
+                                        onChange={handleSearchChange}
+                                        onKeyDown={handleSearchKeyDown}
                                     />
-                                    <button className="absolute right-0 top-0 h-full px-4 bg-white hover:bg-gray-50 rounded-r-md transition-colors border-l border-gray-200">
+                                    <button
+                                        type="button"
+                                        className="absolute right-0 top-0 h-full px-4 bg-white hover:bg-gray-50 rounded-r-md transition-colors border-l border-gray-200"
+                                        onClick={triggerFullSearch}
+                                    >
                                         <Search size={20} className="text-gray-500" />
                                     </button>
+                                    {showSuggestions && searchTerm.trim() && (
+                                        <div className="absolute left-0 right-0 mt-1 z-50">
+                                            <div className="bg-white rounded-lg shadow-lg max-h-80 overflow-y-auto border border-gray-100">
+                                                {searchLoading ? (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                        Đang tìm kiếm...
+                                                    </div>
+                                                ) : searchResults.length === 0 ? (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                        Không tìm thấy sản phẩm phù hợp
+                                                    </div>
+                                                ) : (
+                                                    searchResults.map((product) => (
+                                                        <Link
+                                                            key={product.id}
+                                                            href={`/products/${product.id}`}
+                                                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                                                            onClick={() => setShowSuggestions(false)}
+                                                        >
+                                                            <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                                                                <Image
+                                                                    src={product.image}
+                                                                    alt={product.name}
+                                                                    fill
+                                                                    className="object-cover"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                                                    {product.name}
+                                                                </p>
+                                                                <p className="text-xs text-primary-green font-semibold mt-0.5">
+                                                                    {formatCurrency(product.currentPrice)}
+                                                                </p>
+                                                            </div>
+                                                        </Link>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -448,23 +568,23 @@ export default function Header() {
                                     </Link>
                                 ))}
                                 <Link
-                                    href="/agrishow"
+                                    href="/news"
                                     className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                                 >
                                     <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
                                         <Leaf size={10} className="text-white" />
                                     </div>
-                                    <span>AGRISHOW</span>
+                                    <span>TIN TỨC</span>
                                     <ChevronDown size={12} className="text-gray-400" />
                                 </Link>
                                 <Link
-                                    href="/my-farm"
+                                    href="/contact"
                                     className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                                 >
                                     <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
                                         <Sprout size={10} className="text-white" />
                                     </div>
-                                    <span>MY FARM</span>
+                                    <span>LIÊN HỆ</span>
                                 </Link>
                             </div>
                         </nav>

@@ -20,7 +20,6 @@ const menuItems = [
   { href: '/account/profile', label: 'Thông tin của tôi', icon: User },
   { href: '/account/addresses', label: 'Sổ địa chỉ', icon: MapPin },
   { href: '/account/orders', label: 'Đơn hàng của tôi', icon: ShoppingCart },
-  { href: '/account/my-farm', label: 'My Farm', icon: Leaf },
   { href: '/account/vouchers', label: 'Voucher của tôi', icon: Ticket },
   { href: '/account/wishlist', label: 'Sản phẩm yêu thích', icon: Heart },
   { href: '/account/reviews', label: 'Nhận xét của tôi', icon: MessageSquare },

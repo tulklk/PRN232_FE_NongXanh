@@ -6,9 +6,31 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import ProductCard from '@/components/products/ProductCard'
 import HotDealCard from '@/components/products/HotDealCard'
-import { newsArticles } from '@/data/news'
 import type { Product } from '@/data/products'
 import { useInView } from '@/lib/hooks/useInView'
+import { getBlogs } from '@/lib/api/blogs'
+import type { ApiBlog } from '@/lib/types/api'
+
+function normalizeExternalUrl(url?: string | null): string | null {
+  if (!url) return null
+  const trimmed = url.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'string') return null
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
+  if (trimmed.startsWith('/')) return trimmed
+  return trimmed
+}
+
+function getBlogExternalHref(blog: ApiBlog): string | null {
+  const fromUrl = normalizeExternalUrl(blog.url)
+  if (fromUrl) return fromUrl
+
+  const content = (blog.content ?? '').trim()
+  if (content.startsWith('http://') || content.startsWith('https://')) {
+    return content
+  }
+
+  return null
+}
 
 interface HomePageClientProps {
   products: Product[]
@@ -16,6 +38,9 @@ interface HomePageClientProps {
 
 export default function HomePageClient({ products }: HomePageClientProps) {
   const [activeTab, setActiveTab] = useState<'new' | 'bestseller'>('new')
+  const [featuredBlog, setFeaturedBlog] = useState<ApiBlog | null>(null)
+  const [featuredLoading, setFeaturedLoading] = useState(true)
+  const [featuredError, setFeaturedError] = useState<string | null>(null)
   const newProducts = products.slice(0, 8)
   const bestsellerProducts = [...products]
     .sort((a, b) => (b.salesCount ?? 0) - (a.salesCount ?? 0))
@@ -47,8 +72,40 @@ export default function HomePageClient({ products }: HomePageClientProps) {
   }
 
   useEffect(() => {
-    const interval = setInterval(handleNextBanner, 3000)
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % banners.length)
+    }, 3000)
     return () => clearInterval(interval)
+  }, [banners.length])
+
+  useEffect(() => {
+    let cancelled = false
+    setFeaturedLoading(true)
+    setFeaturedError(null)
+
+    getBlogs({ pageNumber: 1, pageSize: 10 })
+      .then((res) => {
+        if (cancelled) return
+        const items = (res.items ?? []).filter((b) => getBlogExternalHref(b))
+        if (items.length > 0) {
+          const randomIndex = Math.floor(Math.random() * items.length)
+          setFeaturedBlog(items[randomIndex])
+        } else {
+          setFeaturedBlog(null)
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setFeaturedBlog(null)
+        setFeaturedError(err instanceof Error ? err.message : 'Không thể tải tin nổi bật')
+      })
+      .finally(() => {
+        if (!cancelled) setFeaturedLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return (
@@ -94,14 +151,71 @@ export default function HomePageClient({ products }: HomePageClientProps) {
           </div>
 
           <div className="space-y-3 mt-4 lg:mt-0 lg:h-[400px] flex flex-col">
-            <div className="bg-[#0A923C] text-white px-4 py-2 rounded-t-lg font-semibold opacity-0 animate-fadeInUp" style={{ animationDelay: '0.15s', animationFillMode: 'forwards' }}>TIN NỔI BẬT</div>
-            <div className="bg-white rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 transition-all duration-300" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
-              <div className="relative w-full aspect-video bg-gray-100">
-                <div className="absolute inset-0 flex items-center justify-center text-4xl animate-float">🎁</div>
-              </div>
-              <div className="p-3">
-                <p className="text-sm text-gray-800 line-clamp-2">Tuyển sỉ quà Tết 2026 cùng Foodmap - Đồng...</p>
-              </div>
+            <div
+              className="bg-[#0A923C] text-white px-4 py-2 rounded-t-lg font-semibold opacity-0 animate-fadeInUp"
+              style={{ animationDelay: '0.15s', animationFillMode: 'forwards' }}
+            >
+              TIN NỔI BẬT
+            </div>
+            <div
+              className="bg-white rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
+              style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}
+            >
+              {featuredLoading ? (
+                <div className="animate-pulse">
+                  <div className="relative w-full aspect-video bg-gray-100" />
+                  <div className="p-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                </div>
+              ) : featuredBlog && getBlogExternalHref(featuredBlog) ? (
+                <a
+                  href={getBlogExternalHref(featuredBlog) ?? '#'}
+                  className="block"
+                >
+                  <div className="relative w-full aspect-video bg-gray-100 overflow-hidden">
+                    {normalizeExternalUrl(featuredBlog.thumbnailUrl) ? (
+                      <img
+                        src={normalizeExternalUrl(featuredBlog.thumbnailUrl) as string}
+                        alt={featuredBlog.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 py-2">
+                      {featuredBlog.source && (
+                        <p className="text-[11px] text-gray-200 mb-1 line-clamp-1">
+                          {featuredBlog.source}
+                        </p>
+                      )}
+                      <p className="text-sm font-semibold text-white mb-1 line-clamp-2">
+                        {featuredBlog.title}
+                      </p>
+                      {featuredBlog.description && (
+                        <p className="text-xs text-gray-100 line-clamp-2">
+                          {featuredBlog.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </a>
+              ) : (
+                <div>
+                  <div className="relative w-full aspect-video bg-gray-100">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
+                  </div>
+                  <div className="p-3">
+                    <p className="text-sm text-gray-800 line-clamp-2">
+                      {featuredError
+                        ? 'Không thể tải tin nổi bật.'
+                        : 'Chưa có tin nổi bật.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="relative rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 flex-1 min-h-[140px]" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
               <Image
@@ -295,22 +409,26 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                 </div>
               </div>
               <div className="mt-4 space-y-2">
-                {newsArticles.slice(0, 2).map((article) => (
-                  <Link key={article.id} href={`/news/${article.id}`} className="block text-gray-700 hover:text-[#0A923C] text-sm py-2 border-b border-gray-100">
-                    {article.title}
-                  </Link>
-                ))}
+                <Link
+                  href="/news"
+                  className="block text-gray-700 hover:text-[#0A923C] text-sm py-2 border-b border-gray-100"
+                >
+                  Xem thêm tin tức tại NongXanh
+                </Link>
               </div>
             </div>
             <div className="lg:col-span-1 space-y-4">
-              {newsArticles.slice(0, 4).map((article) => (
-                <Link key={article.id} href={`/news/${article.id}`} className="flex gap-3 group">
-                  <div className="w-20 h-16 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
-                    <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100"></div>
-                  </div>
-                  <p className="text-sm text-gray-700 group-hover:text-[#0A923C] line-clamp-2">{article.title}</p>
-                </Link>
-              ))}
+              <Link
+                href="/news"
+                className="flex gap-3 group"
+              >
+                <div className="w-20 h-16 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
+                  <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100" />
+                </div>
+                <p className="text-sm text-gray-700 group-hover:text-[#0A923C] line-clamp-2">
+                  Khám phá thêm các bài viết mới nhất tại mục Tin tức.
+                </p>
+              </Link>
             </div>
           </div>
         </div>

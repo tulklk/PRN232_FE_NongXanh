@@ -167,6 +167,53 @@ export async function updateUser(
   return (result ?? { id, ...data }) as ApiUser
 }
 
+export interface UpdateCurrentUserInput {
+  email?: string
+  phoneNumber?: string
+  displayName?: string
+  isActive?: boolean
+}
+
+export async function updateCurrentUserProfile(
+  data: UpdateCurrentUserInput,
+  token: string
+): Promise<ApiUser> {
+  const body: Record<string, unknown> = {}
+  if (data.email !== undefined) body.email = data.email
+  if (data.phoneNumber !== undefined) body.phoneNumber = data.phoneNumber
+  if (data.displayName !== undefined) body.displayName = data.displayName
+  if (data.isActive !== undefined) body.isActive = data.isActive
+
+  const res = await fetch(`${getBase()}/api/users/me`, {
+    method: 'PUT',
+    headers: getJsonHeaders(token),
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({
+      error: res.statusText,
+      message: res.statusText,
+    }))
+    throw new Error(
+      (err as { message?: string }).message ||
+        (err as { error?: string }).error ||
+        'Không thể cập nhật người dùng'
+    )
+  }
+
+  const json = (await res.json()) as UserApiResponse | ApiUser
+  const result = (json && typeof json === 'object' && 'data' in json
+    ? (json as UserApiResponse).data
+    : json) as ApiUser | undefined
+
+  if (!result) {
+    throw new Error('Phản hồi không hợp lệ từ máy chủ')
+  }
+
+  return result
+}
+
 export async function deleteUser(id: string, token?: string): Promise<void> {
   const res = await fetch(`${getBase()}/api/users/${id}`, {
     method: 'DELETE',

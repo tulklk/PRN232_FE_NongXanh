@@ -4,10 +4,12 @@ import Image from 'next/image'
 import { useUser } from '@/contexts/UserContext'
 import { formatPhoneNumber } from '@/lib/utils'
 import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { updateCurrentUserProfile } from '@/lib/api/users'
 
 export default function ProfilePage() {
-  const { user, isLoading } = useUser()
+  const { user, tokens, isLoading, updateUser } = useUser()
   const router = useRouter()
   const [formData, setFormData] = useState({
     displayName: '',
@@ -21,6 +23,9 @@ export default function ProfilePage() {
     birthday: { day: '', month: '', year: '' },
     changePassword: false,
   })
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -37,6 +42,60 @@ export default function ProfilePage() {
       }))
     }
   }, [user, isLoading, router])
+
+  const submitProfile = async () => {
+    if (!user || !tokens?.idToken) {
+      setSaveError('Bạn cần đăng nhập lại để cập nhật thông tin.')
+      return
+    }
+
+    const cleanedPhone = formData.phoneNumber.replace(/[\s\-()]/g, '').trim()
+
+    setSaving(true)
+    setSaveError(null)
+    setSaveSuccess(null)
+
+    try {
+      const updated = await updateCurrentUserProfile(
+        {
+          displayName: formData.displayName.trim(),
+          phoneNumber: cleanedPhone || undefined,
+          email: formData.email.trim() || undefined,
+        },
+        tokens.idToken
+      )
+
+      setFormData((prev) => ({
+        ...prev,
+        displayName: updated.displayName ?? prev.displayName,
+        phoneNumber: formatPhoneNumber(updated.phoneNumber || '') || updated.phoneNumber || prev.phoneNumber,
+        email: updated.email ?? prev.email,
+      }))
+
+      updateUser({
+        displayName: updated.displayName ?? formData.displayName,
+        phoneNumber: updated.phoneNumber ?? cleanedPhone,
+        email: updated.email ?? formData.email,
+      })
+
+      setSaveSuccess('Cập nhật thông tin tài khoản thành công.')
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Cập nhật thông tin thất bại.'
+      setSaveError(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    await submitProfile()
+  }
+
+  const handleQuickPhoneUpdate = async () => {
+    await submitProfile()
+  }
 
   if (isLoading) {
     return (
@@ -71,9 +130,20 @@ export default function ProfilePage() {
 
       {/* Profile Form */}
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6">Thông tin tài khoản</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Thông tin tài khoản</h2>
 
-        <form className="space-y-6">
+        {saveError && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {saveError}
+          </div>
+        )}
+        {saveSuccess && (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {saveSuccess}
+          </div>
+        )}
+
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Name */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-5 items-center">
             <label className="text-sm text-gray-600">
@@ -84,7 +154,8 @@ export default function ProfilePage() {
                 type="text"
                 value={formData.displayName}
                 onChange={(e) => setFormData((prev) => ({ ...prev, displayName: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled={saving}
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C] disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -104,11 +175,14 @@ export default function ProfilePage() {
                   if (v) setFormData((prev) => ({ ...prev, phoneNumber: formatPhoneNumber(v) }))
                 }}
                 placeholder="0906 337 965"
-                className="flex-1 border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled={saving}
+                className="flex-1 border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C] disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               <button
                 type="button"
-                className="text-[#0A923C] text-sm font-medium hover:underline"
+                className="text-[#0A923C] text-sm font-medium hover:underline disabled:text-gray-400 disabled:cursor-not-allowed"
+                disabled={saving}
+                onClick={handleQuickPhoneUpdate}
               >
                 Cập nhật
               </button>
@@ -123,7 +197,8 @@ export default function ProfilePage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled={saving}
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C] disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -136,8 +211,8 @@ export default function ProfilePage() {
             <div className="md:col-span-3">
               <select
                 value={formData.city}
-                onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               >
                 <option value="">Tỉnh/Thành</option>
                 <option value="hcm">TP. Hồ Chí Minh</option>
@@ -155,8 +230,8 @@ export default function ProfilePage() {
             <div className="md:col-span-3">
               <select
                 value={formData.district}
-                onChange={(e) => setFormData((prev) => ({ ...prev, district: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               >
                 <option value="">Quận/Huyện</option>
               </select>
@@ -171,8 +246,8 @@ export default function ProfilePage() {
             <div className="md:col-span-3">
               <select
                 value={formData.ward}
-                onChange={(e) => setFormData((prev) => ({ ...prev, ward: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               >
                 <option value="">Phường/Xã</option>
               </select>
@@ -190,7 +265,8 @@ export default function ProfilePage() {
                 value={formData.address}
                 onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
                 placeholder="Địa chỉ cụ thể"
-                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C] focus:border-[#0A923C]"
+                disabled
+                className="w-full border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               />
             </div>
           </div>
@@ -206,7 +282,8 @@ export default function ProfilePage() {
                   value="male"
                   checked={formData.gender === 'male'}
                   onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
-                  className="text-[#0A923C] w-4 h-4"
+                  disabled
+                  className="text-[#0A923C] w-4 h-4 cursor-not-allowed"
                 />
                 Nam
               </label>
@@ -217,7 +294,8 @@ export default function ProfilePage() {
                   value="female"
                   checked={formData.gender === 'female'}
                   onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
-                  className="text-[#0A923C] w-4 h-4"
+                  disabled
+                  className="text-[#0A923C] w-4 h-4 cursor-not-allowed"
                 />
                 Nữ
               </label>
@@ -228,7 +306,8 @@ export default function ProfilePage() {
                   value="other"
                   checked={formData.gender === 'other'}
                   onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
-                  className="text-[#0A923C] w-4 h-4"
+                  disabled
+                  className="text-[#0A923C] w-4 h-4 cursor-not-allowed"
                 />
                 Khác
               </label>
@@ -242,7 +321,8 @@ export default function ProfilePage() {
               <select
                 value={formData.birthday.day}
                 onChange={(e) => setFormData((prev) => ({ ...prev, birthday: { ...prev.birthday, day: e.target.value } }))}
-                className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]"
+                disabled
+                className="border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               >
                 <option value="">Ngày</option>
                 {Array.from({ length: 31 }, (_, i) => (
@@ -252,7 +332,8 @@ export default function ProfilePage() {
               <select
                 value={formData.birthday.month}
                 onChange={(e) => setFormData((prev) => ({ ...prev, birthday: { ...prev.birthday, month: e.target.value } }))}
-                className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]"
+                disabled
+                className="border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               >
                 <option value="">Tháng</option>
                 {Array.from({ length: 12 }, (_, i) => (
@@ -262,7 +343,8 @@ export default function ProfilePage() {
               <select
                 value={formData.birthday.year}
                 onChange={(e) => setFormData((prev) => ({ ...prev, birthday: { ...prev.birthday, year: e.target.value } }))}
-                className="border border-gray-200 rounded-md px-5 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0A923C]"
+                disabled
+                className="border border-gray-200 rounded-md px-5 py-3 text-sm bg-gray-50 cursor-not-allowed"
               >
                 <option value="">Năm</option>
                 {Array.from({ length: 100 }, (_, i) => (
@@ -281,7 +363,8 @@ export default function ProfilePage() {
                   type="checkbox"
                   checked={formData.changePassword}
                   onChange={(e) => setFormData((prev) => ({ ...prev, changePassword: e.target.checked }))}
-                  className="text-[#0A923C] w-4 h-4"
+                  disabled
+                  className="text-[#0A923C] w-4 h-4 cursor-not-allowed"
                 />
                 Thay đổi mật khẩu
               </label>
@@ -298,9 +381,10 @@ export default function ProfilePage() {
           <div className="flex justify-center pt-6">
             <button
               type="submit"
-              className="bg-[#0A923C] text-white px-8 py-3 rounded-md text-sm font-medium hover:bg-[#087a32] transition-colors"
+              disabled={saving}
+              className="bg-[#0A923C] text-white px-8 py-3 rounded-md text-sm font-medium hover:bg-[#087a32] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              LƯU THAY ĐỔI
+            {saving ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'}
             </button>
           </div>
         </form>
