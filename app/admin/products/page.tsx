@@ -18,6 +18,7 @@ import {
   type UpdateProductInput,
   updateProduct,
 } from '@/lib/api/products'
+import { uploadMultipleImages } from '@/lib/api/cloudinary'
 import { getCategories } from '@/lib/api/categories'
 import { getProviders } from '@/lib/api/providers'
 import type { ApiCategory, ApiProduct, ApiProvider } from '@/lib/types/api'
@@ -454,9 +455,67 @@ function ProductFormModal({
     ((initialData as any)?.providerId as string | undefined) ?? ''
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const existingImages =
+    (initialData?.productImages as { imageUrl?: string; isPrimary?: boolean }[] | undefined) ??
+    []
+  const existingImageUrls = existingImages
+    .slice()
+    .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
+    .map((img) => img.imageUrl)
+    .filter((url): url is string => Boolean(url))
+
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imageUrls, setImageUrls] = useState<string[]>(existingImageUrls)
+  const [previewUrls, setPreviewUrls] = useState<string[]>(existingImageUrls)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : []
+    if (!files.length) return
+    setUploadError(null)
+    setImageFiles(files)
+    setPreviewUrls(files.map((file) => URL.createObjectURL(file)))
+    setCurrentImageIndex(0)
+    setUploading(true)
+    try {
+      const urls = await uploadMultipleImages(files)
+      setImageUrls(urls)
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : 'Không thể upload ảnh. Vui lòng thử lại.'
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemoveImage = (index: number) => {
+    if (index < 0 || index >= previewUrls.length) return
+
+    const nextPreview = previewUrls.filter((_, i) => i !== index)
+    const nextUrls = imageUrls.filter((_, i) => i !== index)
+
+    setPreviewUrls(nextPreview)
+    setImageUrls(nextUrls)
+
+    if (nextPreview.length === 0) {
+      setCurrentImageIndex(0)
+      return
+    }
+    if (currentImageIndex >= nextPreview.length) {
+      setCurrentImageIndex(nextPreview.length - 1)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
+    if (uploading) {
+      setUploadError('Vui lòng chờ upload ảnh hoàn tất trước khi lưu sản phẩm.')
+      return
+    }
 
     const payload: CreateProductInput = {
       name: name.trim(),
@@ -468,6 +527,8 @@ function ProductFormModal({
       status: status.trim() || null,
       categoryId: categoryId || null,
       providerId: providerId || null,
+      imageUrl: (imageUrls[0] as string | undefined) || null,
+      imageUrls: imageUrls.length > 0 ? imageUrls : null,
     }
 
     onSubmit(payload)
@@ -500,6 +561,7 @@ function ProductFormModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <p className="text-red-600 text-sm">{error}</p>}
+          {uploadError && <p className="text-red-600 text-sm">{uploadError}</p>}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -543,6 +605,106 @@ function ProductFormModal({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
                 disabled={loading}
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hình ảnh sản phẩm
+            </label>
+            <div className="space-y-3">
+              <div className="w-full h-48 border border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 relative">
+                {previewUrls.length > 0 ? (
+                  <>
+                    <img
+                      src={previewUrls[currentImageIndex]}
+                      alt={name || 'Ảnh sản phẩm'}
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-2 left-2 rounded bg-black/60 text-[10px] text-white px-2 py-0.5">
+                      {currentImageIndex === 0 ? 'Ảnh chính' : `Ảnh ${currentImageIndex + 1}`}
+                    </span>
+                    {previewUrls.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCurrentImageIndex(
+                              (currentImageIndex - 1 + previewUrls.length) % previewUrls.length
+                            )
+                          }
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/60"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCurrentImageIndex((currentImageIndex + 1) % previewUrls.length)
+                          }
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/60"
+                        >
+                          ›
+                        </button>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-400 text-center px-2">
+                    Chưa có ảnh. Vui lòng chọn ảnh từ máy.
+                  </span>
+                )}
+              </div>
+              {previewUrls.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {previewUrls.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      className="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-gray-200"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`absolute inset-0 ${index === currentImageIndex ? 'ring-2 ring-primary-green' : ''}`}
+                        aria-label={`Chọn ảnh ${index + 1}`}
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover rounded-md" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRemoveImage(index)
+                        }}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/70 text-white text-[10px] flex items-center justify-center hover:bg-black"
+                        aria-label="Xóa ảnh"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileChange}
+                  disabled={loading || uploading}
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-green file:text-white hover:file:bg-primary-green-dark disabled:opacity-50"
+                />
+                <p className="text-xs text-gray-500">
+                  Có thể chọn nhiều ảnh cùng lúc. Nên dùng ảnh tỷ lệ ngang, dung lượng &lt; 2MB để
+                  hiển thị đẹp.
+                </p>
+                {uploading && (
+                  <p className="text-xs text-primary-green flex items-center gap-1">
+                    <Loader2 size={14} className="animate-spin" />
+                    Đang upload ảnh lên Cloudinary...
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

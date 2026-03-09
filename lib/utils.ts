@@ -50,3 +50,40 @@ export function normalizePhoneNumber(phone: string): string {
 export function calculateDiscount(original: number, current: number): number {
   return Math.round(((original - current) / original) * 100)
 }
+
+/** Voucher shape for discount calculation */
+export interface VoucherForDiscount {
+  discountType?: string | null
+  discountValue: number
+  minOrderValue?: number | null
+  maxDiscount?: number | null
+}
+
+/**
+ * Tính số tiền giảm từ voucher.
+ * - minOrderValue: so sánh với subtotal (đơn tạm tính trước ship).
+ * - FIXED: giảm tiền cố định, tối đa = subtotal + shippingFee.
+ * - PERCENT: giảm % trên (subtotal + shippingFee), bị giới hạn bởi maxDiscount.
+ */
+export function calculateVoucherDiscount(
+  voucher: VoucherForDiscount,
+  subtotal: number,
+  shippingFee: number
+): number {
+  const minOrder = voucher.minOrderValue ?? 0
+  if (minOrder > 0 && subtotal < minOrder) return 0
+
+  const totalBeforeDiscount = subtotal + shippingFee
+  const type = (voucher.discountType ?? '').toUpperCase()
+
+  let discount = 0
+  if (type === 'FIXED') {
+    discount = Math.min(voucher.discountValue ?? 0, totalBeforeDiscount)
+  } else if (type === 'PERCENT') {
+    discount = (totalBeforeDiscount * (voucher.discountValue ?? 0)) / 100
+    const max = voucher.maxDiscount ?? Infinity
+    if (max > 0) discount = Math.min(discount, max)
+  }
+
+  return Math.max(0, Math.round(discount))
+}

@@ -11,6 +11,7 @@ import ReviewCard from '@/components/reviews/ReviewCard'
 import { reviews } from '@/data/reviews'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
 import { getProductById, getProducts } from '@/lib/api/products'
+import ProductImagesGallery from '@/components/products/ProductImagesGallery'
 
 interface ProductDetailPageProps {
   params: Promise<{
@@ -64,42 +65,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
           {/* Product Images */}
           <div className="lg:col-span-5">
-            <div className="relative w-full aspect-square bg-gray-100 rounded-lg mb-3">
-              <Image
-                src={product.image}
-                alt={product.name}
-                fill
-                className="object-cover rounded-lg"
-                sizes="(max-width: 768px) 100vw, 40vw"
-              />
-            </div>
-            {(product.images?.length ?? 0) > 1 ? (
-              <div className="grid grid-cols-4 gap-1.5">
-                {product.images!.slice(0, 4).map((img, i) => (
-                  <div key={i} className="relative aspect-square bg-gray-100 rounded cursor-pointer hover:ring-2 hover:ring-primary-green">
-                    <Image
-                      src={img}
-                      alt={`${product.name} ${i + 1}`}
-                      fill
-                      className="object-cover rounded"
-                      sizes="(max-width: 768px) 25vw, 10vw"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-1.5">
-                <div className="relative aspect-square bg-gray-100 rounded cursor-pointer hover:ring-2 hover:ring-primary-green">
-                  <Image
-                    src={product.image}
-                    alt={product.name}
-                    fill
-                    className="object-cover rounded"
-                    sizes="(max-width: 768px) 25vw, 10vw"
-                  />
-                </div>
-              </div>
-            )}
+            <ProductImagesGallery
+              mainImage={product.image}
+              images={product.images}
+              name={product.name}
+            />
           </div>
 
           {/* Product Info */}

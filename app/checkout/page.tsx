@@ -1,15 +1,18 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Truck, CreditCard, Wallet, Building2 } from 'lucide-react'
-import { formatCurrency, formatPhoneNumber, normalizePhoneNumber } from '@/lib/utils'
+import { ArrowLeft, Truck, CreditCard, Wallet, Building2, X } from 'lucide-react'
+import { formatCurrency, formatPhoneNumber, normalizePhoneNumber, calculateVoucherDiscount, formatDate } from '@/lib/utils'
 import { FIXED_SHIPPING_FEE, PAYMENT_METHODS } from '@/lib/constants'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
 import { createOrder } from '@/lib/api/orders'
+import { getVoucherByCode, getVouchers } from '@/lib/api/vouchers'
+import type { ApiVoucher } from '@/lib/types/api'
 import { createPayment, createVNPayPaymentUrl } from '@/lib/api/payments'
 import { getProvinces, getWardsByProvince, type Province, type Ward } from '@/lib/api/provinces'
 
@@ -33,6 +36,13 @@ export default function CheckoutPage() {
   const [loadingWards, setLoadingWards] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [discountCode, setDiscountCode] = useState('')
+  const [appliedVoucher, setAppliedVoucher] = useState<ApiVoucher | null>(null)
+  const [voucherError, setVoucherError] = useState<string | null>(null)
+  const [voucherLoading, setVoucherLoading] = useState(false)
+  const [voucherPanelOpen, setVoucherPanelOpen] = useState(false)
+  const [panelVouchers, setPanelVouchers] = useState<ApiVoucher[]>([])
+  const [panelLoading, setPanelLoading] = useState(false)
+  const [panelError, setPanelError] = useState<string | null>(null)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -40,7 +50,81 @@ export default function CheckoutPage() {
   const cartItems = cart?.cartItems ?? []
   const subtotal = cart?.totalAmount ?? 0
   const shippingFee = FIXED_SHIPPING_FEE
-  const total = subtotal + shippingFee
+  const discountAmount = appliedVoucher
+    ? calculateVoucherDiscount(appliedVoucher, subtotal, shippingFee)
+    : 0
+  const total = subtotal + shippingFee - discountAmount
+
+  const handleApplyVoucher = async () => {
+    const code = discountCode.trim()
+    if (!code) {
+      setVoucherError('Vui lòng nhập mã')
+      return
+    }
+    setVoucherLoading(true)
+    setVoucherError(null)
+    try {
+      const voucher = await getVoucherByCode(code, tokens?.idToken ?? undefined)
+      if (!voucher) {
+        setVoucherError('Mã giảm giá không hợp lệ hoặc đã hết hạn')
+        setAppliedVoucher(null)
+        return
+      }
+      const discount = calculateVoucherDiscount(voucher, subtotal, shippingFee)
+      const minOrder = voucher.minOrderValue ?? 0
+      if (discount === 0 && minOrder > 0 && subtotal < minOrder) {
+        setVoucherError('Đơn hàng chưa đủ điều kiện áp dụng mã')
+        setAppliedVoucher(null)
+        return
+      }
+      setAppliedVoucher(voucher)
+      setVoucherError(null)
+    } catch {
+      setVoucherError('Mã giảm giá không hợp lệ hoặc đã hết hạn')
+      setAppliedVoucher(null)
+    } finally {
+      setVoucherLoading(false)
+    }
+  }
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null)
+    setVoucherError(null)
+    setDiscountCode('')
+  }
+
+  function isPublicVoucher(status?: string): boolean {
+    return ['active', 'public'].includes((status ?? '').toLowerCase())
+  }
+
+  const applyVoucherFromPanel = (v: ApiVoucher) => {
+    const discount = calculateVoucherDiscount(v, subtotal, shippingFee)
+    const minOrder = v.minOrderValue ?? 0
+    if (discount === 0 && minOrder > 0 && subtotal < minOrder) {
+      setVoucherError('Đơn hàng chưa đủ điều kiện áp dụng mã')
+      setVoucherPanelOpen(false)
+      return
+    }
+    setAppliedVoucher(v)
+    setDiscountCode(v.code ?? '')
+    setVoucherError(null)
+    setVoucherPanelOpen(false)
+  }
+
+  useEffect(() => {
+    if (!voucherPanelOpen) return
+    setPanelLoading(true)
+    setPanelError(null)
+    getVouchers(1, 100, tokens?.idToken ?? undefined)
+      .then((items) => {
+        setPanelVouchers(items.filter((v) => isPublicVoucher(v.status)))
+      })
+      .catch(() => {
+        setPanelError('Không thể tải danh sách mã giảm giá')
+        setPanelVouchers([])
+      })
+      .finally(() => setPanelLoading(false))
+  }, [voucherPanelOpen, tokens?.idToken])
 
   const hasInitializedForm = useRef(false)
   useEffect(() => {
@@ -155,6 +239,7 @@ export default function CheckoutPage() {
           shippingAddress: shippingAddress || undefined,
           userId: user.userId,
           orderDetails,
+          voucherId: appliedVoucher?.voucherId ?? undefined,
         },
         tokens.idToken
       )
@@ -392,21 +477,51 @@ export default function CheckoutPage() {
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-lg p-4 sm:p-6 lg:sticky lg:top-4">
                   <h2 className="text-lg font-bold mb-4">Mã giảm giá</h2>
-                  <div className="flex gap-2 mb-4">
-                    <input
-                      type="text"
-                      value={discountCode}
-                      onChange={(e) => setDiscountCode(e.target.value)}
-                      placeholder="Nhập mã giảm giá"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-green"
-                    />
-                    <button
-                      type="button"
-                      className="bg-primary-green text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-green-dark"
-                    >
-                      ÁP DỤNG
-                    </button>
-                  </div>
+                  {appliedVoucher ? (
+                    <div className="flex items-center justify-between gap-2 mb-4 p-3 bg-primary-green-light rounded-lg">
+                      <span className="text-sm font-medium text-primary-green">
+                        Đã áp dụng: {appliedVoucher.code ?? ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveVoucher}
+                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mb-4">
+                      <input
+                        type="text"
+                        value={discountCode}
+                        onChange={(e) => {
+                          setDiscountCode(e.target.value)
+                          setVoucherError(null)
+                        }}
+                        placeholder="Nhập mã giảm giá"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-green"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyVoucher}
+                        disabled={voucherLoading}
+                        className="bg-primary-green text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-green-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {voucherLoading ? 'ĐANG KIỂM TRA...' : 'ÁP DỤNG'}
+                      </button>
+                    </div>
+                  )}
+                  {voucherError && (
+                    <p className="text-sm text-red-600 mb-4">{voucherError}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setVoucherPanelOpen(true)}
+                    className="text-primary-green underline hover:opacity-80 cursor-pointer text-sm mb-4 block"
+                  >
+                    Chọn mã giảm giá tại đây
+                  </button>
 
                   <div className="border-t border-gray-200 pt-4">
                     <h2 className="text-lg font-bold mb-4">Thông tin đơn hàng</h2>
@@ -446,6 +561,12 @@ export default function CheckoutPage() {
                         <span className="text-gray-600">Phí vận chuyển:</span>
                         <span className="font-semibold">{formatCurrency(shippingFee)}</span>
                       </div>
+                      {discountAmount > 0 && (
+                        <div className="flex justify-between text-primary-green">
+                          <span>Giảm giá:</span>
+                          <span className="font-semibold">-{formatCurrency(discountAmount)}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="border-t border-gray-200 pt-4 mb-4">
                       <div className="flex justify-between">
@@ -483,6 +604,104 @@ export default function CheckoutPage() {
             </div>
           </form>
         )}
+
+        {voucherPanelOpen &&
+          createPortal(
+            <div
+              className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+              onClick={() => setVoucherPanelOpen(false)}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="voucher-panel-title"
+            >
+              <div
+                className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                  <h2 id="voucher-panel-title" className="text-lg font-bold">
+                    Danh sách mã giảm giá đơn hàng
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setVoucherPanelOpen(false)}
+                    className="p-1 rounded hover:bg-gray-100"
+                    aria-label="Đóng"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="overflow-y-auto p-4 flex-1">
+                  {panelLoading && (
+                    <p className="text-gray-500 text-center py-6">Đang tải...</p>
+                  )}
+                  {panelError && (
+                    <p className="text-red-600 text-sm mb-4">{panelError}</p>
+                  )}
+                  {!panelLoading && !panelError && panelVouchers.length === 0 && (
+                    <p className="text-gray-500 text-center py-6">
+                      Chưa có mã giảm giá nào.
+                    </p>
+                  )}
+                  {!panelLoading && panelVouchers.length > 0 && (
+                    <div className="space-y-3">
+                      {panelVouchers.map((v) => {
+                        const type = (v.discountType ?? '').toUpperCase()
+                        const desc =
+                          v.description ||
+                          (type === 'PERCENT'
+                            ? `Giảm ${v.discountValue}%`
+                            : `Giảm ${formatCurrency(v.discountValue)}`)
+                        const minOrder = v.minOrderValue
+                          ? `Đơn tối thiểu ${formatCurrency(v.minOrderValue)}`
+                          : ''
+                        const maxD = v.maxDiscount
+                          ? `Giảm tối đa: ${formatCurrency(v.maxDiscount)}`
+                          : ''
+                        const validity =
+                          v.startDate && v.endDate
+                            ? `Từ ${formatDate(v.startDate)} đến ${formatDate(v.endDate)}`
+                            : ''
+                        return (
+                          <div
+                            key={v.voucherId}
+                            className="flex items-start justify-between gap-3 p-3 border border-gray-200 rounded-lg"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-primary-green">
+                                Mã: {v.code ?? ''}
+                              </p>
+                              <p className="text-sm text-gray-600 mt-0.5">
+                                {desc}
+                              </p>
+                              {(minOrder || maxD) && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {[minOrder, maxD].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
+                              {validity && (
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {validity}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => applyVoucherFromPanel(v)}
+                              className="flex-shrink-0 bg-primary-green text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-green-dark"
+                            >
+                              Áp dụng
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
       </div>
     </div>
   )

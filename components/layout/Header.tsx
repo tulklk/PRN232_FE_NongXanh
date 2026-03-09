@@ -258,9 +258,9 @@ export default function Header() {
                                                 >
                                                     Đơn hàng
                                                 </Link>
-                                                {user.role === 'Admin' && (
+                                                {(user.role === 'Admin' || user.role?.toLowerCase() === 'staff') && (
                                                     <Link
-                                                        href="/admin"
+                                                        href={user.role === 'Admin' ? '/admin' : '/staff'}
                                                         onClick={() => setShowUserMenu(false)}
                                                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                                     >

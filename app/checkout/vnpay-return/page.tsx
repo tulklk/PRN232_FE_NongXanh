@@ -48,6 +48,7 @@ function VnpayReturnContent() {
       const q = new URLSearchParams()
       q.set('orderId', orderId)
       if (orderNumber) q.set('orderNumber', orderNumber)
+      q.set('payment', 'vnpay')
       router.replace(`/checkout/success?${q.toString()}`)
     }
   }, [hasParams, isSuccess, orderId, orderNumber, router])

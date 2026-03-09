@@ -149,6 +149,8 @@ export interface CreateProductInput {
   status?: string | null
   categoryId?: string | null
   providerId?: string | null
+  imageUrl?: string | null
+  imageUrls?: string[] | null
 }
 
 export interface UpdateProductInput {
@@ -161,6 +163,8 @@ export interface UpdateProductInput {
   status?: string | null
   categoryId?: string | null
   providerId?: string | null
+  imageUrl?: string | null
+  imageUrls?: string[] | null
 }
 
 export async function getAdminProducts(
@@ -212,6 +216,21 @@ export async function createProduct(
   data: CreateProductInput,
   token?: string
 ): Promise<ApiProduct> {
+  let images: { imageUrl: string; isPrimary: boolean }[] | undefined
+  if (data.imageUrls && data.imageUrls.length > 0) {
+    images = data.imageUrls.map((url, index) => ({
+      imageUrl: url,
+      isPrimary: index === 0,
+    }))
+  } else if (data.imageUrl) {
+    images = [
+      {
+        imageUrl: data.imageUrl,
+        isPrimary: true,
+      },
+    ]
+  }
+
   const body = {
     name: data.name,
     description: data.description ?? null,
@@ -222,6 +241,7 @@ export async function createProduct(
     status: data.status ?? null,
     categoryId: data.categoryId ?? null,
     providerId: data.providerId ?? null,
+    ...(images ? { images } : {}),
   }
 
   const res = await fetch(`${getBase()}/api/products`, {
@@ -264,6 +284,26 @@ export async function updateProduct(
   if (data.status !== undefined) body.status = data.status
   if (data.categoryId !== undefined) body.categoryId = data.categoryId
   if (data.providerId !== undefined) body.providerId = data.providerId
+
+  // Cập nhật danh sách ảnh khi có thay đổi
+  if (data.imageUrls !== undefined) {
+    ;(body as any).images =
+      data.imageUrls && data.imageUrls.length > 0
+        ? data.imageUrls.map((url, index) => ({
+            imageUrl: url,
+            isPrimary: index === 0,
+          }))
+        : []
+  } else if (data.imageUrl !== undefined) {
+    ;(body as any).images = data.imageUrl
+      ? [
+          {
+            imageUrl: data.imageUrl,
+            isPrimary: true,
+          },
+        ]
+      : []
+  }
 
   const res = await fetch(`${getBase()}/api/products/${id}`, {
     method: 'PUT',

@@ -56,6 +56,27 @@ export async function getVouchers(
   return []
 }
 
+export async function getVoucherByCode(
+  code: string,
+  token?: string
+): Promise<ApiVoucher | null> {
+  const trimmed = code?.trim()
+  if (!trimmed) return null
+
+  const res = await fetch(
+    `${getBase()}/api/vouchers/code/${encodeURIComponent(trimmed)}`,
+    { headers: getHeaders(token) }
+  )
+  if (!res.ok) {
+    if (res.status === 404) return null
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error((err as { error?: string }).error || 'Không thể kiểm tra mã giảm giá')
+  }
+  const json = (await res.json()) as VoucherApiResponse
+  const data = json?.data ?? (json as unknown as ApiVoucher)
+  return data && typeof data === 'object' ? (data as ApiVoucher) : null
+}
+
 export async function getVoucherById(
   id: string,
   token?: string

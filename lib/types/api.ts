@@ -194,6 +194,7 @@ export interface CreateOrderRequest {
   shippingAddress?: string | null
   userId?: string | null
   orderDetails?: CreateOrderDetailRequest[] | null
+  voucherId?: number | null
 }
 
 export interface ApiOrdersPagedResponse {
