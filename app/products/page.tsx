@@ -145,8 +145,9 @@ function ProductsContent() {
             </h1>
             {keyword && (
               <p className="mb-4 text-sm text-gray-600">
-                Kết quả tìm kiếm cho "<span className="font-medium">{keyword}</span>" ({filteredAndSortedProducts.length}{' '}
-                sản phẩm)
+                Kết quả tìm kiếm cho &quot;
+                <span className="font-medium">{keyword}</span>
+                &quot; ({filteredAndSortedProducts.length} sản phẩm)
               </p>
             )}
 
