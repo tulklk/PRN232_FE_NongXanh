@@ -62,7 +62,5 @@ export const FIXED_SHIPPING_FEE = 35000
 
 export const PAYMENT_METHODS = [
   { id: 'cod', name: 'Thanh toán khi nhận hàng (COD)', icon: 'truck' },
-  { id: 'bank', name: 'Chuyển khoản - Mua trước trả sau', icon: 'bank' },
-  { id: 'atm', name: 'Thẻ ATM/Internet Banking', icon: 'card' },
-  { id: 'momo', name: 'Ví điện tử MoMo', icon: 'wallet' },
+  { id: 'vnpay', name: 'Thanh toán qua VNPay', icon: 'bank' },
 ]

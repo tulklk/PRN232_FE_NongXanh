@@ -200,6 +200,42 @@ export interface CreateOrderRequest {
   voucherId?: number | null
 }
 
+export interface CheckoutPreviewRequest {
+  cartItemIds: number[]
+  toWardCode: string
+  provinceId: number
+  toDistrictId?: number
+  insuranceValue?: number
+  voucherCode?: string
+}
+
+export interface CheckoutPreviewResponse {
+  shippingFee: number
+  discountAmount: number
+  totalAmount: number
+  finalAmount: number
+  [key: string]: unknown
+}
+
+export interface CheckoutOrderRequest {
+  cartItemIds: number[]
+  shippingAddress: string
+  shippingMethod: string
+  paymentMethod: 'COD' | 'VNPay'
+  recipientName: string
+  recipientPhone: string
+  toWardCode: string
+  provinceCode: string
+  provinceId: number
+  toDistrictId?: number
+  insuranceValue?: number
+  voucherCode?: string
+}
+
+export interface ShipmentInfo {
+  [key: string]: unknown
+}
+
 export interface ApiOrdersPagedResponse {
   items: ApiOrder[]
   totalCount: number

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { getOrderById } from '@/lib/api/orders'
+import { getOrderById, updateOrderStatus } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -13,29 +13,118 @@ export default function AdminOrderDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
-  const { tokens, isAuthenticated } = useUser()
+  const { tokens, isAuthenticated, isLoading: authLoading } = useUser()
   const [order, setOrder] = useState<ApiOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nextStatus, setNextStatus] = useState('')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
+
+  const getAllowedNextStatuses = (status?: string | null): string[] => {
+    const s = (status ?? '').toLowerCase()
+    if (s === 'pending' || s === 'processing') return ['confirmed', 'cancelled']
+    if (s === 'confirmed') return ['shipped', 'cancelled']
+    if (s === 'shipped') return ['delivered']
+    return []
+  }
+
+  const getStatusLabel = (status?: string | null) => {
+    const labels: Record<string, string> = {
+      pending: 'Chờ xử lý',
+      processing: 'Đang xử lý',
+      confirmed: 'Đã xác nhận',
+      shipped: 'Đã giao hàng',
+      delivered: 'Đã nhận hàng',
+      cancelled: 'Đã hủy',
+    }
+    return labels[(status ?? '').toLowerCase()] ?? status ?? '—'
+  }
 
   useEffect(() => {
+    if (authLoading) return
     if (!isAuthenticated || !tokens?.idToken || !id) {
       setLoading(false)
       return
     }
     getOrderById(id, tokens.idToken)
-      .then(setOrder)
+      .then((data) => {
+        setOrder(data)
+        const allowed = getAllowedNextStatuses(data?.status)
+        setNextStatus(allowed[0] ?? '')
+      })
       .catch((err) =>
         setError(
           err instanceof Error ? err.message : 'Không thể tải đơn hàng'
         )
       )
       .finally(() => setLoading(false))
-  }, [isAuthenticated, tokens?.idToken, id])
+  }, [authLoading, isAuthenticated, tokens?.idToken, id])
 
-  if (!isAuthenticated) {
-    router.push('/login')
-    return null
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace('/login')
+    }
+  }, [authLoading, isAuthenticated, router])
+
+  if (authLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-5">
+        <p className="text-center py-14 text-gray-500">Đang xác thực...</p>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) return null
+
+  const allowedNextStatuses = getAllowedNextStatuses(order?.status)
+  const isStatusLocked = allowedNextStatuses.length === 0
+
+  const handleUpdateStatus = async () => {
+    if (!order || !tokens?.idToken || !nextStatus) return
+    setUpdatingStatus(true)
+    setStatusError(null)
+    setStatusSuccess(null)
+
+    try {
+      const updated = await updateOrderStatus(
+        order.orderId,
+        {
+          status: nextStatus,
+          shippingAddress: order.shippingAddress ?? undefined,
+          vnPayStatus: order.vnPayStatus ?? undefined,
+        },
+        tokens.idToken
+      )
+
+      setOrder((prev) => {
+        if (!prev) return updated
+        return {
+          ...prev,
+          ...updated,
+          // Một số response PUT chỉ trả về vài field, giữ lại dữ liệu cũ nếu thiếu
+          orderDate: updated.orderDate ?? prev.orderDate,
+          orderDetails: updated.orderDetails ?? prev.orderDetails,
+          customerDisplayName:
+            updated.customerDisplayName ?? prev.customerDisplayName,
+          customerEmail: updated.customerEmail ?? prev.customerEmail,
+          customerPhoneNumber:
+            updated.customerPhoneNumber ?? prev.customerPhoneNumber,
+        }
+      })
+      const nextAllowed = getAllowedNextStatuses(updated.status ?? order.status)
+      setNextStatus(nextAllowed[0] ?? '')
+      setStatusSuccess('Cập nhật trạng thái đơn hàng thành công.')
+    } catch (err) {
+      setStatusError(
+        err instanceof Error
+          ? err.message
+          : 'Không thể cập nhật trạng thái đơn hàng'
+      )
+    } finally {
+      setUpdatingStatus(false)
+    }
   }
 
   if (loading) {
@@ -198,6 +287,57 @@ export default function AdminOrderDetailPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="border-t border-gray-200 pt-4 mt-6">
+        <h3 className="font-semibold text-gray-900 mb-3">Cập nhật trạng thái</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Trạng thái hiện tại
+            </label>
+            <p className="font-medium text-gray-900">{getStatusLabel(order.status)}</p>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Chuyển sang
+            </label>
+            <select
+              value={nextStatus}
+              onChange={(e) => {
+                setNextStatus(e.target.value)
+                setStatusError(null)
+                setStatusSuccess(null)
+              }}
+              disabled={isStatusLocked || updatingStatus}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-60"
+            >
+              {isStatusLocked ? (
+                <option value="">Đơn hàng đã hoàn tất / đã hủy</option>
+              ) : (
+                allowedNextStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {getStatusLabel(status)}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={handleUpdateStatus}
+              disabled={isStatusLocked || updatingStatus || !nextStatus}
+              className="w-full md:w-auto px-4 py-2 bg-primary-green text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {updatingStatus ? 'Đang cập nhật...' : 'Cập nhật'}
+            </button>
+          </div>
+        </div>
+        {statusError && <p className="mt-3 text-sm text-red-600">{statusError}</p>}
+        {statusSuccess && (
+          <p className="mt-3 text-sm text-green-600">{statusSuccess}</p>
+        )}
       </div>
     </div>
   )

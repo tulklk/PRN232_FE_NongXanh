@@ -2,18 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Eye } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
 import { formatCurrency } from '@/lib/utils'
 import { useUser } from '@/contexts/UserContext'
 import { getAdminProducts } from '@/lib/api/products'
+import ProductVariantsModal from '@/components/products/ProductVariantsModal'
+import type { ApiProduct } from '@/lib/types/api'
+
+type StaffProduct = ApiProduct & {
+    categoryName?: string
+    providerName?: string
+}
 
 export default function StaffProductsPage() {
     const { tokens } = useUser()
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState('all')
-    const [productList, setProductList] = useState<any[]>([])
-    const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+    const [productList, setProductList] = useState<StaffProduct[]>([])
+    const [selectedProduct, setSelectedProduct] = useState<number | null>(null)
+    const [variantProduct, setVariantProduct] = useState<StaffProduct | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -22,7 +30,7 @@ export default function StaffProductsPage() {
             try {
                 setLoading(true)
                 const items = await getAdminProducts(1, 100, undefined, tokens?.idToken)
-                setProductList((items as any) || [])
+                setProductList((items as StaffProduct[]) || [])
                 setError(null)
             } catch (err) {
                 const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định'
@@ -82,10 +90,6 @@ export default function StaffProductsPage() {
                     >
                         Xem trên cửa hàng
                     </Link>
-                    <button className="bg-[#0A923C] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#10723A] transition-colors flex items-center gap-2">
-                        <Plus size={20} />
-                        Thêm sản phẩm
-                    </button>
                 </div>
             </div>
 
@@ -169,8 +173,10 @@ export default function StaffProductsPage() {
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         setSelectedProduct(product.productId)
+                                                        setVariantProduct(product)
                                                     }}
                                                     className="p-2 text-gray-600 hover:text-[#0A923C] hover:bg-green-50 rounded transition-colors"
+                                                    title="Xem variants"
                                                 >
                                                     <Eye size={18} />
                                                 </button>
@@ -254,6 +260,13 @@ export default function StaffProductsPage() {
                     )}
                 </div>
             </div>
+            <ProductVariantsModal
+                isOpen={Boolean(variantProduct)}
+                product={variantProduct}
+                token={tokens?.idToken}
+                readOnly
+                onClose={() => setVariantProduct(null)}
+            />
         </div>
     )
 }

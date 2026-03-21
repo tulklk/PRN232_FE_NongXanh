@@ -1,16 +1,27 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Truck, CreditCard, Wallet, Building2, X } from 'lucide-react'
-import { formatCurrency, formatPhoneNumber, normalizePhoneNumber, calculateVoucherDiscount, formatDate } from '@/lib/utils'
+import {
+  formatCurrency,
+  formatPhoneNumber,
+  normalizePhoneNumber,
+  calculateVoucherDiscount,
+  formatDate,
+} from '@/lib/utils'
 import { FIXED_SHIPPING_FEE, PAYMENT_METHODS } from '@/lib/constants'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
-import { createOrder } from '@/lib/api/orders'
+import {
+  createOrder,
+  checkoutOrder,
+  previewCheckout,
+  syncOrderShipment,
+} from '@/lib/api/orders'
 import { getVoucherByCode, getVouchers } from '@/lib/api/vouchers'
 import type { ApiVoucher } from '@/lib/types/api'
 import { createPayment, createVNPayPaymentUrl } from '@/lib/api/payments'
@@ -35,6 +46,9 @@ export default function CheckoutPage() {
   const [loadingProvinces, setLoadingProvinces] = useState(true)
   const [loadingWards, setLoadingWards] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
+  const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>(
+    'standard'
+  )
   const [discountCode, setDiscountCode] = useState('')
   const [appliedVoucher, setAppliedVoucher] = useState<ApiVoucher | null>(null)
   const [voucherError, setVoucherError] = useState<string | null>(null)
@@ -46,14 +60,20 @@ export default function CheckoutPage() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [shippingFee, setShippingFee] = useState(0)
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [finalAmount, setFinalAmount] = useState(0)
 
   const cartItems = cart?.cartItems ?? []
+  const cartItemIds = useMemo(
+    () => cartItems.map((i) => i.cartItemId).filter(Boolean),
+    [cartItems]
+  )
+  const cartItemIdsKey = useMemo(() => cartItemIds.join(','), [cartItemIds])
   const subtotal = cart?.totalAmount ?? 0
-  const shippingFee = FIXED_SHIPPING_FEE
-  const discountAmount = appliedVoucher
-    ? calculateVoucherDiscount(appliedVoucher, subtotal, shippingFee)
-    : 0
-  const total = subtotal + shippingFee - discountAmount
+  const total = finalAmount > 0 ? finalAmount : subtotal + shippingFee - discountAmount
 
   const handleApplyVoucher = async () => {
     const code = discountCode.trim()
@@ -98,18 +118,86 @@ export default function CheckoutPage() {
   }
 
   const applyVoucherFromPanel = (v: ApiVoucher) => {
-    const discount = calculateVoucherDiscount(v, subtotal, shippingFee)
-    const minOrder = v.minOrderValue ?? 0
-    if (discount === 0 && minOrder > 0 && subtotal < minOrder) {
-      setVoucherError('Đơn hàng chưa đủ điều kiện áp dụng mã')
-      setVoucherPanelOpen(false)
-      return
-    }
     setAppliedVoucher(v)
     setDiscountCode(v.code ?? '')
     setVoucherError(null)
     setVoucherPanelOpen(false)
   }
+
+  useEffect(() => {
+    if (shippingMethod !== 'express') {
+      const fallbackDiscount = appliedVoucher
+        ? calculateVoucherDiscount(appliedVoucher, subtotal, FIXED_SHIPPING_FEE)
+        : 0
+      setShippingFee(FIXED_SHIPPING_FEE)
+      setDiscountAmount(fallbackDiscount)
+      setFinalAmount(subtotal + FIXED_SHIPPING_FEE - fallbackDiscount)
+      setPreviewError(null)
+      setPreviewLoading(false)
+      return
+    }
+
+    if (cartItemIds.length === 0 || !formData.ward || !formData.province) {
+      const fallbackDiscount = appliedVoucher
+        ? calculateVoucherDiscount(appliedVoucher, subtotal, 0)
+        : 0
+      setShippingFee(0)
+      setDiscountAmount(fallbackDiscount)
+      setFinalAmount(subtotal - fallbackDiscount)
+      setPreviewError(null)
+      return
+    }
+    if (!tokens?.idToken) return
+
+    const voucherCode = (appliedVoucher?.code ?? discountCode.trim()) || undefined
+    let cancelled = false
+    setPreviewLoading(true)
+    setPreviewError(null)
+
+    previewCheckout(
+      {
+        cartItemIds,
+        toWardCode: formData.ward,
+        provinceId: Number(formData.province),
+        voucherCode,
+      },
+      tokens.idToken
+    )
+      .then((res) => {
+        if (cancelled) return
+        const shipping = Number((res as any).shippingFee ?? 0)
+        const discount = Number((res as any).discountAmount ?? 0)
+        const final = Number((res as any).finalAmount ?? subtotal + shipping - discount)
+        setShippingFee(Number.isFinite(shipping) ? shipping : 0)
+        setDiscountAmount(Number.isFinite(discount) ? discount : 0)
+        setFinalAmount(Number.isFinite(final) ? final : subtotal + shipping - discount)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setPreviewError(
+          err instanceof Error ? err.message : 'Không thể tính phí giao hàng'
+        )
+        setShippingFee(0)
+        setDiscountAmount(0)
+        setFinalAmount(subtotal)
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    cartItemIdsKey,
+    formData.ward,
+    formData.province,
+    appliedVoucher?.code,
+    discountCode,
+    shippingMethod,
+    tokens?.idToken,
+    subtotal,
+  ])
 
   useEffect(() => {
     if (!voucherPanelOpen) return
@@ -228,23 +316,44 @@ export default function CheckoutPage() {
         .filter(Boolean)
         .join(', ')
 
-      const orderDetails = cartItems.map((item) => ({
-        variantId: item.variantId,
-        quantity: item.quantity,
-      }))
+      const voucherCode = (appliedVoucher?.code ?? discountCode.trim()) || undefined
+      let order
+      if (shippingMethod === 'express') {
+        const cartItemIds = cartItems.map((item) => item.cartItemId)
+        order = await checkoutOrder(
+          {
+            cartItemIds: cartItemIds as number[],
+            shippingAddress: shippingAddress || '',
+            shippingMethod: 'EXPRESS',
+            paymentMethod: paymentMethod === 'cod' ? 'COD' : 'VNPay',
+            recipientName: formData.fullName,
+            recipientPhone: normalizePhoneNumber(formData.phone) || formData.phone,
+            toWardCode: formData.ward,
+            provinceCode: formData.province,
+            provinceId: Number(formData.province),
+            voucherCode,
+          },
+          tokens.idToken
+        )
+        await syncOrderShipment(order.orderId, tokens.idToken)
+      } else {
+        const orderDetails = cartItems.map((item) => ({
+          variantId: item.variantId,
+          quantity: item.quantity,
+        }))
+        order = await createOrder(
+          {
+            shippingFee: FIXED_SHIPPING_FEE,
+            shippingAddress: shippingAddress || undefined,
+            userId: user.userId,
+            orderDetails,
+            voucherId: appliedVoucher?.voucherId ?? undefined,
+          },
+          tokens.idToken
+        )
+      }
 
-      const order = await createOrder(
-        {
-          shippingFee,
-          shippingAddress: shippingAddress || undefined,
-          userId: user.userId,
-          orderDetails,
-          voucherId: appliedVoucher?.voucherId ?? undefined,
-        },
-        tokens.idToken
-      )
-
-      if (paymentMethod === 'bank') {
+      if (paymentMethod === 'vnpay') {
         const { paymentUrl } = await createVNPayPaymentUrl(
           {
             orderId: String(order.orderId),
@@ -437,6 +546,84 @@ export default function CheckoutPage() {
                       <span>Văn phòng</span>
                     </label>
                   </div>
+                </div>
+
+                {/* Payment Method */}
+                <div className="bg-white rounded-lg p-4 sm:p-6">
+                  <h2 className="text-xl font-bold mb-4">Phương thức giao hàng</h2>
+                  <div className="space-y-3">
+                    <label
+                      className={`flex items-center p-4 border-2 rounded-lg cursor-pointer ${
+                        shippingMethod === 'standard'
+                          ? 'border-primary-green bg-primary-green-light'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="shippingMethod"
+                        value="standard"
+                        checked={shippingMethod === 'standard'}
+                        onChange={(e) =>
+                          setShippingMethod(
+                            e.target.value as 'standard' | 'express'
+                          )
+                        }
+                        className="mr-4 text-primary-green focus:ring-primary-green"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Truck size={20} />
+                        <div>
+                          <p>Giao hàng tiêu chuẩn</p>
+                          <p className="text-xs text-gray-500">
+                            Giao theo thời gian thông thường
+                          </p>
+                        </div>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`flex items-center p-4 border-2 rounded-lg cursor-pointer ${
+                        shippingMethod === 'express'
+                          ? 'border-primary-green bg-primary-green-light'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="shippingMethod"
+                        value="express"
+                        checked={shippingMethod === 'express'}
+                        onChange={(e) =>
+                          setShippingMethod(
+                            e.target.value as 'standard' | 'express'
+                          )
+                        }
+                        className="mr-4 text-primary-green focus:ring-primary-green"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Truck size={20} />
+                        <div>
+                          <p>Giao hàng nhanh</p>
+                          <p className="text-xs text-gray-500">
+                            Đồng bộ vận đơn nhanh ngay sau khi tạo đơn
+                          </p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                  {shippingMethod === 'express' && (
+                    <div className="mt-3">
+                      {previewLoading && (
+                        <p className="text-sm text-gray-500">
+                          Đang tính phí vận chuyển GHN...
+                        </p>
+                      )}
+                      {previewError && (
+                        <p className="text-sm text-red-600">{previewError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Method */}

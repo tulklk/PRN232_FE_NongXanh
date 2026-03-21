@@ -22,6 +22,7 @@ import { uploadMultipleImages } from '@/lib/api/cloudinary'
 import { getCategories } from '@/lib/api/categories'
 import { getProviders } from '@/lib/api/providers'
 import type { ApiCategory, ApiProduct, ApiProvider } from '@/lib/types/api'
+import ProductVariantsModal from '@/components/products/ProductVariantsModal'
 
 function getStatusDisplay(status?: string | null): 'active' | 'inactive' {
   const s = (status ?? '').toLowerCase()
@@ -50,6 +51,7 @@ export default function ProductsPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [variantProduct, setVariantProduct] = useState<ApiProduct | null>(null)
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -297,6 +299,13 @@ export default function ProductsPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => setVariantProduct(product)}
+                            className="p-2 text-gray-600 hover:text-primary-green hover:bg-primary-green-light rounded transition-colors"
+                            title="Quản lý variants"
+                          >
+                            <span className="text-xs font-semibold">Variants</span>
+                          </button>
+                          <button
                             onClick={() => setEditProduct(product)}
                             className="p-2 text-gray-600 hover:text-primary-green hover:bg-primary-green-light rounded transition-colors"
                           >
@@ -413,6 +422,12 @@ export default function ProductsPage() {
         isOpen={showSuccessPopup}
         onClose={() => setShowSuccessPopup(false)}
         duration={2000}
+      />
+      <ProductVariantsModal
+        isOpen={Boolean(variantProduct)}
+        product={variantProduct}
+        token={token}
+        onClose={() => setVariantProduct(null)}
       />
     </div>
   )

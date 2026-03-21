@@ -19,7 +19,8 @@ export default function OrdersPage() {
       setLoading(false)
       return
     }
-    getOrders(1, 100, tokens.idToken)
+    setLoading(true)
+    getOrders(1, 30, tokens.idToken)
       .then((res) => setOrders(res.items ?? []))
       .catch(() => setOrders([]))
       .finally(() => setLoading(false))

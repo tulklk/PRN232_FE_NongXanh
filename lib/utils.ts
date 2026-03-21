@@ -13,8 +13,10 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return '—'
   const dateObj = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(dateObj.getTime())) return '—'
   return format(dateObj, 'dd/MM/yyyy')
 }
 

@@ -13,6 +13,46 @@ function getHeaders(token?: string): Record<string, string> {
   return headers
 }
 
+function getJsonHeaders(token?: string): Record<string, string> {
+  return {
+    ...getHeaders(token),
+    'Content-Type': 'application/json',
+  }
+}
+
+type VariantPayload = {
+  variantName: string
+  price: number
+  stockQuantity: number
+  sku?: string | null
+  status?: string | null
+}
+
+function extractErrorMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object') {
+    const obj = data as { error?: string; message?: string }
+    return obj.error || obj.message || fallback
+  }
+  return fallback
+}
+
+function parseVariantList(raw: unknown): ApiProductVariant[] {
+  if (Array.isArray(raw)) return raw as ApiProductVariant[]
+  if (raw && typeof raw === 'object') {
+    const obj = raw as { data?: ApiProductVariant[]; items?: ApiProductVariant[] }
+    return obj.data ?? obj.items ?? []
+  }
+  return []
+}
+
+function parseVariantItem(raw: unknown): ApiProductVariant {
+  if (raw && typeof raw === 'object') {
+    const obj = raw as { data?: ApiProductVariant; item?: ApiProductVariant }
+    return obj.data ?? obj.item ?? (raw as ApiProductVariant)
+  }
+  throw new Error('Dữ liệu biến thể không hợp lệ')
+}
+
 export async function getProductVariants(
   productId?: number | string,
   token?: string
@@ -31,13 +71,7 @@ export async function getProductVariants(
     )
   }
   const raw = await res.json()
-  let list: ApiProductVariant[] = []
-  if (Array.isArray(raw)) {
-    list = raw
-  } else if (raw && typeof raw === 'object') {
-    const obj = raw as { data?: ApiProductVariant[]; items?: ApiProductVariant[] }
-    list = obj.data ?? obj.items ?? []
-  }
+  let list: ApiProductVariant[] = parseVariantList(raw)
   if (productId != null && list.length > 0) {
     const pidStr = String(productId)
     list = list.filter((v) => {
@@ -46,4 +80,66 @@ export async function getProductVariants(
     })
   }
   return list
+}
+
+export async function createProductVariant(
+  productId: number | string,
+  payload: VariantPayload,
+  token?: string
+): Promise<ApiProductVariant> {
+  const res = await fetch(`${getBase()}/api/products/${productId}/variants`, {
+    method: 'POST',
+    headers: getJsonHeaders(token),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => null)
+    throw new Error(extractErrorMessage(err, 'Không thể tạo biến thể sản phẩm'))
+  }
+  const data = await res.json().catch(() => null)
+  return parseVariantItem(data)
+}
+
+export async function getProductVariantById(
+  id: number | string,
+  token?: string
+): Promise<ApiProductVariant> {
+  const res = await fetch(`${getBase()}/api/product-variants/${id}`, {
+    headers: getHeaders(token),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => null)
+    throw new Error(extractErrorMessage(err, 'Không thể tải chi tiết biến thể sản phẩm'))
+  }
+  const data = await res.json()
+  return parseVariantItem(data)
+}
+
+export async function updateProductVariant(
+  id: number | string,
+  payload: VariantPayload,
+  token?: string
+): Promise<ApiProductVariant> {
+  const res = await fetch(`${getBase()}/api/product-variants/${id}`, {
+    method: 'PUT',
+    headers: getJsonHeaders(token),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => null)
+    throw new Error(extractErrorMessage(err, 'Không thể cập nhật biến thể sản phẩm'))
+  }
+  const data = await res.json()
+  return parseVariantItem(data)
+}
+
+export async function deleteProductVariant(id: number | string, token?: string): Promise<void> {
+  const res = await fetch(`${getBase()}/api/product-variants/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(token),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => null)
+    throw new Error(extractErrorMessage(err, 'Không thể xóa biến thể sản phẩm'))
+  }
 }

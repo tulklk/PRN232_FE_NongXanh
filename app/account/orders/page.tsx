@@ -21,6 +21,7 @@ export default function OrdersPage() {
 
     const load = async () => {
       try {
+        setLoading(true)
         const res = await getOrders(1, 20, tokens.idToken)
         setOrders(res.items ?? [])
       } catch (err) {
