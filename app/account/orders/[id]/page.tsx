@@ -9,6 +9,7 @@ import { useUser } from '@/contexts/UserContext'
 import { getOrderById } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getOrderStatusLabel, getVnPayStatusLabel } from '@/lib/orderDisplay'
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -78,8 +79,12 @@ export default function OrderDetailPage() {
           <span>{formatDate(order.orderDate)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Trạng thái:</span>
-          <span className="font-medium">{order.status ?? '—'}</span>
+          <span className="text-gray-500">Trạng thái đơn hàng:</span>
+          <span className="font-medium">{getOrderStatusLabel(order.status)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Trạng thái thanh toán:</span>
+          <span className="font-medium">{getVnPayStatusLabel(order.vnPayStatus)}</span>
         </div>
         {(order.customerDisplayName || order.displayName || order.customerEmail || order.customerPhoneNumber) && (
           <div className="text-sm">

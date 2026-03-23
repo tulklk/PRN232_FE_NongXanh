@@ -23,9 +23,16 @@ import {
   syncOrderShipment,
 } from '@/lib/api/orders'
 import { getVoucherByCode, getVouchers } from '@/lib/api/vouchers'
-import type { ApiVoucher } from '@/lib/types/api'
+import type { ApiVoucher, CheckoutPreviewResponse } from '@/lib/types/api'
 import { createPayment, createVNPayPaymentUrl } from '@/lib/api/payments'
-import { getProvinces, getWardsByProvince, type Province, type Ward } from '@/lib/api/provinces'
+import {
+  fetchLocationProvinces,
+  fetchLocationWards,
+  getWardToCode,
+  getWardDisplayName,
+  type LocationProvince,
+  type LocationWard,
+} from '@/lib/api/locations'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -36,13 +43,16 @@ export default function CheckoutPage() {
     fullName: '',
     phone: '',
     email: '',
-    province: '',
-    ward: '',
+    provinceId: '',
+    provinceCode: '',
+    districtId: '',
+    districtCode: '',
+    wardCode: '',
     address: '',
     addressType: 'home',
   })
-  const [provinces, setProvinces] = useState<Province[]>([])
-  const [wards, setWards] = useState<Ward[]>([])
+  const [locationProvinces, setLocationProvinces] = useState<LocationProvince[]>([])
+  const [locationWards, setLocationWards] = useState<LocationWard[]>([])
   const [loadingProvinces, setLoadingProvinces] = useState(true)
   const [loadingWards, setLoadingWards] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
@@ -66,7 +76,8 @@ export default function CheckoutPage() {
   const [discountAmount, setDiscountAmount] = useState(0)
   const [finalAmount, setFinalAmount] = useState(0)
 
-  const cartItems = cart?.cartItems ?? []
+  const cartItems = useMemo(() => cart?.cartItems ?? [], [cart?.cartItems])
+  const previewCacheRef = useRef<Map<string, CheckoutPreviewResponse>>(new Map())
   const cartItemIds = useMemo(
     () => cartItems.map((i) => i.cartItemId).filter(Boolean),
     [cartItems]
@@ -137,7 +148,12 @@ export default function CheckoutPage() {
       return
     }
 
-    if (cartItemIds.length === 0 || !formData.ward || !formData.province) {
+    // Bắt buộc đủ tỉnh + phường để backend GHN tính được cước
+    if (
+      cartItemIds.length === 0 ||
+      !formData.wardCode ||
+      !formData.provinceId
+    ) {
       const fallbackDiscount = appliedVoucher
         ? calculateVoucherDiscount(appliedVoucher, subtotal, 0)
         : 0
@@ -145,54 +161,99 @@ export default function CheckoutPage() {
       setDiscountAmount(fallbackDiscount)
       setFinalAmount(subtotal - fallbackDiscount)
       setPreviewError(null)
+      setPreviewLoading(false)
       return
     }
-    if (!tokens?.idToken) return
+    if (!tokens?.idToken) {
+      setPreviewLoading(false)
+      return
+    }
 
-    const voucherCode = (appliedVoucher?.code ?? discountCode.trim()) || undefined
+    const voucherRaw = (appliedVoucher?.code ?? discountCode).trim()
+    const voucherCode = voucherRaw
+    const provinceNumericId = Math.trunc(Number(formData.provinceId))
+    const wardCodeForGhn = String(formData.wardCode).trim()
+
+    const previewKey = `${cartItemIdsKey}|${provinceNumericId}|${wardCodeForGhn}|${voucherCode}`
+    const cached = previewCacheRef.current.get(previewKey)
+    if (cached) {
+      setShippingFee(Number.isFinite(cached.shippingFee) ? cached.shippingFee : 0)
+      setDiscountAmount(
+        Number.isFinite(cached.discountAmount) ? cached.discountAmount : 0
+      )
+      setFinalAmount(Number.isFinite(cached.finalAmount) ? cached.finalAmount : subtotal)
+      setPreviewError(null)
+      setPreviewLoading(false)
+      return
+    }
+
     let cancelled = false
+    const controller = new AbortController()
+
+    // Debounce để tránh bắn GHN liên tục khi user đang đổi quận/phường hoặc state cập nhật nhiều lần
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
     setPreviewLoading(true)
     setPreviewError(null)
 
-    previewCheckout(
-      {
-        cartItemIds,
-        toWardCode: formData.ward,
-        provinceId: Number(formData.province),
-        voucherCode,
-      },
-      tokens.idToken
-    )
-      .then((res) => {
-        if (cancelled) return
-        const shipping = Number((res as any).shippingFee ?? 0)
-        const discount = Number((res as any).discountAmount ?? 0)
-        const final = Number((res as any).finalAmount ?? subtotal + shipping - discount)
-        setShippingFee(Number.isFinite(shipping) ? shipping : 0)
-        setDiscountAmount(Number.isFinite(discount) ? discount : 0)
-        setFinalAmount(Number.isFinite(final) ? final : subtotal + shipping - discount)
-      })
-      .catch((err) => {
-        if (cancelled) return
-        setPreviewError(
-          err instanceof Error ? err.message : 'Không thể tính phí giao hàng'
-        )
-        setShippingFee(0)
-        setDiscountAmount(0)
-        setFinalAmount(subtotal)
-      })
-      .finally(() => {
-        if (!cancelled) setPreviewLoading(false)
-      })
+    timeoutId = setTimeout(() => {
+      previewCheckout(
+        {
+          cartItemIds,
+          toWardCode: wardCodeForGhn,
+          provinceId: provinceNumericId,
+          insuranceValue: 0,
+          voucherCode,
+        },
+        tokens.idToken,
+        { signal: controller.signal }
+      )
+        .then((res) => {
+          if (cancelled) return
+          const shipping = Number((res as any).shippingFee ?? 0)
+          const discount = Number((res as any).discountAmount ?? 0)
+          const final = Number(
+            (res as any).finalAmount ?? subtotal + shipping - discount
+          )
+          setShippingFee(Number.isFinite(shipping) ? shipping : 0)
+          setDiscountAmount(Number.isFinite(discount) ? discount : 0)
+          setFinalAmount(
+            Number.isFinite(final) ? final : subtotal + shipping - discount
+          )
+          // Cache để lần sau đổi qua lại địa chỉ/voucher không phải gọi GHN lại
+          previewCacheRef.current.set(
+            previewKey,
+            res as unknown as CheckoutPreviewResponse
+          )
+        })
+        .catch((err) => {
+          if (cancelled) return
+          // Abort do effect re-run: bỏ qua để không làm UI “giật” / hiển thị lỗi giả
+          if (err && typeof err === 'object' && 'name' in (err as any)) {
+            if ((err as any).name === 'AbortError') return
+          }
+          setPreviewError(
+            err instanceof Error ? err.message : 'Không thể tính phí giao hàng'
+          )
+          setShippingFee(0)
+          setDiscountAmount(0)
+          setFinalAmount(subtotal)
+        })
+        .finally(() => {
+          if (!cancelled) setPreviewLoading(false)
+        })
+    }, 400)
 
     return () => {
       cancelled = true
+      controller.abort()
+      if (timeoutId) clearTimeout(timeoutId)
     }
   }, [
     cartItemIdsKey,
-    formData.ward,
-    formData.province,
-    appliedVoucher?.code,
+    cartItemIds,
+    formData.wardCode,
+    formData.provinceId,
+    appliedVoucher,
     discountCode,
     shippingMethod,
     tokens?.idToken,
@@ -230,40 +291,59 @@ export default function CheckoutPage() {
   useEffect(() => {
     let cancelled = false
     setLoadingProvinces(true)
-    getProvinces()
+    fetchLocationProvinces(tokens?.idToken)
       .then((data) => {
-        if (!cancelled) setProvinces(data)
+        if (!cancelled) setLocationProvinces(data)
       })
       .catch(() => {
-        if (!cancelled) setProvinces([])
+        if (!cancelled) setLocationProvinces([])
       })
       .finally(() => {
         if (!cancelled) setLoadingProvinces(false)
       })
-    return () => { cancelled = true }
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [tokens?.idToken])
 
   useEffect(() => {
-    if (!formData.province) {
-      setWards([])
-      setFormData((prev) => ({ ...prev, ward: '' }))
+    if (!formData.provinceId) {
+      setLocationWards([])
+      setFormData((prev) =>
+        prev.districtId || prev.wardCode
+          ? { ...prev, districtId: '', districtCode: '', wardCode: '' }
+          : prev
+      )
       return
     }
+
     let cancelled = false
     setLoadingWards(true)
-    setFormData((prev) => ({ ...prev, ward: '' }))
-    getWardsByProvince(Number(formData.province))
+    // Đổi tỉnh -> reset district/ward để preview/checkout không dùng dữ liệu cũ
+    setFormData((prev) => ({
+      ...prev,
+      districtId: '',
+      districtCode: '',
+      wardCode: '',
+    }))
+    setLocationWards([])
+
+    fetchLocationWards(formData.provinceId, tokens?.idToken)
       .then((data) => {
-        if (!cancelled) setWards(data)
+        if (!cancelled) setLocationWards(data)
       })
       .catch(() => {
-        if (!cancelled) setWards([])
+        if (!cancelled) setLocationWards([])
       })
       .finally(() => {
         if (!cancelled) setLoadingWards(false)
       })
-    return () => { cancelled = true }
-  }, [formData.province])
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ load lại khi đổi tỉnh; token lấy từ closure
+  }, [formData.provinceId])
 
   if (!isAuthenticated) {
     return (
@@ -304,33 +384,44 @@ export default function CheckoutPage() {
     setSubmitError(null)
 
     try {
-      const provinceName = provinces.find((p) => String(p.code) === formData.province)?.name ?? formData.province
-      const wardName = wards.find((w) => String(w.code) === formData.ward)?.name ?? formData.ward
+      const provinceName =
+        locationProvinces.find((p) => String(p.provinceId) === formData.provinceId)
+          ?.provinceName ?? formData.provinceId
+      const wardMatch = locationWards.find(
+        (w) => getWardToCode(w) === formData.wardCode
+      )
+      const districtName = wardMatch?.districtName ?? ''
+      const wardName = wardMatch
+        ? getWardDisplayName(wardMatch)
+        : formData.wardCode
       const shippingAddress = [
         formData.fullName,
         normalizePhoneNumber(formData.phone) || formData.phone,
         formData.address,
         wardName,
+        districtName,
         provinceName,
       ]
         .filter(Boolean)
         .join(', ')
 
-      const voucherCode = (appliedVoucher?.code ?? discountCode.trim()) || undefined
+      const voucherCode =
+        (appliedVoucher?.code ?? discountCode.trim()) || ''
       let order
       if (shippingMethod === 'express') {
-        const cartItemIds = cartItems.map((item) => item.cartItemId)
+        const expressCartIds = cartItems.map((item) => item.cartItemId)
         order = await checkoutOrder(
           {
-            cartItemIds: cartItemIds as number[],
+            cartItemIds: expressCartIds,
             shippingAddress: shippingAddress || '',
             shippingMethod: 'EXPRESS',
             paymentMethod: paymentMethod === 'cod' ? 'COD' : 'VNPay',
             recipientName: formData.fullName,
             recipientPhone: normalizePhoneNumber(formData.phone) || formData.phone,
-            toWardCode: formData.ward,
-            provinceCode: formData.province,
-            provinceId: Number(formData.province),
+            toWardCode: formData.wardCode,
+            provinceCode: formData.provinceCode,
+            provinceId: Number(formData.provinceId),
+            insuranceValue: 0,
             voucherCode,
           },
           tokens.idToken
@@ -471,17 +562,30 @@ export default function CheckoutPage() {
                       <label className="block text-sm font-semibold mb-2">Tỉnh/Thành phố</label>
                       <select
                         required
-                        value={formData.province}
-                        onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                        value={formData.provinceId}
+                        onChange={(e) => {
+                          const id = e.target.value
+                          const p = locationProvinces.find(
+                            (x) => String(x.provinceId) === id
+                          )
+                          setFormData({
+                            ...formData,
+                            provinceId: id,
+                            provinceCode: p?.code ?? '',
+                            districtId: '',
+                            districtCode: '',
+                            wardCode: '',
+                          })
+                        }}
                         disabled={loadingProvinces}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green disabled:opacity-60"
                       >
                         <option value="">
                           {loadingProvinces ? 'Đang tải...' : 'Chọn tỉnh/thành'}
                         </option>
-                        {provinces.map((p) => (
-                          <option key={p.code} value={String(p.code)}>
-                            {p.name}
+                        {locationProvinces.map((p) => (
+                          <option key={p.provinceId} value={String(p.provinceId)}>
+                            {p.provinceName}
                           </option>
                         ))}
                       </select>
@@ -490,23 +594,32 @@ export default function CheckoutPage() {
                       <label className="block text-sm font-semibold mb-2">Phường/Xã</label>
                       <select
                         required
-                        value={formData.ward}
-                        onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
-                        disabled={!formData.province || loadingWards}
+                        value={formData.wardCode}
+                        onChange={(e) => {
+                          const code = e.target.value
+                          setFormData({
+                            ...formData,
+                            wardCode: code,
+                          })
+                        }}
+                        disabled={!formData.provinceId || loadingWards}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green disabled:opacity-60"
                       >
                         <option value="">
-                          {!formData.province
+                          {!formData.provinceId
                             ? 'Chọn tỉnh trước'
                             : loadingWards
                               ? 'Đang tải...'
                               : 'Chọn phường/xã'}
                         </option>
-                        {wards.map((w) => (
-                          <option key={w.code} value={String(w.code)}>
-                            {w.name}
-                          </option>
-                        ))}
+                        {locationWards.map((w, idx) => {
+                          const code = getWardToCode(w)
+                          return (
+                            <option key={`${code}-${idx}`} value={code}>
+                              {getWardDisplayName(w)}
+                            </option>
+                          )
+                        })}
                       </select>
                     </div>
                   </div>

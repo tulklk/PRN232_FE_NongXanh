@@ -6,6 +6,7 @@ import { useUser } from '@/contexts/UserContext'
 import { getOrders } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getOrderStatusLabel, getVnPayStatusLabel } from '@/lib/orderDisplay'
 
 export default function OrdersPage() {
   const { tokens, isAuthenticated } = useUser()
@@ -94,15 +95,24 @@ export default function OrdersPage() {
                   {formatDate(order.orderDate)}
                 </span>
               </div>
-              <div className="text-right text-sm">
-                <span className="font-bold text-primary-green">
+              <div className="text-right text-sm space-y-1.5">
+                <div className="font-bold text-primary-green">
                   {formatCurrency(order.finalAmount)}
-                </span>
-                {order.status && (
-                  <span className="ml-2 px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
-                    {order.status}
+                </div>
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  <span
+                    className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700"
+                    title="Trạng thái đơn hàng"
+                  >
+                    {getOrderStatusLabel(order.status)}
                   </span>
-                )}
+                  <span
+                    className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-800 border border-emerald-100"
+                    title="Trạng thái thanh toán "
+                  >
+                    VNPay: {getVnPayStatusLabel(order.vnPayStatus)}
+                  </span>
+                </div>
               </div>
             </div>
           </Link>

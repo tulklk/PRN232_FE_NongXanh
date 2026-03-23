@@ -30,6 +30,20 @@ function getJsonHeaders(token?: string): Record<string, string> {
   return headers
 }
 
+/** Map backend PascalCase / mixed JSON to ApiOrder fields */
+function normalizeApiOrder(raw: ApiOrder & Record<string, unknown>): ApiOrder {
+  const vn =
+    raw.vnPayStatus ??
+    (raw.VnPayStatus as string | null | undefined) ??
+    (raw as { vnpayStatus?: string | null }).vnpayStatus
+  const st = raw.status ?? (raw.Status as string | null | undefined)
+  return {
+    ...raw,
+    status: st ?? raw.status,
+    vnPayStatus: vn ?? raw.vnPayStatus,
+  }
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
@@ -65,7 +79,8 @@ export async function getOrders(
   }
   const json = (await res.json()) as { data?: ApiOrdersPagedResponse } & ApiOrdersPagedResponse
   const data = json?.data ?? json
-  const items = (data?.items ?? json?.items ?? []) as ApiOrder[]
+  const rawItems = (data?.items ?? json?.items ?? []) as (ApiOrder & Record<string, unknown>)[]
+  const items = rawItems.map((o) => normalizeApiOrder(o))
   return {
     items,
     totalCount: data?.totalCount ?? items.length,
@@ -92,8 +107,8 @@ export async function getOrderById(
     )
   }
   const json = (await res.json()) as { data?: ApiOrder } & ApiOrder
-  const order = (json?.data ?? json) as ApiOrder
-  return order
+  const orderRaw = (json?.data ?? json) as ApiOrder & Record<string, unknown>
+  return normalizeApiOrder(orderRaw)
 }
 
 export async function createOrder(
@@ -161,14 +176,127 @@ export async function updateOrderStatus(
   return (json?.data ?? json) as ApiOrder
 }
 
+export async function confirmOrder(
+  orderId: number | string,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${getBase()}/api/orders/${orderId}/confirm`, {
+    method: 'POST',
+    headers: getJsonHeaders(token),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(
+      (err as { error?: string }).error || 'Không thể xác nhận đơn hàng'
+    )
+  }
+}
+
+export async function cancelOrder(
+  orderId: number | string,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${getBase()}/api/orders/${orderId}/cancel`, {
+    method: 'POST',
+    headers: getJsonHeaders(token),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(
+      (err as { error?: string }).error || 'Không thể hủy đơn hàng'
+    )
+  }
+}
+
+export async function createOrderShipping(
+  orderId: number | string,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${getBase()}/api/orders/${orderId}/create-shipping`, {
+    method: 'POST',
+    headers: getJsonHeaders(token),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(
+      (err as { error?: string }).error || 'Không thể tạo vận chuyển'
+    )
+  }
+}
+
+/** BE Swagger: cartItemIds là Guid string[] */
+function cartItemIdsAsStrings(ids: readonly (number | string)[]): string[] {
+  return ids.map((id) => String(id))
+}
+
+/** JSON number nguyên cho province/district (không gửi string) */
+function toApiInt(value: unknown): number {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 0
+  return Math.trunc(n)
+}
+
+/**
+ * POST /api/Orders/checkout/preview — đúng Swagger:
+ * cartItemIds, provinceId, toDistrictId, towardCode, insuranceValue, voucherCode
+ */
+function buildCheckoutPreviewBody(data: CheckoutPreviewRequest): Record<string, unknown> {
+  const ward = String(data.toWardCode ?? '').trim()
+  const voucher =
+    data.voucherCode != null && String(data.voucherCode).trim() !== ''
+      ? String(data.voucherCode).trim()
+      : ''
+
+  const body: Record<string, unknown> = {
+    cartItemIds: cartItemIdsAsStrings(data.cartItemIds),
+    provinceId: toApiInt(data.provinceId),
+    towardCode: ward,
+    insuranceValue: toApiInt(data.insuranceValue ?? 0),
+    voucherCode: voucher,
+  }
+
+  // BE có thể không còn bắt buộc district nữa; chỉ gửi khi FE có giá trị.
+  if (data.toDistrictId != null) {
+    body.toDistrictId = toApiInt(data.toDistrictId)
+  }
+
+  return body
+}
+
+/** BE thường trả { success, data: { shippingFee, finalAmount, ... } } */
+function unwrapCheckoutPreviewJson(json: unknown): CheckoutPreviewResponse {
+  let cur: unknown = json
+  for (let depth = 0; depth < 4; depth++) {
+    if (!cur || typeof cur !== 'object' || Array.isArray(cur)) break
+    const o = cur as Record<string, unknown>
+    const hasFees =
+      'shippingFee' in o ||
+      'finalAmount' in o ||
+      'discountAmount' in o ||
+      'totalAmount' in o
+    if (hasFees) return o as CheckoutPreviewResponse
+    if ('data' in o && o.data != null && typeof o.data === 'object') {
+      cur = o.data
+      continue
+    }
+    break
+  }
+  return (cur ?? {}) as CheckoutPreviewResponse
+}
+
 export async function previewCheckout(
   data: CheckoutPreviewRequest,
-  token: string
+  token: string,
+  options?: { signal?: AbortSignal }
 ): Promise<CheckoutPreviewResponse> {
   const res = await fetch(`${getBase()}/api/orders/checkout/preview`, {
     method: 'POST',
     headers: getJsonHeaders(token),
-    body: JSON.stringify(data),
+    body: JSON.stringify(buildCheckoutPreviewBody(data)),
+    signal: options?.signal,
   })
 
   if (!res.ok) {
@@ -178,10 +306,32 @@ export async function previewCheckout(
     )
   }
 
-  const json = (await res.json()) as
-    | { data?: CheckoutPreviewResponse }
-    | CheckoutPreviewResponse
-  return (json as { data?: CheckoutPreviewResponse }).data ?? (json as CheckoutPreviewResponse)
+  const json = await res.json()
+  return unwrapCheckoutPreviewJson(json)
+}
+
+/**
+ * POST /api/Orders/checkout — Swagger: dùng `toWardCode` (khác preview là `towardCode`).
+ */
+function buildCheckoutOrderBody(data: CheckoutOrderRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    cartItemIds: cartItemIdsAsStrings(data.cartItemIds),
+    shippingAddress: data.shippingAddress,
+    shippingMethod: data.shippingMethod,
+    paymentMethod: data.paymentMethod,
+    recipientName: data.recipientName,
+    recipientPhone: data.recipientPhone,
+    provinceCode: data.provinceCode,
+    provinceId: data.provinceId,
+    toWardCode: String(data.toWardCode ?? '').trim(),
+    insuranceValue: data.insuranceValue ?? 0,
+  }
+  if (data.toDistrictId != null && Number.isFinite(data.toDistrictId)) {
+    body.toDistrictId = data.toDistrictId
+  }
+  // Cho phép gửi cả chuỗi rỗng '' để đủ field theo Swagger/GHN.
+  if (data.voucherCode != null) body.voucherCode = String(data.voucherCode)
+  return body
 }
 
 export async function checkoutOrder(
@@ -191,7 +341,7 @@ export async function checkoutOrder(
   const res = await fetch(`${getBase()}/api/orders/checkout`, {
     method: 'POST',
     headers: getJsonHeaders(token),
-    body: JSON.stringify(data),
+    body: JSON.stringify(buildCheckoutOrderBody(data)),
   })
 
   if (!res.ok) {

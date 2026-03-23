@@ -51,8 +51,10 @@ export default function StaffOrdersPage() {
       pending: 'Chờ thanh toán',
       paid: 'Đã thanh toán',
       failed: 'Thanh toán thất bại',
+      notapplicable: 'Chưa thanh toán',
     }
-    return labels[status ?? ''] ?? status ?? '—'
+    const key = (status ?? '').toLowerCase()
+    return labels[key] ?? status ?? '—'
   }
 
   const mapStatusForBadge = (status?: string | null) => {

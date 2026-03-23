@@ -23,6 +23,7 @@ export default function Header() {
     const { user, isAuthenticated, login, logout } = useUser()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [categorySubmenuHovered, setCategorySubmenuHovered] = useState<number | null>(null)
+    const [navCategoryDropdownHovered, setNavCategoryDropdownHovered] = useState<number | null>(null)
     const [categories, setCategories] = useState<ApiCategory[]>([])
     const [isLoginOpen, setIsLoginOpen] = useState(false)
     const [isRegisterOpen, setIsRegisterOpen] = useState(false)
@@ -31,6 +32,7 @@ export default function Header() {
     const [showCartPopup, setShowCartPopup] = useState(false)
     const cartPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const userMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const navCategoryDropdownCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const searchWrapperRef = useRef<HTMLDivElement | null>(null)
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -68,6 +70,9 @@ export default function Header() {
         return () => {
             if (cartPopupTimeoutRef.current) clearTimeout(cartPopupTimeoutRef.current)
             if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current)
+            if (navCategoryDropdownCloseTimeoutRef.current) {
+                clearTimeout(navCategoryDropdownCloseTimeoutRef.current)
+            }
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
         }
     }, [])
@@ -467,7 +472,7 @@ export default function Header() {
                                 {isMenuOpen && (
                                     <div className="absolute left-0 top-full z-50 mt-0 bg-white border border-gray-200 shadow-lg max-h-[70vh]">
                                         <div className="flex">
-                                            {/* Cột danh mục cha */}
+                                            {/* Cột danh mục cha (cate con sẽ hiển thị sang bên phải) */}
                                             <div className="w-64 py-2 max-h-[70vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                                                 <Link
                                                     href="/products"
@@ -479,35 +484,39 @@ export default function Header() {
                                                 {topLevelCategories.map((cat) => {
                                                     const children = buildChildrenForCategory(cat)
                                                     const hasChildren = children.length > 0
-                                                    const isActiveParent = categorySubmenuHovered === cat.categoryId
 
                                                     return (
-                                                        <button
-                                                            key={cat.categoryId}
-                                                            type="button"
-                                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 ${
-                                                                isActiveParent ? 'bg-gray-100 text-[#0A923C]' : 'text-gray-700'
-                                                            }`}
-                                                            onMouseEnter={() => {
-                                                                setCategorySubmenuHovered(cat.categoryId)
-                                                            }}
-                                                            onClick={() => {
-                                                                // Nếu không có con thì đi thẳng tới trang category
-                                                                if (!hasChildren) {
-                                                                    setIsMenuOpen(false)
-                                                                    router.push(`/products?category=${cat.categoryId}`)
-                                                                }
-                                                            }}
-                                                        >
-                                                            {cat.categoryName}
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                key={cat.categoryId}
+                                                                type="button"
+                                                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 ${
+                                                                    categorySubmenuHovered === cat.categoryId
+                                                                        ? 'bg-gray-100 text-[#0A923C]'
+                                                                        : 'text-gray-700'
+                                                                }`}
+                                                                onMouseEnter={() => {
+                                                                    setCategorySubmenuHovered(cat.categoryId)
+                                                                }}
+                                                                onClick={() => {
+                                                                    // Nếu không có con thì đi thẳng tới trang category
+                                                                    if (!hasChildren) {
+                                                                        setIsMenuOpen(false)
+                                                                        router.push(
+                                                                            `/products?category=${cat.categoryId}`
+                                                                        )
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {cat.categoryName}
+                                                            </button>
+                                                        </>
                                                     )
                                                 })}
                                                 {topLevelCategories.length === 0 && (
                                                     <div className="px-4 py-3 text-sm text-gray-500">Đang tải...</div>
                                                 )}
                                             </div>
-
                                             {/* Cột danh mục con */}
                                             {categorySubmenuHovered !== null && (
                                                 <div className="min-w-[220px] border-l border-gray-200 py-2 px-2 bg-white">
@@ -528,7 +537,10 @@ export default function Header() {
                                                             <Link
                                                                 key={child.categoryId}
                                                                 href={`/products?category=${child.categoryId}`}
-                                                                onClick={() => setIsMenuOpen(false)}
+                                                                onClick={() => {
+                                                                    setIsMenuOpen(false)
+                                                                    setCategorySubmenuHovered(null)
+                                                                }}
                                                                 className="block px-3 py-1.5 text-sm text-gray-700 rounded hover:bg-gray-100 hover:text-[#0A923C]"
                                                             >
                                                                 {child.categoryName}
@@ -543,7 +555,13 @@ export default function Header() {
                             </div>
 
                             {/* Navigation Links - from API categories */}
-                            <div className="flex items-center flex-1 justify-center overflow-x-auto">
+                            <div
+                                className={`flex items-center flex-1 justify-center ${
+                                    navCategoryDropdownHovered !== null
+                                        ? 'overflow-x-visible'
+                                        : 'overflow-x-auto'
+                                }`}
+                            >
                                 <Link
                                     href="/products"
                                     className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
@@ -554,19 +572,87 @@ export default function Header() {
                                     <span>ĐI CHỢ ONLINE</span>
                                     <ChevronDown size={12} className="text-gray-400" />
                                 </Link>
-                                {topLevelCategories.slice(0, 4).map((cat) => (
-                                    <Link
-                                        key={cat.categoryId}
-                                        href={`/products?category=${cat.categoryId}`}
-                                        className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
-                                    >
-                                        <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
-                                            <Cherry size={10} className="text-white" />
+                                {topLevelCategories.slice(0, 4).map((cat) => {
+                                    const children = buildChildrenForCategory(cat)
+                                    const hasChildren = children.length > 0
+                                    const isOpen = navCategoryDropdownHovered === cat.categoryId
+                                    return (
+                                        <div
+                                            key={cat.categoryId}
+                                            className="relative"
+                                            onMouseEnter={() => {
+                                                if (hasChildren) setNavCategoryDropdownHovered(cat.categoryId)
+                                                if (navCategoryDropdownCloseTimeoutRef.current) {
+                                                    clearTimeout(navCategoryDropdownCloseTimeoutRef.current)
+                                                    navCategoryDropdownCloseTimeoutRef.current = null
+                                                }
+                                            }}
+                                            onMouseLeave={() => {
+                                                if (!hasChildren) return
+                                                // MouseLeave có thể bắn khi bạn vừa kéo xuống vùng dropdown,
+                                                // nên chờ 120ms rồi mới tắt để kịp hover vào menu con.
+                                                navCategoryDropdownCloseTimeoutRef.current = setTimeout(() => {
+                                                    setNavCategoryDropdownHovered((prev) =>
+                                                        prev === cat.categoryId ? null : prev
+                                                    )
+                                                    navCategoryDropdownCloseTimeoutRef.current = null
+                                                }, 120)
+                                            }}
+                                        >
+                                            <Link
+                                                href={`/products?category=${cat.categoryId}`}
+                                                className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
+                                                onClick={() => setNavCategoryDropdownHovered(null)}
+                                            >
+                                                <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                                                    <Cherry size={10} className="text-white" />
+                                                </div>
+                                                <span>{cat.categoryName.toUpperCase()}</span>
+                                                {hasChildren && (
+                                                    <ChevronDown
+                                                        size={12}
+                                                        className={`text-gray-400 transition-transform ${
+                                                            isOpen ? 'rotate-180' : ''
+                                                        }`}
+                                                    />
+                                                )}
+                                            </Link>
+
+                                            {hasChildren && isOpen && (
+                                                <div
+                                                    className="absolute left-0 top-full mt-2 z-50 w-56 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                                                    onMouseEnter={() => {
+                                                        if (navCategoryDropdownCloseTimeoutRef.current) {
+                                                            clearTimeout(navCategoryDropdownCloseTimeoutRef.current)
+                                                            navCategoryDropdownCloseTimeoutRef.current = null
+                                                        }
+                                                    }}
+                                                    onMouseLeave={() => {
+                                                        navCategoryDropdownCloseTimeoutRef.current = setTimeout(() => {
+                                                            setNavCategoryDropdownHovered((prev) =>
+                                                                prev === cat.categoryId ? null : prev
+                                                            )
+                                                            navCategoryDropdownCloseTimeoutRef.current = null
+                                                        }, 120)
+                                                    }}
+                                                >
+                                                    <div className="py-1">
+                                                        {children.map((child) => (
+                                                            <Link
+                                                                key={child.categoryId}
+                                                                href={`/products?category=${child.categoryId}`}
+                                                                onClick={() => setNavCategoryDropdownHovered(null)}
+                                                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#0A923C]"
+                                                            >
+                                                                {child.categoryName}
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        <span>{cat.categoryName.toUpperCase()}</span>
-                                        <ChevronDown size={12} className="text-gray-400" />
-                                    </Link>
-                                ))}
+                                    )
+                                })}
                                 <Link
                                     href="/news"
                                     className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
@@ -575,7 +661,6 @@ export default function Header() {
                                         <Leaf size={10} className="text-white" />
                                     </div>
                                     <span>TIN TỨC</span>
-                                    <ChevronDown size={12} className="text-gray-400" />
                                 </Link>
                                 <Link
                                     href="/contact"

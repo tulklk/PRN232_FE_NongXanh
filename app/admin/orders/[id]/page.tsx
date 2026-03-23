@@ -5,7 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { getOrderById, updateOrderStatus } from '@/lib/api/orders'
+import {
+  cancelOrder,
+  confirmOrder,
+  createOrderShipping,
+  getOrderById,
+  syncOrderShipment,
+} from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -17,10 +23,10 @@ export default function AdminOrderDetailPage() {
   const [order, setOrder] = useState<ApiOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [nextStatus, setNextStatus] = useState('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
   const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
+  const [ghnCreated, setGhnCreated] = useState(false)
 
   const getAllowedNextStatuses = (status?: string | null): string[] => {
     const s = (status ?? '').toLowerCase()
@@ -51,8 +57,6 @@ export default function AdminOrderDetailPage() {
     getOrderById(id, tokens.idToken)
       .then((data) => {
         setOrder(data)
-        const allowed = getAllowedNextStatuses(data?.status)
-        setNextStatus(allowed[0] ?? '')
       })
       .catch((err) =>
         setError(
@@ -68,6 +72,11 @@ export default function AdminOrderDetailPage() {
     }
   }, [authLoading, isAuthenticated, router])
 
+  // Nếu backend đã chuyển sang `shipped` thì coi như đã tạo GHN.
+  useEffect(() => {
+    if ((order?.status ?? '').toLowerCase() === 'shipped') setGhnCreated(true)
+  }, [order?.status])
+
   if (authLoading) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-5">
@@ -79,48 +88,96 @@ export default function AdminOrderDetailPage() {
   if (!isAuthenticated) return null
 
   const allowedNextStatuses = getAllowedNextStatuses(order?.status)
-  const isStatusLocked = allowedNextStatuses.length === 0
+  const canCancel = allowedNextStatuses.includes('cancelled')
+  const statusLower = (order?.status ?? '').toLowerCase()
+  const canConfirmOrder =
+    statusLower === 'pending' || statusLower === 'processing'
+  const canConfirmShipping = statusLower === 'confirmed' && !ghnCreated
+  const canUpdateGHN = ghnCreated || statusLower === 'shipped'
 
-  const handleUpdateStatus = async () => {
-    if (!order || !tokens?.idToken || !nextStatus) return
+  const refetch = async () => {
+    if (!order || !tokens?.idToken) return null
+    const updated = await getOrderById(order.orderId, tokens.idToken)
+    setOrder(updated)
+    return updated
+  }
+
+  const handleConfirmOrder = async () => {
+    if (!order || !tokens?.idToken) return
+    setUpdatingStatus(true)
+    setStatusError(null)
+    setStatusSuccess(null)
+    setGhnCreated(false)
+
+    try {
+      await confirmOrder(order.orderId, tokens.idToken)
+      await refetch()
+      setStatusSuccess('Xác nhận đơn hàng thành công.')
+    } catch (err) {
+      setStatusError(
+        err instanceof Error ? err.message : 'Không thể xác nhận đơn hàng'
+      )
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const handleConfirmShipping = async () => {
+    if (!order || !tokens?.idToken) return
     setUpdatingStatus(true)
     setStatusError(null)
     setStatusSuccess(null)
 
     try {
-      const updated = await updateOrderStatus(
-        order.orderId,
-        {
-          status: nextStatus,
-          shippingAddress: order.shippingAddress ?? undefined,
-          vnPayStatus: order.vnPayStatus ?? undefined,
-        },
-        tokens.idToken
-      )
-
-      setOrder((prev) => {
-        if (!prev) return updated
-        return {
-          ...prev,
-          ...updated,
-          // Một số response PUT chỉ trả về vài field, giữ lại dữ liệu cũ nếu thiếu
-          orderDate: updated.orderDate ?? prev.orderDate,
-          orderDetails: updated.orderDetails ?? prev.orderDetails,
-          customerDisplayName:
-            updated.customerDisplayName ?? prev.customerDisplayName,
-          customerEmail: updated.customerEmail ?? prev.customerEmail,
-          customerPhoneNumber:
-            updated.customerPhoneNumber ?? prev.customerPhoneNumber,
-        }
-      })
-      const nextAllowed = getAllowedNextStatuses(updated.status ?? order.status)
-      setNextStatus(nextAllowed[0] ?? '')
-      setStatusSuccess('Cập nhật trạng thái đơn hàng thành công.')
+      await createOrderShipping(order.orderId, tokens.idToken)
+      setGhnCreated(true)
+      await refetch()
+      setStatusSuccess('Xác nhận vận chuyển thành công. Mời cập nhật GHN.')
     } catch (err) {
       setStatusError(
         err instanceof Error
           ? err.message
-          : 'Không thể cập nhật trạng thái đơn hàng'
+          : 'Không thể tạo đơn GHN (create-shipping)'
+      )
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const handleUpdateGHNStatus = async () => {
+    if (!order || !tokens?.idToken) return
+    setUpdatingStatus(true)
+    setStatusError(null)
+    setStatusSuccess(null)
+
+    try {
+      await syncOrderShipment(order.orderId, tokens.idToken)
+      setGhnCreated(false)
+      await refetch()
+      setStatusSuccess('Cập nhật trạng thái GHN thành công.')
+    } catch (err) {
+      setStatusError(
+        err instanceof Error ? err.message : 'Không thể đồng bộ trạng thái GHN'
+      )
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const handleCancelOrder = async () => {
+    if (!order || !tokens?.idToken) return
+    setUpdatingStatus(true)
+    setStatusError(null)
+    setStatusSuccess(null)
+    setGhnCreated(false)
+
+    try {
+      await cancelOrder(order.orderId, tokens.idToken)
+      await refetch()
+      setStatusSuccess('Hủy đơn hàng thành công.')
+    } catch (err) {
+      setStatusError(
+        err instanceof Error ? err.message : 'Không thể hủy đơn hàng'
       )
     } finally {
       setUpdatingStatus(false)
@@ -292,45 +349,53 @@ export default function AdminOrderDetailPage() {
       <div className="border-t border-gray-200 pt-4 mt-6">
         <h3 className="font-semibold text-gray-900 mb-3">Cập nhật trạng thái</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div>
+          <div className="md:col-span-1">
             <label className="block text-sm text-gray-600 mb-1">
               Trạng thái hiện tại
             </label>
             <p className="font-medium text-gray-900">{getStatusLabel(order.status)}</p>
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Chuyển sang
-            </label>
-            <select
-              value={nextStatus}
-              onChange={(e) => {
-                setNextStatus(e.target.value)
-                setStatusError(null)
-                setStatusSuccess(null)
-              }}
-              disabled={isStatusLocked || updatingStatus}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-60"
-            >
-              {isStatusLocked ? (
-                <option value="">Đơn hàng đã hoàn tất / đã hủy</option>
-              ) : (
-                allowedNextStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {getStatusLabel(status)}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-          <div>
+          <div className="md:col-span-2 flex justify-end gap-3">
+            {canConfirmOrder && (
+              <button
+                type="button"
+                onClick={handleConfirmOrder}
+                disabled={updatingStatus || !canConfirmOrder}
+                className="px-4 py-2 bg-primary-green text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
+              >
+                {updatingStatus ? 'Đang cập nhật...' : 'Xác nhận đơn hàng'}
+              </button>
+            )}
+
+            {canConfirmShipping && (
+              <button
+                type="button"
+                onClick={handleConfirmShipping}
+                disabled={updatingStatus || !canConfirmShipping}
+                className="px-4 py-2 bg-primary-green text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
+              >
+                {updatingStatus ? 'Đang cập nhật...' : 'Xác nhận vận chuyển'}
+              </button>
+            )}
+
+            {canUpdateGHN && (
+              <button
+                type="button"
+                onClick={handleUpdateGHNStatus}
+                disabled={updatingStatus || !canUpdateGHN}
+                className="px-4 py-2 bg-primary-green text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
+              >
+                {updatingStatus ? 'Đang cập nhật...' : 'Cập nhật trạng thái GHN'}
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={handleUpdateStatus}
-              disabled={isStatusLocked || updatingStatus || !nextStatus}
-              className="w-full md:w-auto px-4 py-2 bg-primary-green text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleCancelOrder}
+              disabled={updatingStatus || !canCancel}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
             >
-              {updatingStatus ? 'Đang cập nhật...' : 'Cập nhật'}
+              {updatingStatus ? 'Đang cập nhật...' : 'Hủy đơn hàng'}
             </button>
           </div>
         </div>

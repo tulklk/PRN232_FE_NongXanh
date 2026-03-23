@@ -125,7 +125,8 @@ export interface ApiProvidersPagedResponse {
 
 // API Cart structure
 export interface ApiCartItem {
-  cartItemId: number
+  /** BE có thể trả Guid string */
+  cartItemId: number | string
   quantity: number
   priceAtTime: number
   subTotal: number
@@ -201,9 +202,12 @@ export interface CreateOrderRequest {
 }
 
 export interface CheckoutPreviewRequest {
-  cartItemIds: number[]
+  /** BE Swagger: mảng string (Guid) */
+  cartItemIds: (number | string)[]
+  /** Mã phường/xã — buildCheckoutPreviewBody gửi `towardCode` (+ `toWardCode` dự phòng) */
   toWardCode: string
   provinceId: number
+  /** Không bắt buộc (BE yêu cầu tùy phiên bản) */
   toDistrictId?: number
   insuranceValue?: number
   voucherCode?: string
@@ -218,12 +222,14 @@ export interface CheckoutPreviewResponse {
 }
 
 export interface CheckoutOrderRequest {
-  cartItemIds: number[]
+  /** BE Swagger: mảng string (Guid) */
+  cartItemIds: (number | string)[]
   shippingAddress: string
   shippingMethod: string
   paymentMethod: 'COD' | 'VNPay'
   recipientName: string
   recipientPhone: string
+  /** Mã phường/xã — BE Swagger checkout: `toWardCode` */
   toWardCode: string
   provinceCode: string
   provinceId: number

@@ -13,6 +13,32 @@ export default function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [orders, setOrders] = useState<ApiOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [pageNumber, setPageNumber] = useState(1)
+  const pageSize = 10
+  const [totalPages, setTotalPages] = useState(1)
+
+  const getPaginationItems = () => {
+    const safeTotal = Math.max(1, totalPages)
+    const cur = Math.min(Math.max(1, pageNumber), safeTotal)
+    const range = 2
+
+    const pageSet = new Set<number>()
+    pageSet.add(1)
+    pageSet.add(safeTotal)
+    for (let p = cur - range; p <= cur + range; p++) {
+      if (p >= 1 && p <= safeTotal) pageSet.add(p)
+    }
+
+    const sortedPages = Array.from(pageSet).sort((a, b) => a - b)
+    const items: Array<number | '...'> = []
+    for (let i = 0; i < sortedPages.length; i++) {
+      const p = sortedPages[i]
+      const prev = sortedPages[i - 1]
+      if (i > 0 && prev != null && p - prev > 1) items.push('...')
+      items.push(p)
+    }
+    return items
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.idToken) {
@@ -20,11 +46,18 @@ export default function OrdersPage() {
       return
     }
     setLoading(true)
-    getOrders(1, 30, tokens.idToken)
-      .then((res) => setOrders(res.items ?? []))
+    getOrders(pageNumber, pageSize, tokens.idToken)
+      .then((res) => {
+        setOrders(res.items ?? [])
+        const fallbackTotalPages = Math.ceil(
+          (res.totalCount ?? res.items?.length ?? 0) / pageSize
+        )
+        const computedTotalPages = res.totalPages ?? fallbackTotalPages ?? 1
+        setTotalPages(computedTotalPages || 1)
+      })
       .catch(() => setOrders([]))
       .finally(() => setLoading(false))
-  }, [isAuthenticated, tokens?.idToken])
+  }, [isAuthenticated, tokens?.idToken, pageNumber])
 
   const filteredOrders = orders.filter((order) => {
     const q = searchQuery.trim().toLowerCase()
@@ -49,7 +82,8 @@ export default function OrdersPage() {
       delivered: 'Đã nhận hàng',
       cancelled: 'Đã hủy',
     }
-    return labels[status ?? ''] ?? status ?? '—'
+    const key = (status ?? '').toLowerCase()
+    return labels[key] ?? status ?? '—'
   }
 
   const getPaymentLabel = (status?: string | null) => {
@@ -57,8 +91,10 @@ export default function OrdersPage() {
       pending: 'Chờ thanh toán',
       paid: 'Đã thanh toán',
       failed: 'Thanh toán thất bại',
+      notapplicable: 'Chưa thanh toán',
     }
-    return labels[status ?? ''] ?? status ?? '—'
+    const key = (status ?? '').toLowerCase()
+    return labels[key] ?? status ?? '—'
   }
 
   const mapStatusForBadge = (status?: string | null) => {
@@ -69,7 +105,8 @@ export default function OrdersPage() {
       delivered: 'delivered',
       cancelled: 'cancelled',
     }
-    return map[status ?? ''] ?? 'processing'
+    const key = (status ?? '').toLowerCase()
+    return map[key] ?? 'processing'
   }
 
   return (
@@ -86,7 +123,10 @@ export default function OrdersPage() {
         <SearchBar
           placeholder="Tìm theo mã đơn, userId, địa chỉ hoặc tổng tiền"
           value={searchQuery}
-          onChange={setSearchQuery}
+          onChange={(v) => {
+            setPageNumber(1)
+            setSearchQuery(v)
+          }}
         />
       </div>
 
@@ -159,6 +199,57 @@ export default function OrdersPage() {
         )}
         {!loading && filteredOrders.length === 0 && (
           <p className="py-8 text-center text-gray-500">Không có đơn hàng nào</p>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber === 1}
+              className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trang trước
+            </button>
+
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {getPaginationItems().map((item, idx) => {
+                if (item === '...') {
+                  return (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
+                      ...
+                    </span>
+                  )
+                }
+                const p = item
+                const isActive = p === pageNumber
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPageNumber(p)}
+                    disabled={isActive}
+                    className={`px-3 py-2 rounded-lg text-sm ${
+                      isActive
+                        ? 'bg-primary-green text-white'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
+              disabled={pageNumber === totalPages}
+              className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trang sau
+            </button>
+          </div>
         )}
       </div>
     </div>
