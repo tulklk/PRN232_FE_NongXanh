@@ -7,6 +7,7 @@ import { Phone, MessageCircle } from 'lucide-react'
 import ProductGrid from '@/components/products/ProductGrid'
 import RatingStars from '@/components/common/RatingStars'
 import ProductDetailActions from '@/components/products/ProductDetailActions'
+import WishlistToggleButton from '@/components/products/WishlistToggleButton'
 import ReviewCard from '@/components/reviews/ReviewCard'
 import { reviews } from '@/data/reviews'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
@@ -74,7 +75,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
           {/* Product Info */}
           <div className="lg:col-span-5">
-            <h1 className="text-base sm:text-lg font-bold text-gray-900 mb-2">{product.name}</h1>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <h1 className="text-base sm:text-lg font-bold text-gray-900">{product.name}</h1>
+              <WishlistToggleButton
+                productId={product.id}
+                productHref={`/products/${product.id}`}
+                className="p-2 rounded-full border border-gray-300 text-gray-500 bg-white hover:border-red-400 hover:text-red-500 transition-colors"
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 text-xs">
               <RatingStars rating={averageRating} size={14} showNumber />
               <span className="text-gray-400">|</span>
@@ -251,7 +259,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         {/* Related Products */}
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-4">CÁC SẢN PHẨM TƯƠNG TỰ</h2>
-          <ProductGrid products={relatedProducts} columns={4} />
+          <ProductGrid products={relatedProducts} columns={4} mobileColumns={2} />
         </section>
       </div>
     </div>

@@ -28,11 +28,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const pageNumber = searchParams.get('pageNumber') || '1'
     const pageSize = searchParams.get('pageSize') || '10'
-    const categoryId = searchParams.get('categoryId')
+    const categoryId = searchParams.get('categoryId') || searchParams.get('category')
 
     let url = `${API_BASE_URL}/api/Products?pageNumber=${pageNumber}&pageSize=${pageSize}`
     if (categoryId) {
-      url += `&categoryId=${categoryId}`
+      const encoded = encodeURIComponent(categoryId)
+      // Gửi cả 2 key để tương thích BE filter.
+      url += `&categoryId=${encoded}&category=${encoded}`
     }
     const res = await fetch(url, {
       headers: getAuthHeaders(request),

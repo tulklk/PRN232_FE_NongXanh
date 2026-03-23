@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { id } = params
     const res = await fetch(`${API_BASE_URL}/api/products/${id}/variants`, {
       headers: getAuthHeaders(request),
-      next: { revalidate: 30 },
+      cache: 'no-store',
     })
 
     if (!res.ok) {

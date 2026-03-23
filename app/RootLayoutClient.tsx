@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import ScrollToTop from '@/components/common/ScrollToTop'
 import { UserProvider } from '@/contexts/UserContext'
 import { CartProvider } from '@/contexts/CartContext'
+import { WishlistProvider } from '@/contexts/WishlistContext'
 
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''
 
@@ -21,15 +22,19 @@ export default function RootLayoutClient({
 
   const content = isAdminPage || isStaffPage ? (
     <UserProvider>
-      <CartProvider>{children}</CartProvider>
+      <CartProvider>
+        <WishlistProvider>{children}</WishlistProvider>
+      </CartProvider>
     </UserProvider>
   ) : (
     <UserProvider>
       <CartProvider>
-        <Header />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
-        <ScrollToTop />
+        <WishlistProvider>
+          <Header />
+          <main className="min-h-screen">{children}</main>
+          <Footer />
+          <ScrollToTop />
+        </WishlistProvider>
       </CartProvider>
     </UserProvider>
   )

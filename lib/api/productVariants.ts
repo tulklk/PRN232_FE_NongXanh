@@ -37,10 +37,11 @@ function extractErrorMessage(data: unknown, fallback: string): string {
 }
 
 function parseVariantList(raw: unknown): ApiProductVariant[] {
-  if (Array.isArray(raw)) return raw as ApiProductVariant[]
+  if (Array.isArray(raw)) return raw.map(normalizeVariantItem)
   if (raw && typeof raw === 'object') {
     const obj = raw as { data?: ApiProductVariant[]; items?: ApiProductVariant[] }
-    return obj.data ?? obj.items ?? []
+    const list = obj.data ?? obj.items ?? []
+    return list.map(normalizeVariantItem)
   }
   return []
 }
@@ -48,9 +49,23 @@ function parseVariantList(raw: unknown): ApiProductVariant[] {
 function parseVariantItem(raw: unknown): ApiProductVariant {
   if (raw && typeof raw === 'object') {
     const obj = raw as { data?: ApiProductVariant; item?: ApiProductVariant }
-    return obj.data ?? obj.item ?? (raw as ApiProductVariant)
+    return normalizeVariantItem(obj.data ?? obj.item ?? (raw as ApiProductVariant))
   }
   throw new Error('Dữ liệu biến thể không hợp lệ')
+}
+
+function normalizeVariantItem(raw: ApiProductVariant | Record<string, unknown>): ApiProductVariant {
+  const row = raw as Record<string, unknown>
+  return {
+    ...(raw as ApiProductVariant),
+    variantId: (row.variantId ?? row.VariantId ?? row.id ?? row.Id) as any,
+    variantName: String(row.variantName ?? row.VariantName ?? row.name ?? row.Name ?? ''),
+    price: Number(row.price ?? row.Price ?? 0),
+    stockQuantity: Number(row.stockQuantity ?? row.StockQuantity ?? 0),
+    sku: (row.sku ?? row.Sku ?? null) as string | null,
+    status: (row.status ?? row.Status ?? null) as string | null,
+    productId: (row.productId ?? row.ProductId) as any,
+  }
 }
 
 export async function getProductVariants(
@@ -87,10 +102,17 @@ export async function createProductVariant(
   payload: VariantPayload,
   token?: string
 ): Promise<ApiProductVariant> {
-  const res = await fetch(`${getBase()}/api/products/${productId}/variants`, {
+  const res = await fetch(`${getBase()}/api/product-variants`, {
     method: 'POST',
     headers: getJsonHeaders(token),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      name: payload.variantName,
+      price: payload.price,
+      stockQuantity: payload.stockQuantity,
+      sku: payload.sku ?? '',
+      status: payload.status ?? 'Active',
+      productId: String(productId),
+    }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => null)
@@ -123,7 +145,13 @@ export async function updateProductVariant(
   const res = await fetch(`${getBase()}/api/product-variants/${id}`, {
     method: 'PUT',
     headers: getJsonHeaders(token),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      name: payload.variantName,
+      price: payload.price,
+      stockQuantity: payload.stockQuantity,
+      sku: payload.sku ?? '',
+      status: payload.status ?? 'Active',
+    }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => null)

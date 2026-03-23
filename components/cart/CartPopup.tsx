@@ -27,6 +27,10 @@ function getImageSrc(item: ApiCartItem): string {
   return item.imageUrl && item.imageUrl.startsWith('http') ? item.imageUrl : '/images/logo.png'
 }
 
+function getCartItemNumericId(item: ApiCartItem): number {
+  return Number(item.cartItemId)
+}
+
 export default function CartPopup({
   items,
   totalAmount,
@@ -36,11 +40,11 @@ export default function CartPopup({
   onClose,
 }: CartPopupProps) {
   const [localQuantities, setLocalQuantities] = useState<Record<number, number>>(
-    () => Object.fromEntries(items.map((i) => [i.cartItemId, i.quantity]))
+    () => Object.fromEntries(items.map((i) => [getCartItemNumericId(i), i.quantity]))
   )
 
   useEffect(() => {
-    setLocalQuantities(Object.fromEntries(items.map((i) => [i.cartItemId, i.quantity])))
+    setLocalQuantities(Object.fromEntries(items.map((i) => [getCartItemNumericId(i), i.quantity])))
   }, [items])
 
   const handleQtyChange = (cartItemId: number, delta: number) => {
@@ -52,7 +56,7 @@ export default function CartPopup({
 
   const displayTotal =
     items.reduce(
-      (sum, i) => sum + i.priceAtTime * (localQuantities[i.cartItemId] ?? i.quantity),
+      (sum, i) => sum + i.priceAtTime * (localQuantities[getCartItemNumericId(i)] ?? i.quantity),
       0
     )
 
@@ -76,7 +80,10 @@ export default function CartPopup({
           </div>
         ) : (
           <div className="space-y-4">
-            {items.map((item) => (
+            {items.map((item) => {
+              const cartItemId = getCartItemNumericId(item)
+              const hasValidCartItemId = Number.isFinite(cartItemId)
+              return (
               <div
                 key={item.cartItemId}
                 className="flex gap-3 py-2 border-b border-gray-100 last:border-0"
@@ -98,7 +105,11 @@ export default function CartPopup({
                     </p>
                     <button
                       type="button"
-                      onClick={() => onRemoveItem(item.cartItemId)}
+                      onClick={() => {
+                        if (!hasValidCartItemId) return
+                        onRemoveItem(cartItemId)
+                      }}
+                      disabled={!hasValidCartItemId}
                       className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                       aria-label="Xóa"
                     >
@@ -109,30 +120,37 @@ export default function CartPopup({
                     <div className="inline-flex items-center border border-gray-300 rounded text-sm bg-white">
                       <button
                         type="button"
-                        onClick={() => handleQtyChange(item.cartItemId, -1)}
-                        disabled={(localQuantities[item.cartItemId] ?? item.quantity) <= 1}
+                        onClick={() => {
+                          if (!hasValidCartItemId) return
+                          handleQtyChange(cartItemId, -1)
+                        }}
+                        disabled={!hasValidCartItemId || (localQuantities[cartItemId] ?? item.quantity) <= 1}
                         className="p-1.5 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="px-3 py-1 min-w-[2rem] text-center font-medium text-gray-900 bg-gray-50 border-x border-gray-200">
-                        {localQuantities[item.cartItemId] ?? item.quantity}
+                        {localQuantities[cartItemId] ?? item.quantity}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleQtyChange(item.cartItemId, 1)}
-                        className="p-1.5 hover:bg-gray-100 text-gray-700"
+                        onClick={() => {
+                          if (!hasValidCartItemId) return
+                          handleQtyChange(cartItemId, 1)
+                        }}
+                        disabled={!hasValidCartItemId}
+                        className="p-1.5 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plus size={12} />
                       </button>
                     </div>
                     <span className="text-sm font-semibold text-[#0A923C]">
-                      {formatCurrency(item.priceAtTime * (localQuantities[item.cartItemId] ?? item.quantity))}
+                      {formatCurrency(item.priceAtTime * (localQuantities[cartItemId] ?? item.quantity))}
                     </span>
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

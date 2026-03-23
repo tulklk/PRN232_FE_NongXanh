@@ -25,6 +25,33 @@ function flattenCategories(cats: ApiCategory[]): ApiCategory[] {
   return result
 }
 
+function normalizeCategoryId(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function getDirectChildCategoryIds(
+  selectedCategoryId: string,
+  categories: ApiCategory[]
+): string[] {
+  const selectedKey = normalizeCategoryId(selectedCategoryId)
+  if (!selectedKey) return []
+
+  const fromParentId = categories
+    .filter(
+      (c) =>
+        !c.isDeleted &&
+        normalizeCategoryId((c as any).parentId) === selectedKey
+    )
+    .map((c) => String(c.categoryId))
+
+  const fromChildrenField = categories
+    .filter((c) => normalizeCategoryId(c.categoryId) === selectedKey)
+    .flatMap((c) => (c.children ?? []).filter((x) => !x.isDeleted))
+    .map((c) => String(c.categoryId))
+
+  return Array.from(new Set([...fromParentId, ...fromChildrenField]))
+}
+
 function ProductsContent() {
   const searchParams = useSearchParams()
   const category = searchParams.get('category') || 'all'
@@ -36,7 +63,7 @@ function ProductsContent() {
   const [pageNumber, setPageNumber] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [categories, setCategories] = useState<ApiCategory[]>([])
-  const pageSize = 12
+  const pageSize = 16
 
   useEffect(() => {
     if (sortParam === 'bestseller' || sortParam === 'price-low' || sortParam === 'price-high' || sortParam === 'newest') {
@@ -55,19 +82,78 @@ function ProductsContent() {
   }, [category])
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    getProducts({
-      pageNumber,
-      pageSize,
-      categoryId: category !== 'all' ? category : undefined,
-    })
-      .then((res) => {
-        setProducts(res.items)
-        setTotalPages(res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1))
-      })
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false))
-  }, [category, pageNumber])
+
+    const loadProducts = async () => {
+      try {
+        if (category === 'all') {
+          const res = await getProducts({
+            pageNumber,
+            pageSize,
+          })
+          if (cancelled) return
+          setProducts(res.items)
+          setTotalPages(
+            res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1)
+          )
+          return
+        }
+
+        const childCategoryIds = getDirectChildCategoryIds(category, categories)
+        const isParentCategory = childCategoryIds.length > 0
+
+        if (!isParentCategory) {
+          const res = await getProducts({
+            pageNumber,
+            pageSize,
+            categoryId: category,
+          })
+          if (cancelled) return
+          setProducts(res.items)
+          setTotalPages(
+            res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1)
+          )
+          return
+        }
+
+        const results = await Promise.all(
+          childCategoryIds.map((childId) =>
+            getProducts({ pageNumber: 1, pageSize: 200, categoryId: childId })
+          )
+        )
+        if (cancelled) return
+
+        const merged: Product[] = []
+        const seen = new Set<string>()
+        results.forEach((res) => {
+          res.items.forEach((item) => {
+            const key = String(item.id)
+            if (seen.has(key)) return
+            seen.add(key)
+            merged.push(item)
+          })
+        })
+
+        const start = (pageNumber - 1) * pageSize
+        const paged = merged.slice(start, start + pageSize)
+        setProducts(paged)
+        setTotalPages(Math.max(1, Math.ceil(merged.length / pageSize)))
+      } catch {
+        if (!cancelled) {
+          setProducts([])
+          setTotalPages(1)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadProducts()
+    return () => {
+      cancelled = true
+    }
+  }, [category, pageNumber, pageSize, categories])
 
   const allCategories = useMemo(
     () => flattenCategories(categories),
@@ -85,6 +171,24 @@ function ProductsContent() {
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products]
+
+    if (category !== 'all') {
+      const selectedCategory = String(category).trim().toLowerCase()
+      const childCategoryIds = getDirectChildCategoryIds(category, categories).map(
+        (id) => normalizeCategoryId(id)
+      )
+      const isParentCategory = childCategoryIds.length > 0
+      const allowedCategoryIds = isParentCategory
+        ? new Set(childCategoryIds)
+        : new Set([selectedCategory])
+
+      filtered = filtered.filter((p) => {
+        const categoryOfProduct = String((p as any).categoryId ?? p.category ?? '')
+          .trim()
+          .toLowerCase()
+        return allowedCategoryIds.has(categoryOfProduct)
+      })
+    }
 
     if (keyword) {
       const lower = keyword.toLowerCase()
@@ -112,7 +216,7 @@ function ProductsContent() {
         break
     }
     return filtered
-  }, [products, sortBy, keyword])
+  }, [products, sortBy, keyword, category, categories])
 
   return (
     <div className="bg-white min-h-screen">
@@ -183,7 +287,7 @@ function ProductsContent() {
             ) : filteredAndSortedProducts.length === 0 ? (
               <div className="py-12 text-center text-gray-500">Không tìm thấy sản phẩm.</div>
             ) : (
-              <ProductGrid products={filteredAndSortedProducts} columns={4} />
+              <ProductGrid products={filteredAndSortedProducts} columns={4} mobileColumns={2} />
             )}
 
             {/* Pagination */}
@@ -211,7 +315,7 @@ function ProductsContent() {
             {products.length > 0 && (
               <section className="mt-12">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">SẢN PHẨM ĐÃ XEM</h2>
-                <ProductGrid products={products.slice(0, 4)} columns={4} />
+                <ProductGrid products={products.slice(0, 4)} columns={4} mobileColumns={2} />
               </section>
             )}
 

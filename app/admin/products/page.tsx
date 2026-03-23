@@ -30,6 +30,40 @@ function getStatusDisplay(status?: string | null): 'active' | 'inactive' {
   return 'inactive'
 }
 
+function getChildCategoryOptions(categories: ApiCategory[]): ApiCategory[] {
+  const active = categories.filter((cat) => !cat.isDeleted)
+  const byId = new Map<string, ApiCategory>()
+
+  const add = (cat: ApiCategory) => {
+    const key = String(cat.categoryId ?? '')
+    if (!key) return
+    byId.set(key, cat)
+  }
+
+  // Trường hợp API trả dạng phẳng: cate con có parentId
+  active
+    .filter((cat) => cat.parentId != null && cat.parentId !== 0)
+    .forEach(add)
+
+  // Trường hợp API trả dạng cây: cate con nằm trong children
+  const collectChildren = (nodes: ApiCategory[]) => {
+    nodes.forEach((node) => {
+      const children = node.children ?? []
+      children.forEach((child) => {
+        add(child)
+      })
+      if (children.length > 0) collectChildren(children)
+    })
+  }
+  collectChildren(active)
+
+  return Array.from(byId.values())
+}
+
+function normalizeCategoryKey(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
 export default function ProductsPage() {
   const { tokens } = useUser()
   const token = tokens?.idToken ?? undefined
@@ -149,7 +183,7 @@ export default function ProductsPage() {
     }
   }
 
-  const categoryOptions = categories
+  const categoryOptions = getChildCategoryOptions(categories)
   const providerMap = new Map<string | number, string>()
   providers.forEach((p) => {
     providerMap.set(p.providerId, p.providerName)
@@ -250,10 +284,17 @@ export default function ProductsPage() {
                   const primaryImage = product.productImages?.find((i) => i.isPrimary)
                   const imageUrl =
                     primaryImage?.imageUrl || product.productImages?.[0]?.imageUrl || ''
+                  const productCategoryKey = normalizeCategoryKey(product.categoryId)
+                  const matchedCategory = categories.find(
+                    (c) => normalizeCategoryKey(c.categoryId) === productCategoryKey
+                  )
+                  const productAny = product as any
                   const categoryName =
-                    categoryOptions.find(
-                      (c) => c.categoryId != null && String(c.categoryId) === String(product.categoryId)
-                    )?.categoryName ?? '-'
+                    matchedCategory?.categoryName ??
+                    productAny.categoryName ??
+                    productAny.category?.categoryName ??
+                    productAny.category?.name ??
+                    '-'
                   const providerName =
                     providerMap.get((product as any).providerId ?? '') ?? product.provider ?? '-'
 
@@ -469,6 +510,7 @@ function ProductFormModal({
   const [providerId, setProviderId] = useState<string>(
     ((initialData as any)?.providerId as string | undefined) ?? ''
   )
+  const categoryOptions = getChildCategoryOptions(categories)
 
   const existingImages =
     (initialData?.productImages as { imageUrl?: string; isPrimary?: boolean }[] | undefined) ??
@@ -735,7 +777,7 @@ function ProductFormModal({
                 disabled={loading}
               >
                 <option value="">Chọn danh mục</option>
-                {categories.map((cat) => (
+                {categoryOptions.map((cat) => (
                   <option key={cat.categoryId} value={String(cat.categoryId)}>
                     {cat.categoryName}
                   </option>

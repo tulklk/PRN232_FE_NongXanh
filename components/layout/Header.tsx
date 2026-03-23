@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, QrCode, Cherry, Leaf, Sprout, LogOut } from 'lucide-react'
+import { Search, ShoppingCart, Bell, Menu, ChevronDown, Download, Users, User, QrCode, Cherry, Leaf, Sprout, LogOut, X } from 'lucide-react'
 import LoginModal from '@/components/auth/LoginModal'
 import RegisterModal from '@/components/auth/RegisterModal'
 import SuccessPopup from '@/components/common/SuccessPopup'
@@ -33,7 +33,8 @@ export default function Header() {
     const cartPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const userMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const navCategoryDropdownCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const searchWrapperRef = useRef<HTMLDivElement | null>(null)
+    const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null)
+    const mobileSearchWrapperRef = useRef<HTMLDivElement | null>(null)
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const handleCategoryMenuEnter = () => {
@@ -90,6 +91,10 @@ export default function Header() {
     const [searchResults, setSearchResults] = useState<Product[]>([])
     const [searchLoading, setSearchLoading] = useState(false)
     const [showSuggestions, setShowSuggestions] = useState(false)
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+    const [mobileProductsOpen, setMobileProductsOpen] = useState(false)
+    const [mobileGuideOpen, setMobileGuideOpen] = useState(false)
 
     const handleLogin = async (email: string, password: string) => {
         try {
@@ -188,6 +193,7 @@ export default function Header() {
         if (!query) return
         router.push(`/products?q=${encodeURIComponent(query)}`)
         setShowSuggestions(false)
+        setMobileSearchOpen(false)
     }
 
     const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -199,7 +205,10 @@ export default function Header() {
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (searchWrapperRef.current && !searchWrapperRef.current.contains(event.target as Node)) {
+            const targetNode = event.target as Node
+            const clickedDesktopSearch = desktopSearchWrapperRef.current?.contains(targetNode) ?? false
+            const clickedMobileSearch = mobileSearchWrapperRef.current?.contains(targetNode) ?? false
+            if (!clickedDesktopSearch && !clickedMobileSearch) {
                 setShowSuggestions(false)
             }
         }
@@ -209,6 +218,15 @@ export default function Header() {
             document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [])
+
+    useEffect(() => {
+        if (!mobileDrawerOpen) return
+        const originalOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        return () => {
+            document.body.style.overflow = originalOverflow
+        }
+    }, [mobileDrawerOpen])
 
     useEffect(() => {
         getCategories()
@@ -241,7 +259,7 @@ export default function Header() {
         <>
             <header className="sticky top-0 z-40">
                 {/* Top bar - Dark Green */}
-                <div className="bg-[#10723A] text-white py-1.5">
+                <div className="hidden bg-[#10723A] text-white py-1.5 md:block">
                     <div className="max-w-[1400px] mx-auto px-8">
                         <div className="flex items-center justify-between text-sm">
                             {/* Left - Hotline */}
@@ -268,7 +286,161 @@ export default function Header() {
                 {/* Main header - Green */}
                 <div className="bg-[#0A923C] text-white">
                     <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-3">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-8">
+                        {/* Mobile header row */}
+                        <div className="flex items-center justify-between gap-3 md:hidden">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    aria-label="Mở danh mục"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/20 hover:bg-white/10 transition-colors"
+                                    onClick={() => setMobileDrawerOpen(true)}
+                                >
+                                    <Menu size={20} />
+                                </button>
+                                <Link href="/" className="flex items-center flex-shrink-0">
+                                    <div className="relative w-32 h-10">
+                                        <Image
+                                            src="/images/logo.png"
+                                            alt="Nông Xanh Logo"
+                                            fill
+                                            className="object-contain object-left"
+                                            sizes="128px"
+                                            priority
+                                        />
+                                    </div>
+                                </Link>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    aria-label="Tìm kiếm"
+                                    className="hover:text-yellow-300 transition-colors"
+                                    onClick={() => setMobileSearchOpen(true)}
+                                >
+                                    <Search size={20} />
+                                </button>
+                                <Link
+                                    href="/cart"
+                                    aria-label="Giỏ hàng"
+                                    className="relative hover:text-yellow-300 transition-colors inline-flex"
+                                >
+                                    <ShoppingCart size={20} />
+                                    {cartCount > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center font-bold">
+                                            {cartCount}
+                                        </span>
+                                    )}
+                                </Link>
+                                {isAuthenticated && user ? (
+                                    <Link
+                                        href="/account"
+                                        aria-label="Tài khoản"
+                                        className="hover:text-yellow-300 transition-colors"
+                                    >
+                                        <User size={20} />
+                                    </Link>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        aria-label="Đăng nhập"
+                                        className="hover:text-yellow-300 transition-colors"
+                                        onClick={() => setIsLoginOpen(true)}
+                                    >
+                                        <User size={20} />
+                                    </button>
+                                )}
+                                <Link
+                                    href="/notifications"
+                                    aria-label="Thông báo"
+                                    className="hover:text-yellow-300 transition-colors"
+                                >
+                                    <Bell size={20} />
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Mobile search panel */}
+                        {mobileSearchOpen && (
+                            <div className="mt-3 md:hidden" ref={mobileSearchWrapperRef}>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Nhập nội dung tìm kiếm"
+                                        className="w-full px-4 py-2.5 pr-20 text-gray-900 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
+                                        value={searchTerm}
+                                        onChange={handleSearchChange}
+                                        onKeyDown={handleSearchKeyDown}
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label="Tìm kiếm"
+                                        className="absolute right-11 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        onClick={triggerFullSearch}
+                                    >
+                                        <Search size={18} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label="Đóng tìm kiếm"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        onClick={() => {
+                                            setMobileSearchOpen(false)
+                                            setShowSuggestions(false)
+                                        }}
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                    {showSuggestions && searchTerm.trim() && (
+                                        <div className="absolute left-0 right-0 mt-1 z-50">
+                                            <div className="bg-white rounded-lg shadow-lg max-h-80 overflow-y-auto border border-gray-100">
+                                                {searchLoading ? (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                        Đang tìm kiếm...
+                                                    </div>
+                                                ) : searchResults.length === 0 ? (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                        Không tìm thấy sản phẩm phù hợp
+                                                    </div>
+                                                ) : (
+                                                    searchResults.map((product) => (
+                                                        <Link
+                                                            key={product.id}
+                                                            href={`/products/${product.id}`}
+                                                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                                                            onClick={() => {
+                                                                setShowSuggestions(false)
+                                                                setMobileSearchOpen(false)
+                                                            }}
+                                                        >
+                                                            <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                                                                <Image
+                                                                    src={product.image}
+                                                                    alt={product.name}
+                                                                    fill
+                                                                    className="object-cover"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                                                    {product.name}
+                                                                </p>
+                                                                <p className="text-xs text-primary-green font-semibold mt-0.5">
+                                                                    {formatCurrency(product.currentPrice)}
+                                                                </p>
+                                                            </div>
+                                                        </Link>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Desktop header row */}
+                        <div className="hidden md:flex md:items-center md:gap-8">
                             {/* Logo */}
                             <Link href="/" className="flex items-center flex-shrink-0">
                                 <div className="relative w-44 h-12">
@@ -285,7 +457,7 @@ export default function Header() {
 
                             {/* Search bar */}
                             <div className="w-full md:flex-1 md:max-w-2xl">
-                                <div className="relative" ref={searchWrapperRef}>
+                                <div className="relative" ref={desktopSearchWrapperRef}>
                                     <input
                                         type="text"
                                         placeholder="Nhập nội dung tìm kiếm"
@@ -346,7 +518,7 @@ export default function Header() {
                             </div>
 
                             {/* Right side actions */}
-                            <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 flex-shrink-0 w-full md:w-auto">
+                            <div className="flex items-center justify-end gap-6 flex-shrink-0 w-auto">
                                 {/* Notifications */}
                                 <Link href="/notifications" className="flex items-center gap-2 hover:text-yellow-300 transition-colors">
                                     <Bell size={20} />
@@ -449,8 +621,125 @@ export default function Header() {
                     </div>
                 </div>
 
+                {/* Mobile drawer menu */}
+                <div
+                    className={`fixed inset-0 z-[70] md:hidden transition-opacity duration-300 ${
+                        mobileDrawerOpen
+                            ? 'pointer-events-auto bg-black/35 opacity-100'
+                            : 'pointer-events-none bg-black/0 opacity-0'
+                    }`}
+                    onClick={() => setMobileDrawerOpen(false)}
+                >
+                    <div
+                        className={`h-full w-[82%] max-w-[360px] bg-white shadow-xl transition-transform duration-300 ease-out ${
+                            mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+                        }`}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between bg-[#0A923C] px-4 py-4 text-white">
+                            <p className="text-base font-semibold uppercase">Danh mục sản phẩm</p>
+                            <button
+                                type="button"
+                                aria-label="Đóng menu"
+                                className="rounded p-1 hover:bg-white/15 transition-colors"
+                                onClick={() => setMobileDrawerOpen(false)}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <nav className="h-[calc(100%-64px)] overflow-y-auto">
+                            <Link
+                                href="/"
+                                className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                                onClick={() => setMobileDrawerOpen(false)}
+                            >
+                                Trang chủ
+                            </Link>
+                            <button
+                                type="button"
+                                className="flex w-full items-center justify-between border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                                onClick={() => setMobileProductsOpen((prev) => !prev)}
+                            >
+                                <span>Sản phẩm</span>
+                                <span className="text-2xl font-normal">{mobileProductsOpen ? '-' : '+'}</span>
+                            </button>
+                            {mobileProductsOpen && (
+                                <div className="border-b border-gray-200 bg-gray-50 py-2">
+                                    <Link
+                                        href="/products"
+                                        className="block px-8 py-2 text-base font-medium text-gray-700"
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                    >
+                                        Tất cả sản phẩm
+                                    </Link>
+                                    {topLevelCategories.map((cat) => (
+                                        <Link
+                                            key={cat.categoryId}
+                                            href={`/products?category=${cat.categoryId}`}
+                                            className="block px-8 py-2 text-base font-medium text-gray-700"
+                                            onClick={() => setMobileDrawerOpen(false)}
+                                        >
+                                            {cat.categoryName}
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase">
+                                Sale off
+                            </div>
+                            <Link
+                                href="/news"
+                                className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                                onClick={() => setMobileDrawerOpen(false)}
+                            >
+                                Tin tức
+                            </Link>
+                            <div className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase">
+                                Chính sách nhượng quyền
+                            </div>
+                            <button
+                                type="button"
+                                className="flex w-full items-center justify-between border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                                onClick={() => setMobileGuideOpen((prev) => !prev)}
+                            >
+                                <span>Hướng dẫn</span>
+                                <span className="text-2xl font-normal">{mobileGuideOpen ? '-' : '+'}</span>
+                            </button>
+                            {mobileGuideOpen && (
+                                <div className="border-b border-gray-200 bg-gray-50 py-2">
+                                    <div className="block px-8 py-2 text-base font-medium text-gray-700">
+                                        Câu hỏi thường gặp
+                                    </div>
+                                    <Link
+                                        href="/contact"
+                                        className="block px-8 py-2 text-base font-medium text-gray-700"
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                    >
+                                        Liên hệ hỗ trợ
+                                    </Link>
+                                </div>
+                            )}
+                            <div className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase">
+                                Công nghệ sản phẩm
+                            </div>
+                            <div className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase">
+                                Giới thiệu
+                            </div>
+                            <Link
+                                href="/contact"
+                                className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                                onClick={() => setMobileDrawerOpen(false)}
+                            >
+                                Liên hệ
+                            </Link>
+                        </nav>
+                    </div>
+                </div>
+
                 {/* Navigation bar - White background like Foodmap */}
-                <div className="bg-white border-b border-gray-200 shadow-sm relative">
+                <div className="hidden bg-white border-b border-gray-200 shadow-sm relative md:block">
                     <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
                         <nav className="flex items-center gap-2">
                             {/* Category Dropdown - Green background, mở khi hover */}
@@ -499,13 +788,12 @@ export default function Header() {
                                                                     setCategorySubmenuHovered(cat.categoryId)
                                                                 }}
                                                                 onClick={() => {
-                                                                    // Nếu không có con thì đi thẳng tới trang category
-                                                                    if (!hasChildren) {
-                                                                        setIsMenuOpen(false)
-                                                                        router.push(
-                                                                            `/products?category=${cat.categoryId}`
-                                                                        )
-                                                                    }
+                                                                    // Cate cha/cate con đều cho phép click để điều hướng trang sản phẩm.
+                                                                    setIsMenuOpen(false)
+                                                                    setCategorySubmenuHovered(null)
+                                                                    router.push(
+                                                                        `/products?category=${cat.categoryId}`
+                                                                    )
                                                                 }}
                                                             >
                                                                 {cat.categoryName}

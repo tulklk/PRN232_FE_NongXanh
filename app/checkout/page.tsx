@@ -27,10 +27,12 @@ import type { ApiVoucher, CheckoutPreviewResponse } from '@/lib/types/api'
 import { createPayment, createVNPayPaymentUrl } from '@/lib/api/payments'
 import {
   fetchLocationProvinces,
+  fetchLocationDistricts,
   fetchLocationWards,
   getWardToCode,
   getWardDisplayName,
   type LocationProvince,
+  type LocationDistrict,
   type LocationWard,
 } from '@/lib/api/locations'
 
@@ -53,8 +55,10 @@ export default function CheckoutPage() {
   })
   const [locationProvinces, setLocationProvinces] = useState<LocationProvince[]>([])
   const [locationWards, setLocationWards] = useState<LocationWard[]>([])
+  const [locationDistricts, setLocationDistricts] = useState<LocationDistrict[]>([])
   const [loadingProvinces, setLoadingProvinces] = useState(true)
   const [loadingWards, setLoadingWards] = useState(false)
+  const [loadingDistricts, setLoadingDistricts] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>(
     'standard'
@@ -148,9 +152,10 @@ export default function CheckoutPage() {
       return
     }
 
-    // Bắt buộc đủ tỉnh + phường để backend GHN tính được cước
+    // Bắt buộc đủ tỉnh + quận + phường để backend GHN tính được cước
     if (
       cartItemIds.length === 0 ||
+      !formData.districtId ||
       !formData.wardCode ||
       !formData.provinceId
     ) {
@@ -172,9 +177,10 @@ export default function CheckoutPage() {
     const voucherRaw = (appliedVoucher?.code ?? discountCode).trim()
     const voucherCode = voucherRaw
     const provinceNumericId = Math.trunc(Number(formData.provinceId))
+    const districtNumericId = Math.trunc(Number(formData.districtId))
     const wardCodeForGhn = String(formData.wardCode).trim()
 
-    const previewKey = `${cartItemIdsKey}|${provinceNumericId}|${wardCodeForGhn}|${voucherCode}`
+    const previewKey = `${cartItemIdsKey}|${provinceNumericId}|${districtNumericId}|${wardCodeForGhn}|${voucherCode}`
     const cached = previewCacheRef.current.get(previewKey)
     if (cached) {
       setShippingFee(Number.isFinite(cached.shippingFee) ? cached.shippingFee : 0)
@@ -201,6 +207,7 @@ export default function CheckoutPage() {
           cartItemIds,
           toWardCode: wardCodeForGhn,
           provinceId: provinceNumericId,
+          toDistrictId: districtNumericId,
           insuranceValue: 0,
           voucherCode,
         },
@@ -251,6 +258,7 @@ export default function CheckoutPage() {
   }, [
     cartItemIdsKey,
     cartItemIds,
+    formData.districtId,
     formData.wardCode,
     formData.provinceId,
     appliedVoucher,
@@ -308,9 +316,10 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!formData.provinceId) {
+      setLocationDistricts([])
       setLocationWards([])
       setFormData((prev) =>
-        prev.districtId || prev.wardCode
+        prev.districtId || prev.districtCode || prev.wardCode
           ? { ...prev, districtId: '', districtCode: '', wardCode: '' }
           : prev
       )
@@ -318,7 +327,9 @@ export default function CheckoutPage() {
     }
 
     let cancelled = false
+    setLoadingDistricts(true)
     setLoadingWards(true)
+
     // Đổi tỉnh -> reset district/ward để preview/checkout không dùng dữ liệu cũ
     setFormData((prev) => ({
       ...prev,
@@ -326,17 +337,30 @@ export default function CheckoutPage() {
       districtCode: '',
       wardCode: '',
     }))
+    setLocationDistricts([])
     setLocationWards([])
 
-    fetchLocationWards(formData.provinceId, tokens?.idToken)
-      .then((data) => {
-        if (!cancelled) setLocationWards(data)
+    Promise.all([
+      fetchLocationDistricts(formData.provinceId, tokens?.idToken),
+      fetchLocationWards(formData.provinceId, tokens?.idToken),
+    ])
+      .then(([districts, wards]) => {
+        if (!cancelled) {
+          setLocationDistricts(districts)
+          setLocationWards(wards)
+        }
       })
       .catch(() => {
-        if (!cancelled) setLocationWards([])
+        if (!cancelled) {
+          setLocationDistricts([])
+          setLocationWards([])
+        }
       })
       .finally(() => {
-        if (!cancelled) setLoadingWards(false)
+        if (!cancelled) {
+          setLoadingDistricts(false)
+          setLoadingWards(false)
+        }
       })
 
     return () => {
@@ -390,7 +414,14 @@ export default function CheckoutPage() {
       const wardMatch = locationWards.find(
         (w) => getWardToCode(w) === formData.wardCode
       )
-      const districtName = wardMatch?.districtName ?? ''
+      const districtIdFromWard =
+        wardMatch?.districtId != null ? String(wardMatch.districtId) : ''
+      const districtIdToUse = formData.districtId || districtIdFromWard
+      const districtObj = locationDistricts.find(
+        (d) => String(d.districtId) === districtIdToUse
+      )
+      const districtName =
+        districtObj?.districtName ?? wardMatch?.districtName ?? ''
       const wardName = wardMatch
         ? getWardDisplayName(wardMatch)
         : formData.wardCode
@@ -409,6 +440,23 @@ export default function CheckoutPage() {
         (appliedVoucher?.code ?? discountCode.trim()) || ''
       let order
       if (shippingMethod === 'express') {
+        const districtNumericId = Math.trunc(Number(formData.districtId))
+        const wardCodeForGhn = String(formData.wardCode).trim()
+
+        if (
+          !formData.provinceId ||
+          !formData.districtId ||
+          !wardCodeForGhn ||
+          !Number.isFinite(districtNumericId) ||
+          districtNumericId <= 0
+        ) {
+          setSubmitError(
+            'Vui lòng chọn đầy đủ tỉnh/thành, quận/huyện và phường/xã'
+          )
+          setSubmitting(false)
+          return
+        }
+
         const expressCartIds = cartItems.map((item) => item.cartItemId)
         order = await checkoutOrder(
           {
@@ -421,6 +469,7 @@ export default function CheckoutPage() {
             toWardCode: formData.wardCode,
             provinceCode: formData.provinceCode,
             provinceId: Number(formData.provinceId),
+            toDistrictId: districtNumericId,
             insuranceValue: 0,
             voucherCode,
           },
@@ -557,7 +606,7 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold mb-2">Tỉnh/Thành phố</label>
                       <select
@@ -591,15 +640,61 @@ export default function CheckoutPage() {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-sm font-semibold mb-2">Quận/Huyện</label>
+                      <select
+                        required={shippingMethod === 'express'}
+                        value={formData.districtId}
+                        onChange={(e) => {
+                          const id = e.target.value
+                          const d = locationDistricts.find(
+                            (x) => String(x.districtId) === id
+                          )
+                          setFormData({
+                            ...formData,
+                            districtId: id,
+                            districtCode: d?.code ?? '',
+                            wardCode: '',
+                          })
+                        }}
+                        disabled={!formData.provinceId || loadingDistricts}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green disabled:opacity-60"
+                      >
+                        <option value="">
+                          {!formData.provinceId
+                            ? 'Chọn tỉnh trước'
+                            : loadingDistricts
+                              ? 'Đang tải...'
+                              : 'Chọn quận/huyện'}
+                        </option>
+                        {locationDistricts.map((d) => (
+                          <option key={d.districtId} value={String(d.districtId)}>
+                            {d.districtName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-sm font-semibold mb-2">Phường/Xã</label>
                       <select
                         required
                         value={formData.wardCode}
                         onChange={(e) => {
                           const code = e.target.value
+                          const wardMatch = locationWards.find(
+                            (w) => getWardToCode(w) === code
+                          )
+                          const districtIdFromWard =
+                            wardMatch?.districtId != null
+                              ? String(wardMatch.districtId)
+                              : formData.districtId
+                          const districtObj = locationDistricts.find(
+                            (d) => String(d.districtId) === districtIdFromWard
+                          )
                           setFormData({
                             ...formData,
                             wardCode: code,
+                            districtId: districtIdFromWard,
+                            districtCode: districtObj?.code ?? '',
                           })
                         }}
                         disabled={!formData.provinceId || loadingWards}
@@ -612,7 +707,14 @@ export default function CheckoutPage() {
                               ? 'Đang tải...'
                               : 'Chọn phường/xã'}
                         </option>
-                        {locationWards.map((w, idx) => {
+                        {(formData.districtId
+                          ? locationWards.filter(
+                              (w) =>
+                                String(w.districtId ?? '') ===
+                                String(formData.districtId)
+                            )
+                          : locationWards
+                        ).map((w, idx) => {
                           const code = getWardToCode(w)
                           return (
                             <option key={`${code}-${idx}`} value={code}>

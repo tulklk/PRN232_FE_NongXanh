@@ -84,12 +84,18 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
   const pageSize = params?.pageSize ?? 10
   const categoryId = params?.categoryId
   const isServer = typeof window === 'undefined'
-  let url = isServer
-    ? `${BACKEND_URL}/api/Products?pageNumber=${pageNumber}&pageSize=${pageSize}`
-    : `${getBase()}/api/products?pageNumber=${pageNumber}&pageSize=${pageSize}`
+  const search = new URLSearchParams({
+    pageNumber: String(pageNumber),
+    pageSize: String(pageSize),
+  })
   if (categoryId) {
-    url += `&categoryId=${categoryId}`
+    // Hỗ trợ nhiều backend naming conventions.
+    search.set('categoryId', categoryId)
+    search.set('category', categoryId)
   }
+  const url = isServer
+    ? `${BACKEND_URL}/api/Products?${search.toString()}`
+    : `${getBase()}/api/products?${search.toString()}`
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     ...(typeof window === 'undefined' && { next: { revalidate: 60 } }),

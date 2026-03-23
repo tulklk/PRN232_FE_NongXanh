@@ -94,6 +94,8 @@ export default function CartPage() {
                   const displayName =
                     [item.productName, item.variantName].filter(Boolean).join(' - ') || 'Sản phẩm'
                   const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
+                  const cartItemNumericId = Number(item.cartItemId)
+                  const hasValidCartItemId = Number.isFinite(cartItemNumericId)
                   return (
                   <div
                     key={item.cartItemId}
@@ -120,10 +122,17 @@ export default function CartPage() {
                         <div className="flex items-center gap-3">
                           <QuantitySelector
                             defaultValue={item.quantity}
-                            onChange={(qty) => updateItem(item.cartItemId, qty)}
+                            onChange={(qty) => {
+                              if (!hasValidCartItemId) return
+                              updateItem(cartItemNumericId, qty)
+                            }}
                           />
                           <button
-                            onClick={() => removeItem(item.cartItemId)}
+                            onClick={() => {
+                              if (!hasValidCartItemId) return
+                              removeItem(cartItemNumericId)
+                            }}
+                            disabled={!hasValidCartItemId}
                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                           >
                             <Trash2 size={20} />

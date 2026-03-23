@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { brands } from '@/data/brands'
 import { PRICE_RANGES } from '@/lib/constants'
 import { getCategories } from '@/lib/api/categories'
-import type { ApiCategory } from '@/lib/types/api'
+import { getProviders } from '@/lib/api/providers'
+import type { ApiCategory, ApiProvider } from '@/lib/types/api'
 
 interface CategorySidebarProps {
   activeCategory?: string
@@ -13,6 +13,7 @@ interface CategorySidebarProps {
 
 export default function CategorySidebar({ activeCategory }: CategorySidebarProps) {
   const [categories, setCategories] = useState<ApiCategory[]>([])
+  const [providers, setProviders] = useState<ApiProvider[]>([])
   const [hoveredParentId, setHoveredParentId] = useState<number | null>(null)
   const sidebarSubmenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -20,6 +21,12 @@ export default function CategorySidebar({ activeCategory }: CategorySidebarProps
     getCategories()
       .then(setCategories)
       .catch(() => setCategories([]))
+
+    getProviders(1, 100)
+      .then((items) => {
+        setProviders(items)
+      })
+      .catch(() => setProviders([]))
   }, [])
 
   useEffect(() => {
@@ -29,6 +36,9 @@ export default function CategorySidebar({ activeCategory }: CategorySidebarProps
   }, [])
 
   const topLevelCategories = categories.filter((c) => !c.isDeleted)
+  const featuredProviders = providers
+    .filter((p) => (p.providerName ?? '').trim().length > 0)
+    .slice(0, 6)
 
   const handleParentEnter = (categoryId: number) => {
     if (sidebarSubmenuTimeoutRef.current) {
@@ -123,14 +133,23 @@ export default function CategorySidebar({ activeCategory }: CategorySidebarProps
       <div>
         <h3 className="font-bold text-primary-green mb-3">NHỮNG THƯƠNG HIỆU UY TÍN</h3>
         <div className="grid grid-cols-2 gap-2">
-          {brands.map((brand) => (
-            <div
-              key={brand.id}
-              className="bg-white border border-gray-200 rounded p-3 hover:border-primary-green cursor-pointer"
-            >
-              <div className="text-xs font-semibold text-center">{brand.name}</div>
+          {featuredProviders.length > 0 ? (
+            featuredProviders.map((provider) => (
+              <div
+                key={provider.providerId}
+                className="bg-white border border-gray-200 rounded p-3 hover:border-primary-green"
+                title={provider.providerName}
+              >
+                <div className="text-xs font-semibold text-center line-clamp-1">
+                  {provider.providerName}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-2 text-sm text-gray-500">
+              Chưa có nhà cung cấp
             </div>
-          ))}
+          )}
         </div>
       </div>
 

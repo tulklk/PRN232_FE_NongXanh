@@ -300,3 +300,24 @@ export interface ApiProductVariant {
   product?: ApiProduct | null
   isDeleted?: boolean
 }
+
+// API Wishlist structure
+export interface ApiWishlistItem {
+  wishlistId?: number | string
+  userId?: string | null
+  productId: number | string
+  productName?: string | null
+  imageUrl?: string | null
+  price?: number | null
+  originalPrice?: number | null
+  product?: ApiProduct | null
+}
+
+export interface ApiWishlistListResponse {
+  items?: ApiWishlistItem[]
+  data?: ApiWishlistItem[] | { items?: ApiWishlistItem[] }
+}
+
+export interface AddWishlistRequest {
+  productId: number | string
+}

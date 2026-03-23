@@ -1,25 +1,14 @@
 'use client'
 
+import Link from 'next/link'
 import Image from 'next/image'
-import { Trash2, ShoppingCart } from 'lucide-react'
-
-const wishlistItems = [
-  {
-    id: '1',
-    name: 'Trà Lá Mãng Cầu Sấy Lạnh - Indochine Blends',
-    image: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=200',
-    currentPrice: 63000,
-    originalPrice: 89000,
-  },
-]
+import { Trash2 } from 'lucide-react'
+import { useWishlist } from '@/contexts/WishlistContext'
+import AddToCartButton from '@/components/products/AddToCartButton'
+import { formatCurrency } from '@/lib/utils'
 
 export default function WishlistPage() {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(value)
-  }
+  const { wishlistItems, loading, removeFromWishlist } = useWishlist()
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-5">
@@ -32,15 +21,22 @@ export default function WishlistPage() {
       </div>
 
       {/* Table Body */}
-      {wishlistItems.length > 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-14">
+          <p className="text-base text-gray-500">Đang tải danh sách yêu thích...</p>
+        </div>
+      ) : wishlistItems.length > 0 ? (
         <div className="divide-y divide-gray-100">
           {wishlistItems.map((item) => (
-            <div key={item.id} className="grid grid-cols-4 gap-5 py-5 items-center">
+            <div
+              key={`${item.wishlistId ?? item.productId}`}
+              className="grid grid-cols-4 gap-5 py-5 items-center"
+            >
               <div className="flex justify-center">
                 <div className="relative w-24 h-24 rounded-md overflow-hidden">
                   <Image
-                    src={item.image}
-                    alt={item.name}
+                    src={item.imageUrl || '/images/logo.png'}
+                    alt={item.productName || 'Sản phẩm yêu thích'}
                     fill
                     className="object-cover"
                     sizes="96px"
@@ -48,23 +44,37 @@ export default function WishlistPage() {
                 </div>
               </div>
               <div className="text-center">
-                <p className="text-xs text-gray-700">{item.name}</p>
+                <Link
+                  href={`/products/${item.productId}`}
+                  className="text-xs text-gray-700 hover:text-[#0A923C] line-clamp-2"
+                >
+                  {item.productName || `Sản phẩm #${item.productId}`}
+                </Link>
               </div>
               <div className="text-center">
-                <p className="text-xs font-bold text-[#0A923C]">
-                  {formatCurrency(item.currentPrice)}
-                </p>
-                <p className="text-[10px] text-gray-400 line-through">
-                  {formatCurrency(item.originalPrice)}
-                </p>
+                {item.price != null ? (
+                  <p className="text-xs font-bold text-[#0A923C]">
+                    {formatCurrency(item.price)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400">Liên hệ</p>
+                )}
+                {item.originalPrice != null && item.originalPrice > 0 && (
+                  <p className="text-[10px] text-gray-400 line-through">
+                    {formatCurrency(item.originalPrice)}
+                  </p>
+                )}
               </div>
               <div className="flex justify-center gap-3">
-                <button className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => removeFromWishlist(item.productId)}
+                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Xóa khỏi yêu thích"
+                >
                   <Trash2 size={16} />
                 </button>
-                <button className="p-2 border border-gray-200 rounded-md text-gray-400 hover:text-[#0A923C] hover:border-[#0A923C] transition-colors">
-                  <ShoppingCart size={16} />
-                </button>
+                <AddToCartButton productId={String(item.productId)} />
               </div>
             </div>
           ))}

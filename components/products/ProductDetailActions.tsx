@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart } from 'lucide-react'
 import QuantitySelector from '@/components/common/QuantitySelector'
 import SuccessPopup from '@/components/common/SuccessPopup'
 import { useCart } from '@/contexts/CartContext'
@@ -27,6 +26,10 @@ export default function ProductDetailActions({
   const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const [addSuccess, setAddSuccess] = useState(false)
+  const selectedVariant =
+    variants.find((v) => v.variantId === selectedVariantId) ?? variants[0]
+  const selectedStock = Number(selectedVariant?.stockQuantity ?? 0)
+  const isOutOfStock = selectedStock <= 0
 
   useEffect(() => {
     const load = async () => {
@@ -53,6 +56,10 @@ export default function ProductDetailActions({
       setError('Sản phẩm chưa có biến thể')
       return
     }
+    if (isOutOfStock) {
+      setError('Biến thể đã hết hàng')
+      return
+    }
     setError(null)
     setAddSuccess(false)
     try {
@@ -74,6 +81,10 @@ export default function ProductDetailActions({
       setError('Sản phẩm chưa có biến thể')
       return
     }
+    if (isOutOfStock) {
+      setError('Biến thể đã hết hàng')
+      return
+    }
     setError(null)
     try {
       await addItem(vid, quantity)
@@ -87,14 +98,14 @@ export default function ProductDetailActions({
     <>
       <div className="mb-4">
         <p className="text-xs text-gray-500 mb-2">Đóng Gói:</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {variants.length > 0 ? (
             variants.map((v) => (
               <button
                 key={v.variantId}
                 type="button"
                 onClick={() => setSelectedVariantId(v.variantId)}
-                className={`px-3 py-1.5 text-xs border rounded transition-colors ${
+                className={`w-full px-2 py-1.5 text-xs border rounded transition-colors ${
                   selectedVariantId === v.variantId
                     ? 'border-primary-green text-primary-green bg-green-50'
                     : 'border-gray-300 text-gray-700 hover:border-primary-green'
@@ -115,6 +126,12 @@ export default function ProductDetailActions({
       <div className="mb-4">
         <p className="text-xs text-gray-500 mb-2">Số lượng:</p>
         <QuantitySelector defaultValue={1} onChange={setQuantity} />
+        <p className="mt-2 text-sm font-semibold">
+          <span className="text-gray-500 mb-2">Trạng thái : </span>
+          <span className={isOutOfStock ? 'text-red-500' : 'text-primary-green'}>
+            {isOutOfStock ? 'Hết hàng' : 'Còn hàng'}
+          </span>
+        </p>
       </div>
 
       {error && (
@@ -127,27 +144,27 @@ export default function ProductDetailActions({
         onClose={() => setAddSuccess(false)}
         duration={2000}
       />
-
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleAddToCart}
-          disabled={loading || variants.length === 0}
-          className="flex-1 border border-primary-green text-primary-green py-2 px-4 rounded text-xs font-medium hover:bg-green-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-        >
-          THÊM VÀO GIỎ HÀNG
-        </button>
-        <button
-          type="button"
-          onClick={handleBuyNow}
-          disabled={loading || variants.length === 0}
-          className="flex-1 bg-primary-green text-white py-2 px-4 rounded text-xs font-medium hover:bg-primary-green-dark transition-colors disabled:opacity-50"
-        >
-          MUA NGAY
-        </button>
-        <button className="p-2 border border-gray-300 rounded hover:border-red-400 hover:text-red-400 transition-colors">
-          <Heart size={16} />
-        </button>
+        {!isOutOfStock && (
+          <>
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={loading || variants.length === 0}
+              className="flex-1 border border-primary-green text-primary-green py-2 px-4 rounded text-xs font-medium hover:bg-green-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              THÊM VÀO GIỎ HÀNG
+            </button>
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              disabled={loading || variants.length === 0}
+              className="flex-1 bg-primary-green text-white py-2 px-4 rounded text-xs font-medium hover:bg-primary-green-dark transition-colors disabled:opacity-50"
+            >
+              MUA NGAY
+            </button>
+          </>
+        )}
       </div>
     </>
   )

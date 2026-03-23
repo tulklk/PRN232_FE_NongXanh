@@ -2,15 +2,17 @@ import Link from 'next/link'
 import Image from 'next/image'
 import RatingStars from '@/components/common/RatingStars'
 import AddToCartButton from '@/components/products/AddToCartButton'
+import WishlistToggleButton from '@/components/products/WishlistToggleButton'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
 import { Product } from '@/data/products'
 
 interface ProductCardProps {
   product: Product
   showCart?: boolean
+  showWishlist?: boolean
 }
 
-export default function ProductCard({ product, showCart = true }: ProductCardProps) {
+export default function ProductCard({ product, showCart = true, showWishlist = true }: ProductCardProps) {
   const discount = product.originalPrice
     ? calculateDiscount(product.originalPrice, product.currentPrice)
     : 0
@@ -35,6 +37,14 @@ export default function ProductCard({ product, showCart = true }: ProductCardPro
           {discount > 0 && (
             <div className="absolute top-2 right-2 bg-red-500 text-white text-[11px] font-bold px-2 py-1 rounded">
               -{discount}%
+            </div>
+          )}
+          {showWishlist && (
+            <div className="absolute bottom-2 right-2 z-10">
+              <WishlistToggleButton
+                productId={product.id}
+                productHref={`/products/${product.id}`}
+              />
             </div>
           )}
         </div>

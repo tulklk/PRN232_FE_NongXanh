@@ -238,7 +238,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <button
                 type="button"
                 onClick={() => setActiveTab('new')}
-                className={`px-6 py-3 rounded-lg font-bold text-lg transition-colors ${
+                className={`px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-bold text-[15px] sm:text-lg transition-colors ${
                   activeTab === 'new'
                     ? 'bg-[#0A923C] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -249,7 +249,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <button
                 type="button"
                 onClick={() => setActiveTab('bestseller')}
-                className={`px-6 py-3 rounded-lg font-bold text-lg transition-colors ${
+                className={`px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-bold text-[15px] sm:text-lg transition-colors ${
                   activeTab === 'bestseller'
                     ? 'bg-[#0A923C] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -266,7 +266,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
             </Link>
           </div>
           <div className="relative">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {tabProducts.map((product, i) => (
                 <div
                   key={product.id}
@@ -290,7 +290,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       {/* TET Collections Section */}
       <section ref={tetSectionInView.ref} className="py-6 sm:py-8">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 transition-all duration-600 ${tetSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${tetSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
             <h2 className="text-lg sm:text-xl font-bold text-gray-800">TẾT BÌNH NGỌ COLLECTIONS</h2>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
               <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Bánh/Hạt</button>
@@ -302,7 +302,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-6 transition-all duration-600 delay-150 ${tetSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${tetSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
             <Image
               src="/images/homepage/homeimg3.jpg"
               alt="Tuyển chọn hương vị ngày Tết"
@@ -311,15 +311,15 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               sizes="(max-width: 1400px) 100vw, 1400px"
             />
           </div>
-          <div className="relative">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="relative mt-1 sm:mt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
               {tetProducts.map((product, i) => (
                 <div
                   key={product.id}
                   className={`transition-all duration-500 ${tetSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                   style={{ transitionDelay: `${200 + i * 50}ms` }}
                 >
-                  <ProductCard product={product} />
+                  <ProductCard product={product} showWishlist={false} />
                 </div>
               ))}
             </div>
@@ -336,7 +336,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       {/* Fresh Fruits Section */}
       <section ref={fruitsSectionInView.ref} className="py-6 sm:py-8 bg-white">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 transition-all duration-600 ${fruitsSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${fruitsSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
             <h2 className="text-lg sm:text-xl font-bold text-gray-800">TRÁI CÂY TƯƠI NGON</h2>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
               <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Nội địa</button>
@@ -347,7 +347,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-6 transition-all duration-600 delay-150 ${fruitsSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${fruitsSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
             <Image
               src="/images/homepage/homeimg4.png"
               alt="Trái cây tươi ngon"
@@ -356,14 +356,14 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               sizes="(max-width: 1400px) 100vw, 1400px"
             />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
             {fruitProducts.map((product, i) => (
               <div
                 key={product.id}
                 className={`transition-all duration-500 ${fruitsSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 style={{ transitionDelay: `${200 + i * 50}ms` }}
               >
-                <ProductCard product={product} />
+                <ProductCard product={product} showWishlist={false} />
               </div>
             ))}
           </div>

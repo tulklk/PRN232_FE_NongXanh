@@ -14,9 +14,9 @@ function getAuthHeaders(request: NextRequest): Record<string, string> {
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const res = await fetch(`${API_BASE_URL}/api/product-variants/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/ProductVariants/${id}`, {
       headers: getAuthHeaders(request),
-      next: { revalidate: 30 },
+      cache: 'no-store',
     })
 
     const data = await res.json().catch(() => null)
@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   try {
     const { id } = params
     const body = await request.json()
-    const res = await fetch(`${API_BASE_URL}/api/product-variants/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/ProductVariants/${id}`, {
       method: 'PUT',
       headers: {
         ...getAuthHeaders(request),
@@ -81,7 +81,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const res = await fetch(`${API_BASE_URL}/api/product-variants/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/ProductVariants/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(request),
     })
