@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 
 interface SuccessPopupProps {
@@ -16,17 +16,32 @@ export default function SuccessPopup({
     onClose,
     duration = 2000 
 }: SuccessPopupProps) {
+    const [shouldRender, setShouldRender] = useState(false)
+    const [visible, setVisible] = useState(false)
+
     useEffect(() => {
         if (isOpen) {
+            setShouldRender(true)
+            requestAnimationFrame(() => {
+                setVisible(true)
+            })
+
             const timer = setTimeout(() => {
                 onClose()
             }, duration)
 
             return () => clearTimeout(timer)
         }
+
+        setVisible(false)
+        const hideTimer = setTimeout(() => {
+            setShouldRender(false)
+        }, 280)
+
+        return () => clearTimeout(hideTimer)
     }, [isOpen, duration, onClose])
 
-    if (!isOpen) return null
+    if (!shouldRender) return null
 
     // Split message by newline if it contains one
     const messageLines = message.split('\n')
@@ -34,9 +49,13 @@ export default function SuccessPopup({
     const subtitle = messageLines[1] || ''
 
     return (
-        <div className="fixed bottom-4 right-4 z-[60] pointer-events-none">
+        <div className="fixed right-4 top-4 z-[60] pointer-events-none">
             <div 
-                className="bg-white rounded-lg shadow-2xl p-4 min-w-[320px] max-w-md pointer-events-auto animate-slideRightFade will-change-transform border-l-4 border-[#0A923C]"
+                className={`min-w-[320px] max-w-md rounded-lg border-l-4 border-[#0A923C] bg-white p-4 shadow-2xl pointer-events-auto will-change-transform transition-all duration-300 ease-out ${
+                    visible
+                        ? 'translate-x-0 opacity-100'
+                        : 'translate-x-8 opacity-0'
+                }`}
             >
                 <div className="flex items-start gap-3">
                     {/* Checkmark Icon */}

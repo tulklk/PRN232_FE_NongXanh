@@ -5,6 +5,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import ScrollToTop from '@/components/common/ScrollToTop'
+import ChatWidget from '@/components/common/ChatWidget'
 import { UserProvider } from '@/contexts/UserContext'
 import { CartProvider } from '@/contexts/CartContext'
 import { WishlistProvider } from '@/contexts/WishlistContext'
@@ -34,6 +35,7 @@ export default function RootLayoutClient({
           <main className="min-h-screen">{children}</main>
           <Footer />
           <ScrollToTop />
+          <ChatWidget />
         </WishlistProvider>
       </CartProvider>
     </UserProvider>
