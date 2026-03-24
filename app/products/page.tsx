@@ -1,16 +1,39 @@
 'use client'
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import CategorySidebar from '@/components/products/CategorySidebar'
 import ProductGrid from '@/components/products/ProductGrid'
-import NewsCard from '@/components/news/NewsCard'
-import { newsArticles } from '@/data/news'
 import { SORT_OPTIONS } from '@/lib/constants'
 import { getProducts } from '@/lib/api/products'
+import { getBlogs } from '@/lib/api/blogs'
+import { getProviders } from '@/lib/api/providers'
 import type { Product } from '@/data/products'
 import { getCategories } from '@/lib/api/categories'
-import type { ApiCategory } from '@/lib/types/api'
+import type { ApiBlog, ApiCategory, ApiProvider } from '@/lib/types/api'
+import { formatDate } from '@/lib/utils'
+
+function normalizeExternalUrl(url?: string | null): string | null {
+  if (!url) return null
+  const trimmed = url.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'string') return null
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
+  return null
+}
+
+function getBlogExternalHref(blog: ApiBlog): string | null {
+  const fromUrl = normalizeExternalUrl(blog.url)
+  if (fromUrl) return fromUrl
+
+  const content = (blog.content ?? '').trim()
+  if (content.startsWith('http://') || content.startsWith('https://')) {
+    return content
+  }
+
+  return null
+}
 
 function flattenCategories(cats: ApiCategory[]): ApiCategory[] {
   const result: ApiCategory[] = []
@@ -52,17 +75,29 @@ function getDirectChildCategoryIds(
   return Array.from(new Set([...fromParentId, ...fromChildrenField]))
 }
 
+const LARGE_FETCH_PAGE_SIZE = 500
+
 function ProductsContent() {
   const searchParams = useSearchParams()
   const category = searchParams.get('category') || 'all'
   const sortParam = searchParams.get('sort')
   const keyword = searchParams.get('q')?.trim() ?? ''
+  const providerParam = searchParams.get('provider')?.trim() ?? ''
+  const minPriceStr = searchParams.get('minPrice')
+  const maxPriceStr = searchParams.get('maxPrice')
+  const hasPriceFilter =
+    (minPriceStr !== null && minPriceStr !== '') ||
+    (maxPriceStr !== null && maxPriceStr !== '')
+
   const [sortBy, setSortBy] = useState('newest')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [pageNumber, setPageNumber] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [categories, setCategories] = useState<ApiCategory[]>([])
+  const [providers, setProviders] = useState<ApiProvider[]>([])
+  const [relatedBlogs, setRelatedBlogs] = useState<ApiBlog[]>([])
+  const [relatedBlogsLoading, setRelatedBlogsLoading] = useState(true)
   const pageSize = 16
 
   useEffect(() => {
@@ -78,25 +113,61 @@ function ProductsContent() {
   }, [])
 
   useEffect(() => {
+    getProviders(1, 200)
+      .then(setProviders)
+      .catch(() => setProviders([]))
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setRelatedBlogsLoading(true)
+    getBlogs({ pageNumber: 1, pageSize: 6 })
+      .then((res) => {
+        if (cancelled) return
+        const items = res.items ?? []
+        setRelatedBlogs(items.slice(0, 3))
+      })
+      .catch(() => {
+        if (!cancelled) setRelatedBlogs([])
+      })
+      .finally(() => {
+        if (!cancelled) setRelatedBlogsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     setPageNumber(1)
-  }, [category])
+  }, [category, providerParam, minPriceStr, maxPriceStr])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
 
     const loadProducts = async () => {
+      const providerIdArg = providerParam || undefined
+      const useLargeBatch = hasPriceFilter
+      const apiPage = useLargeBatch ? 1 : pageNumber
+      const apiPageSize = useLargeBatch ? LARGE_FETCH_PAGE_SIZE : pageSize
+
       try {
         if (category === 'all') {
           const res = await getProducts({
-            pageNumber,
-            pageSize,
+            pageNumber: apiPage,
+            pageSize: apiPageSize,
+            providerId: providerIdArg,
           })
           if (cancelled) return
           setProducts(res.items)
-          setTotalPages(
-            res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1)
-          )
+          if (useLargeBatch) {
+            setTotalPages(1)
+          } else {
+            setTotalPages(
+              res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1)
+            )
+          }
           return
         }
 
@@ -105,21 +176,32 @@ function ProductsContent() {
 
         if (!isParentCategory) {
           const res = await getProducts({
-            pageNumber,
-            pageSize,
+            pageNumber: apiPage,
+            pageSize: apiPageSize,
             categoryId: category,
+            providerId: providerIdArg,
           })
           if (cancelled) return
           setProducts(res.items)
-          setTotalPages(
-            res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1)
-          )
+          if (useLargeBatch) {
+            setTotalPages(1)
+          } else {
+            setTotalPages(
+              res.totalPages ?? (Math.ceil((res.totalCount ?? 0) / pageSize) || 1)
+            )
+          }
           return
         }
 
+        const perChildSize = useLargeBatch ? 500 : 200
         const results = await Promise.all(
           childCategoryIds.map((childId) =>
-            getProducts({ pageNumber: 1, pageSize: 200, categoryId: childId })
+            getProducts({
+              pageNumber: 1,
+              pageSize: perChildSize,
+              categoryId: childId,
+              providerId: providerIdArg,
+            })
           )
         )
         if (cancelled) return
@@ -135,10 +217,15 @@ function ProductsContent() {
           })
         })
 
-        const start = (pageNumber - 1) * pageSize
-        const paged = merged.slice(start, start + pageSize)
-        setProducts(paged)
-        setTotalPages(Math.max(1, Math.ceil(merged.length / pageSize)))
+        if (useLargeBatch) {
+          setProducts(merged)
+          setTotalPages(1)
+        } else {
+          const start = (pageNumber - 1) * pageSize
+          const paged = merged.slice(start, start + pageSize)
+          setProducts(paged)
+          setTotalPages(Math.max(1, Math.ceil(merged.length / pageSize)))
+        }
       } catch {
         if (!cancelled) {
           setProducts([])
@@ -153,7 +240,7 @@ function ProductsContent() {
     return () => {
       cancelled = true
     }
-  }, [category, pageNumber, pageSize, categories])
+  }, [category, pageNumber, pageSize, categories, providerParam, hasPriceFilter])
 
   const allCategories = useMemo(
     () => flattenCategories(categories),
@@ -168,6 +255,24 @@ function ProductsContent() {
   const pageTitle =
     activeCategoryObj?.categoryName?.toUpperCase() ??
     (category === 'all' ? 'TẤT CẢ SẢN PHẨM' : 'SẢN PHẨM')
+
+  const selectedProviderName = useMemo(() => {
+    if (!providerParam) return null
+    const pr = providers.find((x) => String(x.providerId) === providerParam)
+    return pr?.providerName?.trim() ?? null
+  }, [providers, providerParam])
+
+  const filterMinPrice = useMemo(() => {
+    if (minPriceStr === null || minPriceStr === '') return null
+    const n = Number(minPriceStr)
+    return Number.isFinite(n) ? n : null
+  }, [minPriceStr])
+
+  const filterMaxPrice = useMemo(() => {
+    if (maxPriceStr === null || maxPriceStr === '') return null
+    const n = Number(maxPriceStr)
+    return Number.isFinite(n) ? n : null
+  }, [maxPriceStr])
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products]
@@ -188,6 +293,23 @@ function ProductsContent() {
           .toLowerCase()
         return allowedCategoryIds.has(categoryOfProduct)
       })
+    }
+
+    if (providerParam) {
+      filtered = filtered.filter((p) => {
+        if (p.providerId && String(p.providerId) === providerParam) return true
+        if (selectedProviderName) {
+          return p.seller.trim().toLowerCase() === selectedProviderName.toLowerCase()
+        }
+        return false
+      })
+    }
+
+    if (filterMinPrice !== null && filtered.length > 0) {
+      filtered = filtered.filter((p) => p.currentPrice >= filterMinPrice)
+    }
+    if (filterMaxPrice !== null && filtered.length > 0) {
+      filtered = filtered.filter((p) => p.currentPrice <= filterMaxPrice)
     }
 
     if (keyword) {
@@ -216,7 +338,32 @@ function ProductsContent() {
         break
     }
     return filtered
-  }, [products, sortBy, keyword, category, categories])
+  }, [
+    products,
+    sortBy,
+    keyword,
+    category,
+    categories,
+    providerParam,
+    selectedProviderName,
+    filterMinPrice,
+    filterMaxPrice,
+  ])
+
+  const effectiveTotalPages = useMemo(() => {
+    if (hasPriceFilter) {
+      return Math.max(1, Math.ceil(filteredAndSortedProducts.length / pageSize))
+    }
+    return totalPages
+  }, [hasPriceFilter, filteredAndSortedProducts.length, totalPages, pageSize])
+
+  const pagedProducts = useMemo(() => {
+    if (hasPriceFilter) {
+      const start = (pageNumber - 1) * pageSize
+      return filteredAndSortedProducts.slice(start, start + pageSize)
+    }
+    return filteredAndSortedProducts
+  }, [hasPriceFilter, pageNumber, pageSize, filteredAndSortedProducts])
 
   return (
     <div className="bg-white min-h-screen">
@@ -284,10 +431,15 @@ function ProductsContent() {
             {/* Product Grid */}
             {loading ? (
               <div className="py-12 text-center text-gray-500">Đang tải sản phẩm...</div>
-            ) : filteredAndSortedProducts.length === 0 ? (
+            ) : pagedProducts.length === 0 ? (
               <div className="py-12 text-center text-gray-500">Không tìm thấy sản phẩm.</div>
             ) : (
-              <ProductGrid products={filteredAndSortedProducts} columns={4} mobileColumns={2} />
+              <ProductGrid
+                products={pagedProducts}
+                columns={4}
+                mobileColumns={2}
+                showWishlist={false}
+              />
             )}
 
             {/* Pagination */}
@@ -300,11 +452,11 @@ function ProductsContent() {
                 Trước
               </button>
               <span className="px-4 py-2 text-sm text-gray-600">
-                Trang {pageNumber} / {totalPages}
+                Trang {pageNumber} / {effectiveTotalPages}
               </span>
               <button
-                onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
-                disabled={pageNumber >= totalPages}
+                onClick={() => setPageNumber((p) => Math.min(effectiveTotalPages, p + 1))}
+                disabled={pageNumber >= effectiveTotalPages}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Sau
@@ -312,21 +464,83 @@ function ProductsContent() {
             </div>
 
             {/* Recently Viewed Products */}
-            {products.length > 0 && (
+            {filteredAndSortedProducts.length > 0 && (
               <section className="mt-12">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">SẢN PHẨM ĐÃ XEM</h2>
-                <ProductGrid products={products.slice(0, 4)} columns={4} mobileColumns={2} />
+                <ProductGrid
+                  products={filteredAndSortedProducts.slice(0, 4)}
+                  columns={4}
+                  mobileColumns={2}
+                  showWishlist={false}
+                />
               </section>
             )}
 
-            {/* Related News */}
+            {/* Related News — cùng nguồn bài viết như trang /news */}
             <section className="mt-12">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">TIN TỨC LIÊN QUAN</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {newsArticles.slice(0, 3).map((article) => (
-                  <NewsCard key={article.id} article={article} />
-                ))}
-              </div>
+              {relatedBlogsLoading ? (
+                <div className="py-8 text-center text-gray-500 text-sm">Đang tải tin tức...</div>
+              ) : relatedBlogs.length === 0 ? (
+                <div className="py-8 text-center text-gray-500 text-sm">
+                  Chưa có tin tức.{' '}
+                  <Link href="/news" className="text-primary-green font-medium hover:underline">
+                    Xem trang tin tức
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {relatedBlogs.map((blog) => {
+                    const href = getBlogExternalHref(blog)
+                    const thumb = normalizeExternalUrl(blog.thumbnailUrl)
+                    const cardBody = (
+                      <>
+                        <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
+                          {thumb ? (
+                            <Image
+                              src={thumb}
+                              alt={blog.title}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <p className="text-xs text-gray-500 mb-1 line-clamp-1">
+                            {blog.source?.trim() || 'Tin tức Nông Xanh'}
+                          </p>
+                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm hover:text-primary-green">
+                            {blog.title}
+                          </h3>
+                          <p className="text-xs text-gray-400">{formatDate(blog.createdAt)}</p>
+                        </div>
+                      </>
+                    )
+                    return href ? (
+                      <Link
+                        key={blog.blogId}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        {cardBody}
+                      </Link>
+                    ) : (
+                      <div
+                        key={blog.blogId}
+                        className="bg-white rounded-lg overflow-hidden shadow-sm opacity-80"
+                      >
+                        {cardBody}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </section>
           </div>
         </div>

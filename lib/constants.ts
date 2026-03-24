@@ -50,12 +50,19 @@ export const SORT_OPTIONS = [
   { value: 'price-high', label: 'Giá từ cao đến thấp' },
 ]
 
-export const PRICE_RANGES = [
-  { min: 20000, max: 50000, label: '20.000 - 50.000' },
-  { min: 50000, max: 100000, label: '50.000 - 100.000' },
-  { min: 100000, max: 200000, label: '100.000 - 200.000' },
-  { min: 200000, max: 500000, label: '200.000 - 500.000' },
-  { min: 500000, max: 1000000, label: '500.000 - 1 triệu đồng' },
+/** Khoảng giá lọc sidebar; `max: null` = không giới hạn trên */
+export interface PriceRangeOption {
+  min: number
+  max: number | null
+  label: string
+}
+
+export const PRICE_RANGES: PriceRangeOption[] = [
+  { min: 0, max: 30_000, label: 'Dưới 30.000 đ' },
+  { min: 30_000, max: 100_000, label: '30.000 – 100.000 đ' },
+  { min: 100_000, max: 300_000, label: '100.000 – 300.000 đ' },
+  { min: 300_000, max: 1_000_000, label: '300.000 – 1.000.000 đ' },
+  { min: 1_000_000, max: null, label: 'Trên 1.000.000 đ' },
 ]
 
 export const FIXED_SHIPPING_FEE = 35000

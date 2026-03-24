@@ -25,11 +25,27 @@ function getStatusDisplay(status?: string | null): 'active' | 'inactive' {
 }
 
 function resolveProviderImageSrc(provider: ApiProvider): string | null {
+  const extended = provider as ApiProvider & {
+    image?: string | null
+    logoUrl?: string | null
+    ImageUrl?: string | null
+    imageURL?: string | null
+    imageurl?: string | null
+    providerImageUrl?: string | null
+    ProviderImageUrl?: string | null
+    LogoUrl?: string | null
+  }
   const rawValue =
     (
       provider.imageUrl ??
-      (provider as ApiProvider & { image?: string | null; logoUrl?: string | null }).image ??
-      (provider as ApiProvider & { image?: string | null; logoUrl?: string | null }).logoUrl ??
+      extended.ImageUrl ??
+      extended.imageURL ??
+      extended.imageurl ??
+      extended.providerImageUrl ??
+      extended.ProviderImageUrl ??
+      extended.logoUrl ??
+      extended.LogoUrl ??
+      extended.image ??
       ''
     )
       .toString()
@@ -106,7 +122,7 @@ export default function ProvidersPage() {
     }
   }
 
-  const handleUpdate = async (id: number, data: UpdateProviderInput) => {
+  const handleUpdate = async (id: number | string, data: UpdateProviderInput) => {
     setSubmitLoading(true)
     setSubmitError(null)
     try {
@@ -428,6 +444,9 @@ function ProviderFormModal({
   const [email, setEmail] = useState(initialData?.email ?? '')
   const [address, setAddress] = useState(initialData?.address ?? '')
   const [description, setDescription] = useState(initialData?.description ?? '')
+  const [ratingAverage, setRatingAverage] = useState(
+    initialData?.ratingAverage != null ? String(initialData.ratingAverage) : ''
+  )
   const [status, setStatus] = useState(initialData?.status ?? 'Active')
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadImageError, setUploadImageError] = useState<string | null>(null)
@@ -463,6 +482,8 @@ function ProviderFormModal({
       email: email.trim() || null,
       address: address.trim() || null,
       description: description.trim() || null,
+      ratingAverage:
+        ratingAverage.trim() === '' ? null : Number(ratingAverage.trim()),
       status: status.trim() || null,
     })
   }
@@ -607,6 +628,23 @@ function ProviderFormModal({
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
               placeholder="Thông tin mô tả thêm về nhà cung cấp"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rating trung bình
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={5}
+              step={0.1}
+              value={ratingAverage}
+              onChange={(e) => setRatingAverage(e.target.value)}
+              placeholder="0 - 5"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
               disabled={loading}
             />
           </div>

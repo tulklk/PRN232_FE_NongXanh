@@ -35,6 +35,55 @@ interface ProviderApiResponse {
   data?: ApiProvider
 }
 
+function normalizeApiProvider(raw: ApiProvider & Record<string, unknown>): ApiProvider {
+  const providerId =
+    raw.providerId ??
+    (raw.ProviderId as number | string | undefined) ??
+    (raw.id as number | string | undefined) ??
+    (raw.Id as number | string | undefined) ??
+    ''
+  const providerName =
+    raw.providerName ??
+    (raw.ProviderName as string | undefined) ??
+    (raw.name as string | undefined) ??
+    (raw.Name as string | undefined) ??
+    ''
+  const phoneNumber =
+    raw.phoneNumber ??
+    (raw.PhoneNumber as string | null | undefined) ??
+    (raw.phones as string | null | undefined) ??
+    (raw.Phones as string | null | undefined)
+  const imageUrl =
+    raw.imageUrl ??
+    (raw.ImageUrl as string | null | undefined) ??
+    (raw.imageURL as string | null | undefined) ??
+    (raw.imageurl as string | null | undefined) ??
+    (raw.providerImageUrl as string | null | undefined) ??
+    (raw.ProviderImageUrl as string | null | undefined) ??
+    (raw.logoUrl as string | null | undefined) ??
+    (raw.LogoUrl as string | null | undefined) ??
+    (raw.image as string | null | undefined)
+
+  const ratingAverageRaw =
+    raw.ratingAverage ??
+    (raw.RatingAverage as number | string | null | undefined)
+  const ratingAverage =
+    ratingAverageRaw == null || ratingAverageRaw === ''
+      ? null
+      : Number(ratingAverageRaw)
+
+  return {
+    ...raw,
+    providerId,
+    providerName,
+    phoneNumber: phoneNumber ?? null,
+    ratingAverage: Number.isFinite(ratingAverage as number)
+      ? (ratingAverage as number)
+      : null,
+    imageUrl: imageUrl ?? null,
+  }
+}
+
 export async function getProviders(
   pageNumber = 1,
   pageSize = 100,
@@ -54,11 +103,25 @@ export async function getProviders(
   const json = (await res.json()) as ProvidersApiResponse
   const data = json?.data
   if (data && Array.isArray((data as ApiProvidersPagedResponse).items)) {
-    return (data as ApiProvidersPagedResponse).items
+    return (data as ApiProvidersPagedResponse).items.map((p) =>
+      normalizeApiProvider(p as ApiProvider & Record<string, unknown>)
+    )
   }
-  if (Array.isArray(json.items)) return json.items
-  if (Array.isArray(data)) return data as ApiProvider[]
-  if (Array.isArray(json as unknown)) return json as unknown as ApiProvider[]
+  if (Array.isArray(json.items)) {
+    return json.items.map((p) =>
+      normalizeApiProvider(p as ApiProvider & Record<string, unknown>)
+    )
+  }
+  if (Array.isArray(data)) {
+    return (data as ApiProvider[]).map((p) =>
+      normalizeApiProvider(p as ApiProvider & Record<string, unknown>)
+    )
+  }
+  if (Array.isArray(json as unknown)) {
+    return (json as unknown as ApiProvider[]).map((p) =>
+      normalizeApiProvider(p as ApiProvider & Record<string, unknown>)
+    )
+  }
   return []
 }
 
@@ -79,9 +142,12 @@ export async function getProviderById(
   }
   const json = (await res.json()) as ProviderApiResponse | ApiProvider
   if (json && typeof json === 'object' && 'data' in json) {
-    return (json as ProviderApiResponse).data ?? null
+    const data = (json as ProviderApiResponse).data
+    return data
+      ? normalizeApiProvider(data as ApiProvider & Record<string, unknown>)
+      : null
   }
-  return json as ApiProvider
+  return normalizeApiProvider(json as ApiProvider & Record<string, unknown>)
 }
 
 export interface CreateProviderInput {
@@ -89,6 +155,7 @@ export interface CreateProviderInput {
   imageUrl?: string | null
   description?: string | null
   phoneNumber?: string | null
+  ratingAverage?: number | null
   email?: string | null
   address?: string | null
   status?: string | null
@@ -99,6 +166,10 @@ export async function createProvider(
   token?: string
 ): Promise<ApiProvider> {
   const body = {
+    // Ưu tiên field theo Swagger BE mới
+    name: data.providerName,
+    phones: data.phoneNumber ?? null,
+    ratingAverage: data.ratingAverage ?? 0,
     providerName: data.providerName,
     imageUrl: data.imageUrl ?? null,
     description: data.description ?? null,
@@ -125,9 +196,11 @@ export async function createProvider(
   }
   const json = (await res.json()) as ProviderApiResponse | ApiProvider
   if (json && typeof json === 'object' && 'data' in json) {
-    return (json as ProviderApiResponse).data as ApiProvider
+    return normalizeApiProvider(
+      (json as ProviderApiResponse).data as ApiProvider & Record<string, unknown>
+    )
   }
-  return json as ApiProvider
+  return normalizeApiProvider(json as ApiProvider & Record<string, unknown>)
 }
 
 export interface UpdateProviderInput {
@@ -135,6 +208,7 @@ export interface UpdateProviderInput {
   imageUrl?: string | null
   description?: string | null
   phoneNumber?: string | null
+  ratingAverage?: number | null
   email?: string | null
   address?: string | null
   status?: string | null
@@ -146,10 +220,17 @@ export async function updateProvider(
   token?: string
 ): Promise<ApiProvider> {
   const body: Record<string, unknown> = {}
-  if (data.providerName !== undefined) body.providerName = data.providerName
+  if (data.providerName !== undefined) {
+    body.providerName = data.providerName
+    body.name = data.providerName
+  }
   if (data.imageUrl !== undefined) body.imageUrl = data.imageUrl
   if (data.description !== undefined) body.description = data.description
-  if (data.phoneNumber !== undefined) body.phoneNumber = data.phoneNumber
+  if (data.phoneNumber !== undefined) {
+    body.phoneNumber = data.phoneNumber
+    body.phones = data.phoneNumber
+  }
+  if (data.ratingAverage !== undefined) body.ratingAverage = data.ratingAverage
   if (data.email !== undefined) body.email = data.email
   if (data.address !== undefined) body.address = data.address
   if (data.status !== undefined) body.status = data.status
@@ -172,9 +253,11 @@ export async function updateProvider(
   }
   const json = (await res.json()) as ProviderApiResponse | ApiProvider
   if (json && typeof json === 'object' && 'data' in json) {
-    return (json as ProviderApiResponse).data as ApiProvider
+    return normalizeApiProvider(
+      (json as ProviderApiResponse).data as ApiProvider & Record<string, unknown>
+    )
   }
-  return json as ApiProvider
+  return normalizeApiProvider(json as ApiProvider & Record<string, unknown>)
 }
 
 export async function deleteProvider(

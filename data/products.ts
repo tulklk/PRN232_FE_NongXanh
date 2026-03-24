@@ -12,6 +12,8 @@ export interface Product {
   category: string
   description?: string
   specifications?: Record<string, string>
+  /** Khớp nhà cung cấp / thương hiệu khi API trả về */
+  providerId?: string
 }
 
 export const products: Product[] = [

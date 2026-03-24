@@ -5,9 +5,15 @@ interface ProductGridProps {
   products: Product[]
   columns?: number
   mobileColumns?: 1 | 2
+  showWishlist?: boolean
 }
 
-export default function ProductGrid({ products, columns = 4, mobileColumns = 1 }: ProductGridProps) {
+export default function ProductGrid({
+  products,
+  columns = 4,
+  mobileColumns = 1,
+  showWishlist = true,
+}: ProductGridProps) {
   const gridColsClass = {
     1: 'lg:grid-cols-1',
     2: 'lg:grid-cols-2',
@@ -22,7 +28,7 @@ export default function ProductGrid({ products, columns = 4, mobileColumns = 1 }
       className={`grid ${mobileGridClass} sm:grid-cols-2 ${gridColsClass} gap-4`}
     >
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+        <ProductCard key={product.id} product={product} showWishlist={showWishlist} />
       ))}
     </div>
   )

@@ -32,6 +32,8 @@ export interface ApiProduct {
   reviewCount?: number
   salesCount?: number
   provider?: string
+  /** Backend có thể trả providerId / ProviderId */
+  providerId?: number | string
 }
 
 // API response wrappers
@@ -105,11 +107,12 @@ export interface ApiUsersPagedResponse {
 
 // API Provider structure
 export interface ApiProvider {
-  providerId: number
+  providerId: number | string
   providerName: string
   imageUrl?: string | null
   description?: string | null
   phoneNumber?: string | null
+  ratingAverage?: number | null
   email?: string | null
   address?: string | null
   status?: string | null

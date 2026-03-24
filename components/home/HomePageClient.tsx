@@ -32,6 +32,28 @@ function getBlogExternalHref(blog: ApiBlog): string | null {
   return null
 }
 
+function formatBlogPostDate(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+const AGRISHOW_NAV_LINKS: { label: string; href: string }[] = [
+  { label: 'Nông Nghiệp 360', href: '/news' },
+  { label: 'Câu Chuyện Và Nhân Vật', href: '/news' },
+  { label: 'Podcast - Agrishow', href: '/news' },
+  { label: 'Trải Nghiệm Nông Nghiệp', href: '/news' },
+  { label: 'Agritech', href: '/news' },
+  { label: 'Nông Nghiệp Bền Vững', href: '/news' },
+  { label: 'Xuất Nhập Khẩu', href: '/news' },
+  { label: 'Trồng Cây Nuôi Con', href: '/news' },
+]
+
 interface HomePageClientProps {
   products: Product[]
 }
@@ -39,6 +61,7 @@ interface HomePageClientProps {
 export default function HomePageClient({ products }: HomePageClientProps) {
   const [activeTab, setActiveTab] = useState<'new' | 'bestseller'>('new')
   const [featuredBlog, setFeaturedBlog] = useState<ApiBlog | null>(null)
+  const [homepageNewsBlogs, setHomepageNewsBlogs] = useState<ApiBlog[]>([])
   const [featuredLoading, setFeaturedLoading] = useState(true)
   const [featuredError, setFeaturedError] = useState<string | null>(null)
   const newProducts = products.slice(0, 8)
@@ -83,10 +106,11 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     setFeaturedLoading(true)
     setFeaturedError(null)
 
-    getBlogs({ pageNumber: 1, pageSize: 10 })
+    getBlogs({ pageNumber: 1, pageSize: 15 })
       .then((res) => {
         if (cancelled) return
-        const items = (res.items ?? []).filter((b) => getBlogExternalHref(b))
+        const items = (res.items ?? []).filter((b) => getBlogExternalHref(b)).slice(0, 15)
+        setHomepageNewsBlogs(items)
         if (items.length > 0) {
           const randomIndex = Math.floor(Math.random() * items.length)
           setFeaturedBlog(items[randomIndex])
@@ -96,6 +120,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       })
       .catch((err) => {
         if (cancelled) return
+        setHomepageNewsBlogs([])
         setFeaturedBlog(null)
         setFeaturedError(err instanceof Error ? err.message : 'Không thể tải tin nổi bật')
       })
@@ -107,6 +132,11 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       cancelled = true
     }
   }, [])
+
+  const homepageNewsMain = homepageNewsBlogs[0] ?? null
+  const homepageNewsSupplementary = homepageNewsBlogs.slice(1, 3)
+  const homepageNewsMedium = homepageNewsBlogs.slice(3, 5)
+  const homepageNewsMini = homepageNewsBlogs.slice(5, 10)
 
   return (
     <div className="bg-[#F5F5F5]">
@@ -176,11 +206,13 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                 >
                   <div className="relative w-full aspect-video bg-gray-100 overflow-hidden">
                     {normalizeExternalUrl(featuredBlog.thumbnailUrl) ? (
-                      <img
+                      <Image
                         src={normalizeExternalUrl(featuredBlog.thumbnailUrl) as string}
                         alt={featuredBlog.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 1024px) 100vw, 400px"
+                        unoptimized
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
@@ -370,64 +402,237 @@ export default function HomePageClient({ products }: HomePageClientProps) {
         </div>
       </section>
 
-      {/* Agrishow Section */}
+      {/* Agrishow Section — layout: sidebar | bài lớn + tin phụ | 2 thẻ medium | 5 tin mini */}
       <section ref={agrishowInView.ref} className="py-8">
-        <div className="max-w-[1400px] mx-auto px-8">
-          <div className={`grid grid-cols-1 lg:grid-cols-4 gap-6 transition-all duration-700 ${agrishowInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="lg:col-span-1">
-              <div className="bg-[#0A923C] text-white rounded-lg overflow-hidden">
-                <div className="p-4">
-                  <h3 className="text-xl font-bold mb-4">AGRISHOW</h3>
-                  <ul className="space-y-3">
-                    <li><Link href="/agrishow/360" className="text-white/90 hover:text-white text-sm">Nông Nghiệp 360</Link></li>
-                    <li><Link href="/agrishow/stories" className="text-white/90 hover:text-white text-sm">Câu Chuyện Và Nhân Vật</Link></li>
-                    <li><Link href="/agrishow/podcast" className="text-white/90 hover:text-white text-sm">Podcast - Agrishow</Link></li>
-                    <li><Link href="/agrishow/experience" className="text-white/90 hover:text-white text-sm">Trải Nghiệm Nông Nghiệp</Link></li>
-                    <li><Link href="/agrishow/agritech" className="text-white/90 hover:text-white text-sm">Agritech</Link></li>
-                    <li><Link href="/agrishow/sustainable" className="text-white/90 hover:text-white text-sm">Nông Nghiệp Bền Vững</Link></li>
-                    <li><Link href="/agrishow/export" className="text-white/90 hover:text-white text-sm">Xuất Nhập Khẩu</Link></li>
-                    <li><Link href="/agrishow/farming" className="text-white/90 hover:text-white text-sm">Trồng Cây Nuôi Con</Link></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg overflow-hidden shadow-sm">
-                <div className="relative h-[300px] bg-gradient-to-r from-green-100 to-yellow-100">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600 mb-2">🎁 foodmap.asia</p>
-                      <h3 className="text-2xl font-bold text-[#0A923C] mb-2">QUÀ TẾT 2026</h3>
-                      <p className="text-lg font-medium text-gray-700">PHÙ ĐỔNG THIÊN VƯƠNG</p>
-                      <div className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg inline-block">CHIẾT KHẤU ĐẾN 30%</div>
-                    </div>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
+          <div
+            className={`rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm transition-all duration-700 ${agrishowInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          >
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5">
+              {/* Cột 1: AGRISHOW */}
+              <aside className="lg:col-span-2">
+                <div className="rounded-lg border border-gray-100 overflow-hidden bg-white h-full min-h-[200px]">
+                  <div className="bg-[#0A923C] px-3 py-3 sm:py-4">
+                    <h3 className="text-center text-sm font-bold uppercase tracking-wide text-white sm:text-base">
+                      AGRISHOW
+                    </h3>
                   </div>
+                  <nav className="px-3 py-3 sm:px-4 sm:py-4">
+                    <ul className="space-y-2.5 text-sm text-gray-800">
+                      {AGRISHOW_NAV_LINKS.map((item) => (
+                        <li key={item.label}>
+                          <Link href={item.href} className="hover:text-[#0A923C] transition-colors">
+                            {item.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
                 </div>
-                <div className="p-4">
-                  <h4 className="font-medium text-gray-800 mb-2">Tuyển sĩ quà Tết 2026 cùng Foodmap - Đồng hành cùng doanh nghiệp trong hành trình trao gửi tri ân và giá trị Việt</h4>
-                  <p className="text-sm text-gray-500">Đăng bởi <span className="text-[#0A923C]">Vu Vy</span> ngày 22/10/2025</p>
+              </aside>
+
+              {/* Cột 2: Bài chính + 2 dòng tin phụ */}
+              <div className="lg:col-span-5 flex flex-col">
+                <div className="rounded-lg border border-gray-100 overflow-hidden bg-white flex-1 flex flex-col">
+                  {featuredLoading ? (
+                    <div className="animate-pulse">
+                      <div className="aspect-[16/9] max-h-[320px] bg-gray-100" />
+                      <div className="p-4 space-y-2">
+                        <div className="h-5 bg-gray-200 rounded w-[92%]" />
+                        <div className="h-3 bg-gray-100 rounded w-1/2" />
+                        <div className="h-3 bg-gray-100 rounded w-2/3" />
+                      </div>
+                    </div>
+                  ) : homepageNewsMain && getBlogExternalHref(homepageNewsMain) ? (
+                    <>
+                      <a
+                        href={getBlogExternalHref(homepageNewsMain) ?? '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block shrink-0"
+                      >
+                        <div className="relative aspect-[16/9] max-h-[320px] w-full bg-gray-100">
+                          {normalizeExternalUrl(homepageNewsMain.thumbnailUrl) ? (
+                            <Image
+                              src={normalizeExternalUrl(homepageNewsMain.thumbnailUrl) as string}
+                              alt={homepageNewsMain.title}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 1024px) 100vw, 620px"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-100 to-amber-100" />
+                          )}
+                        </div>
+                      </a>
+                      <div className="p-4 flex-1 flex flex-col">
+                        <a
+                          href={getBlogExternalHref(homepageNewsMain) ?? '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block"
+                        >
+                          <h4 className="text-base sm:text-lg font-bold text-gray-900 leading-snug line-clamp-3 hover:text-[#0A923C]">
+                            {homepageNewsMain.title}
+                          </h4>
+                        </a>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {homepageNewsMain.authorName || homepageNewsMain.source
+                            ? `Đăng bởi ${homepageNewsMain.authorName || homepageNewsMain.source || 'NongXanh'}`
+                            : 'Đăng bởi NongXanh'}
+                          {formatBlogPostDate(homepageNewsMain.createdAt || homepageNewsMain.updatedAt)
+                            ? ` ngày ${formatBlogPostDate(homepageNewsMain.createdAt || homepageNewsMain.updatedAt)}`
+                            : ''}
+                        </p>
+                        {homepageNewsSupplementary.length > 0 && (
+                          <div className="mt-4 border-t border-gray-200 pt-1">
+                            {homepageNewsSupplementary.map((blog, idx) => {
+                              const href = getBlogExternalHref(blog)
+                              if (!href) return null
+                              return (
+                                <a
+                                  key={blog.blogId}
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`block py-3 text-sm font-medium text-gray-800 hover:text-[#0A923C] ${idx < homepageNewsSupplementary.length - 1 ? 'border-b border-gray-100' : ''}`}
+                                >
+                                  {blog.title}
+                                </a>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-6 flex-1 flex flex-col justify-center">
+                      <p className="text-sm text-gray-600 mb-3">
+                        {featuredError ? 'Không thể tải tin tức từ hệ thống.' : 'Chưa có tin tức hiển thị.'}
+                      </p>
+                      <Link href="/news" className="text-sm text-[#0A923C] hover:underline">
+                        Xem thêm tin tức tại NongXanh
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="mt-4 space-y-2">
-                <Link
-                  href="/news"
-                  className="block text-gray-700 hover:text-[#0A923C] text-sm py-2 border-b border-gray-100"
-                >
-                  Xem thêm tin tức tại NongXanh
-                </Link>
+
+              {/* Cột 3: 2 thẻ medium */}
+              <div className="lg:col-span-3 flex flex-col gap-4">
+                {featuredLoading ? (
+                  <>
+                    <div className="rounded-lg border border-gray-100 overflow-hidden animate-pulse">
+                      <div className="h-[140px] bg-gray-100" />
+                      <div className="p-3 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-full" />
+                        <div className="h-4 bg-gray-100 rounded w-5/6" />
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-gray-100 overflow-hidden animate-pulse">
+                      <div className="h-[140px] bg-gray-100" />
+                      <div className="p-3 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-full" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  homepageNewsMedium.map((blog) => {
+                    const href = getBlogExternalHref(blog)
+                    const thumb = normalizeExternalUrl(blog.thumbnailUrl)
+                    if (!href) return null
+                    return (
+                      <a
+                        key={blog.blogId}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-lg border border-gray-100 overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <div className="relative h-[140px] w-full bg-gray-100">
+                          {thumb ? (
+                            <Image
+                              src={thumb}
+                              alt={blog.title}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 1024px) 100vw, 360px"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-sky-50" />
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <h4 className="text-sm font-bold text-gray-900 line-clamp-3 leading-snug hover:text-[#0A923C]">
+                            {blog.title}
+                          </h4>
+                        </div>
+                      </a>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Cột 4: 5 tin nhỏ (thumb + title) */}
+              <div className="lg:col-span-2 flex flex-col gap-3 justify-start">
+                {featuredLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex gap-2 animate-pulse">
+                      <div className="w-[72px] h-[72px] shrink-0 rounded-md bg-gray-100" />
+                      <div className="flex-1 space-y-2 pt-1">
+                        <div className="h-3 bg-gray-200 rounded w-full" />
+                        <div className="h-3 bg-gray-100 rounded w-4/5" />
+                      </div>
+                    </div>
+                  ))
+                ) : homepageNewsMini.length > 0 ? (
+                  homepageNewsMini.map((blog) => {
+                    const href = getBlogExternalHref(blog)
+                    const thumb = normalizeExternalUrl(blog.thumbnailUrl)
+                    if (!href) return null
+                    return (
+                      <a
+                        key={blog.blogId}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex gap-2.5 group min-h-[72px]"
+                      >
+                        <div className="relative w-[72px] h-[72px] shrink-0 overflow-hidden rounded-md bg-gray-100">
+                          {thumb ? (
+                            <Image
+                              src={thumb}
+                              alt={blog.title}
+                              fill
+                              className="object-cover"
+                              sizes="72px"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-green-100 to-blue-100" />
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-[13px] text-gray-800 leading-snug group-hover:text-[#0A923C] line-clamp-3">
+                          {blog.title}
+                        </p>
+                      </a>
+                    )
+                  })
+                ) : (
+                  <Link href="/news" className="flex gap-2.5 group">
+                    <div className="w-[72px] h-[72px] shrink-0 rounded-md bg-gradient-to-br from-green-100 to-blue-100" />
+                    <p className="text-xs text-gray-700 group-hover:text-[#0A923C] line-clamp-3">
+                      Khám phá thêm các bài viết mới nhất tại mục Tin tức.
+                    </p>
+                  </Link>
+                )}
               </div>
             </div>
-            <div className="lg:col-span-1 space-y-4">
-              <Link
-                href="/news"
-                className="flex gap-3 group"
-              >
-                <div className="w-20 h-16 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
-                  <div className="w-full h-full bg-gradient-to-br from-green-100 to-blue-100" />
-                </div>
-                <p className="text-sm text-gray-700 group-hover:text-[#0A923C] line-clamp-2">
-                  Khám phá thêm các bài viết mới nhất tại mục Tin tức.
-                </p>
+            <div className="mt-4 text-right border-t border-gray-100 pt-3">
+              <Link href="/news" className="text-sm font-medium text-[#0A923C] hover:underline">
+                Xem tất cả tin tức
               </Link>
             </div>
           </div>

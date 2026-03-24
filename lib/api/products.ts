@@ -38,6 +38,14 @@ function normalizeImageUrl(url?: string | null): string | null {
   return null
 }
 
+function pickProviderIdFromApi(api: ApiProduct): string | undefined {
+  const extended = api as ApiProduct & { ProviderId?: number | string }
+  const raw = api.providerId ?? extended.ProviderId
+  if (raw === undefined || raw === null) return undefined
+  const s = String(raw).trim()
+  return s || undefined
+}
+
 function mapApiProductToProduct(api: ApiProduct): Product {
   const primaryImage = api.productImages?.find((i) => i.isPrimary)
   const primaryUrl = normalizeImageUrl(primaryImage?.imageUrl)
@@ -47,6 +55,7 @@ function mapApiProductToProduct(api: ApiProduct): Product {
     api.productImages
       ?.map((i) => normalizeImageUrl(i.imageUrl))
       .filter((u): u is string => Boolean(u)) ?? []
+  const providerId = pickProviderIdFromApi(api)
 
   return {
     id: String(api.productId),
@@ -62,6 +71,7 @@ function mapApiProductToProduct(api: ApiProduct): Product {
     category: String(api.categoryId),
     description: api.description,
     specifications: api.origin ? { 'Xuất xứ': api.origin } : undefined,
+    ...(providerId ? { providerId } : {}),
   }
 }
 
@@ -69,6 +79,8 @@ export interface GetProductsParams {
   pageNumber?: number
   pageSize?: number
   categoryId?: string
+  /** Lọc theo nhà cung cấp (BE có thể hỗ trợ providerId / provider) */
+  providerId?: string
 }
 
 export interface GetProductsResult {
@@ -83,6 +95,7 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
   const pageNumber = params?.pageNumber ?? 1
   const pageSize = params?.pageSize ?? 10
   const categoryId = params?.categoryId
+  const providerId = params?.providerId?.trim()
   const isServer = typeof window === 'undefined'
   const search = new URLSearchParams({
     pageNumber: String(pageNumber),
@@ -92,6 +105,10 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
     // Hỗ trợ nhiều backend naming conventions.
     search.set('categoryId', categoryId)
     search.set('category', categoryId)
+  }
+  if (providerId) {
+    search.set('providerId', providerId)
+    search.set('provider', providerId)
   }
   const url = isServer
     ? `${BACKEND_URL}/api/Products?${search.toString()}`
