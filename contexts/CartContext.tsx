@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react'
 import type { ApiCart } from '@/lib/types/api'
@@ -18,8 +19,8 @@ interface CartContextType {
   error: string | null
   refreshCart: () => Promise<void>
   addItem: (variantId: number, quantity?: number) => Promise<void>
-  updateItem: (cartItemId: number, quantity: number) => Promise<void>
-  removeItem: (cartItemId: number) => Promise<void>
+  updateItem: (cartItemId: number | string, quantity: number) => Promise<void>
+  removeItem: (cartItemId: number | string) => Promise<void>
   clearCart: () => Promise<void>
   cartCount: number
 }
@@ -31,6 +32,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<ApiCart | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const cartRequestVersionRef = useRef(0)
 
   const token = tokens?.idToken
 
@@ -42,13 +44,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true)
     setError(null)
+    const requestVersion = ++cartRequestVersionRef.current
     try {
       const data = await cartApi.getCart(token)
+      if (requestVersion !== cartRequestVersionRef.current) return
       setCart(data)
     } catch (err) {
+      if (requestVersion !== cartRequestVersionRef.current) return
       setError(err instanceof Error ? err.message : 'Không thể tải giỏ hàng')
       setCart(null)
     } finally {
+      if (requestVersion !== cartRequestVersionRef.current) return
       setLoading(false)
     }
   }, [token, isAuthenticated])
@@ -65,6 +71,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       setLoading(true)
       setError(null)
+      cartRequestVersionRef.current += 1
       try {
         const updated = await cartApi.addCartItem({ variantId, quantity }, token)
         setCart(updated)
@@ -79,10 +86,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   )
 
   const updateItem = useCallback(
-    async (cartItemId: number, quantity: number) => {
+    async (cartItemId: number | string, quantity: number) => {
       if (!token) return
       setLoading(true)
       setError(null)
+      cartRequestVersionRef.current += 1
       try {
         const updated = await cartApi.updateCartItem(cartItemId, quantity, token)
         setCart(updated)
@@ -97,21 +105,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
   )
 
   const removeItem = useCallback(
-    async (cartItemId: number) => {
+    async (cartItemId: number | string) => {
       if (!token) return
+      const targetId = String(cartItemId)
+      const previousCart = cart
+
       setLoading(true)
       setError(null)
+      cartRequestVersionRef.current += 1
+
+      // Optimistic UI: xóa item ngay trên giao diện, không chờ refresh trang.
+      setCart((prev) => {
+        if (!prev?.cartItems) return prev
+        const nextItems = prev.cartItems.filter(
+          (item) => String(item.cartItemId) !== targetId
+        )
+        const nextTotal = nextItems.reduce(
+          (sum, item) => sum + (item.subTotal ?? item.priceAtTime * item.quantity),
+          0
+        )
+        return {
+          ...prev,
+          cartItems: nextItems,
+          totalAmount: nextTotal,
+        }
+      })
+
       try {
         await cartApi.removeCartItem(cartItemId, token)
-        await refreshCart()
       } catch (err) {
+        // Rollback nếu backend trả lỗi
+        setCart(previousCart)
         setError(err instanceof Error ? err.message : 'Không thể xóa khỏi giỏ')
         throw err
       } finally {
         setLoading(false)
       }
     },
-    [token, refreshCart]
+    [token, cart]
   )
 
   const clearCart = useCallback(async () => {

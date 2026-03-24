@@ -10,6 +10,7 @@ import {
   confirmOrder,
   createOrderShipping,
   getOrderById,
+  getOrderShipment,
   syncOrderShipment,
 } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
@@ -27,6 +28,12 @@ export default function AdminOrderDetailPage() {
   const [statusError, setStatusError] = useState<string | null>(null)
   const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
   const [ghnCreated, setGhnCreated] = useState(false)
+
+  const isShipmentCreated = (shipment: unknown): boolean => {
+    if (!shipment || typeof shipment !== 'object') return false
+    const record = shipment as Record<string, unknown>
+    return Object.keys(record).length > 0
+  }
 
   const getAllowedNextStatuses = (status?: string | null): string[] => {
     const s = (status ?? '').toLowerCase()
@@ -55,8 +62,19 @@ export default function AdminOrderDetailPage() {
       return
     }
     getOrderById(id, tokens.idToken)
-      .then((data) => {
+      .then(async (data) => {
         setOrder(data)
+        if (!data) {
+          setGhnCreated(false)
+          return
+        }
+        const statusLower = (data.status ?? '').toLowerCase()
+        if (statusLower === 'shipped') {
+          setGhnCreated(true)
+          return
+        }
+        const shipment = await getOrderShipment(data.orderId, tokens.idToken)
+        setGhnCreated(isShipmentCreated(shipment))
       })
       .catch((err) =>
         setError(
@@ -71,11 +89,6 @@ export default function AdminOrderDetailPage() {
       router.replace('/login')
     }
   }, [authLoading, isAuthenticated, router])
-
-  // Nếu backend đã chuyển sang `shipped` thì coi như đã tạo GHN.
-  useEffect(() => {
-    if ((order?.status ?? '').toLowerCase() === 'shipped') setGhnCreated(true)
-  }, [order?.status])
 
   if (authLoading) {
     return (
@@ -99,6 +112,17 @@ export default function AdminOrderDetailPage() {
     if (!order || !tokens?.idToken) return null
     const updated = await getOrderById(order.orderId, tokens.idToken)
     setOrder(updated)
+    if (!updated) {
+      setGhnCreated(false)
+      return updated
+    }
+    const statusLower = (updated.status ?? '').toLowerCase()
+    if (statusLower === 'shipped') {
+      setGhnCreated(true)
+      return updated
+    }
+    const shipment = await getOrderShipment(updated.orderId, tokens.idToken)
+    setGhnCreated(isShipmentCreated(shipment))
     return updated
   }
 
@@ -130,7 +154,6 @@ export default function AdminOrderDetailPage() {
 
     try {
       await createOrderShipping(order.orderId, tokens.idToken)
-      setGhnCreated(true)
       await refetch()
       setStatusSuccess('Xác nhận vận chuyển thành công. Mời cập nhật GHN.')
     } catch (err) {
@@ -152,7 +175,6 @@ export default function AdminOrderDetailPage() {
 
     try {
       await syncOrderShipment(order.orderId, tokens.idToken)
-      setGhnCreated(false)
       await refetch()
       setStatusSuccess('Cập nhật trạng thái GHN thành công.')
     } catch (err) {

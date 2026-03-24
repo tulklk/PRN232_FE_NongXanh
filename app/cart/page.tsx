@@ -94,8 +94,6 @@ export default function CartPage() {
                   const displayName =
                     [item.productName, item.variantName].filter(Boolean).join(' - ') || 'Sản phẩm'
                   const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
-                  const cartItemNumericId = Number(item.cartItemId)
-                  const hasValidCartItemId = Number.isFinite(cartItemNumericId)
                   return (
                   <div
                     key={item.cartItemId}
@@ -122,18 +120,21 @@ export default function CartPage() {
                         <div className="flex items-center gap-3">
                           <QuantitySelector
                             defaultValue={item.quantity}
-                            onChange={(qty) => {
-                              if (!hasValidCartItemId) return
-                              updateItem(cartItemNumericId, qty)
-                            }}
+                            onChange={(qty) => updateItem(item.cartItemId, qty)}
                           />
                           <button
-                            onClick={() => {
-                              if (!hasValidCartItemId) return
-                              removeItem(cartItemNumericId)
+                            type="button"
+                            onClick={async (e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              try {
+                                await removeItem(item.cartItemId)
+                              } catch {
+                                // Lỗi đã được xử lý trong CartContext (setError + rollback).
+                              }
                             }}
-                            disabled={!hasValidCartItemId}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                            disabled={loading}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Trash2 size={20} />
                           </button>

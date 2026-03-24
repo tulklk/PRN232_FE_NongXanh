@@ -20,7 +20,6 @@ import {
   createOrder,
   checkoutOrder,
   previewCheckout,
-  syncOrderShipment,
 } from '@/lib/api/orders'
 import { getVoucherByCode, getVouchers } from '@/lib/api/vouchers'
 import type { ApiVoucher, CheckoutPreviewResponse } from '@/lib/types/api'
@@ -328,7 +327,6 @@ export default function CheckoutPage() {
 
     let cancelled = false
     setLoadingDistricts(true)
-    setLoadingWards(true)
 
     // Đổi tỉnh -> reset district/ward để preview/checkout không dùng dữ liệu cũ
     setFormData((prev) => ({
@@ -340,26 +338,20 @@ export default function CheckoutPage() {
     setLocationDistricts([])
     setLocationWards([])
 
-    Promise.all([
-      fetchLocationDistricts(formData.provinceId, tokens?.idToken),
-      fetchLocationWards(formData.provinceId, tokens?.idToken),
-    ])
-      .then(([districts, wards]) => {
+    fetchLocationDistricts(formData.provinceId, tokens?.idToken)
+      .then((districts) => {
         if (!cancelled) {
           setLocationDistricts(districts)
-          setLocationWards(wards)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setLocationDistricts([])
-          setLocationWards([])
         }
       })
       .finally(() => {
         if (!cancelled) {
           setLoadingDistricts(false)
-          setLoadingWards(false)
         }
       })
 
@@ -368,6 +360,38 @@ export default function CheckoutPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ load lại khi đổi tỉnh; token lấy từ closure
   }, [formData.provinceId])
+
+  useEffect(() => {
+    if (!formData.districtId) {
+      setLocationWards([])
+      setLoadingWards(false)
+      setFormData((prev) =>
+        prev.wardCode ? { ...prev, wardCode: '' } : prev
+      )
+      return
+    }
+
+    let cancelled = false
+    setLoadingWards(true)
+    setLocationWards([])
+    setFormData((prev) => ({ ...prev, wardCode: '' }))
+
+    fetchLocationWards(formData.districtId, tokens?.idToken)
+      .then((wards) => {
+        if (!cancelled) setLocationWards(wards)
+      })
+      .catch(() => {
+        if (!cancelled) setLocationWards([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWards(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ load lại khi đổi quận/huyện
+  }, [formData.districtId])
 
   if (!isAuthenticated) {
     return (
@@ -475,7 +499,6 @@ export default function CheckoutPage() {
           },
           tokens.idToken
         )
-        await syncOrderShipment(order.orderId, tokens.idToken)
       } else {
         const orderDetails = cartItems.map((item) => ({
           variantId: item.variantId,
@@ -697,24 +720,17 @@ export default function CheckoutPage() {
                             districtCode: districtObj?.code ?? '',
                           })
                         }}
-                        disabled={!formData.provinceId || loadingWards}
+                        disabled={!formData.districtId || loadingWards}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green disabled:opacity-60"
                       >
                         <option value="">
-                          {!formData.provinceId
-                            ? 'Chọn tỉnh trước'
+                          {!formData.districtId
+                            ? 'Chọn quận/huyện trước'
                             : loadingWards
                               ? 'Đang tải...'
                               : 'Chọn phường/xã'}
                         </option>
-                        {(formData.districtId
-                          ? locationWards.filter(
-                              (w) =>
-                                String(w.districtId ?? '') ===
-                                String(formData.districtId)
-                            )
-                          : locationWards
-                        ).map((w, idx) => {
+                        {locationWards.map((w, idx) => {
                           const code = getWardToCode(w)
                           return (
                             <option key={`${code}-${idx}`} value={code}>

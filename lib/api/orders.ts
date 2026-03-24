@@ -358,12 +358,13 @@ export async function checkoutOrder(
 export async function getOrderShipment(
   orderId: number | string,
   token: string
-): Promise<ShipmentInfo> {
+): Promise<ShipmentInfo | null> {
   const res = await fetch(`${getBase()}/api/orders/${orderId}/shipment`, {
     headers: getHeaders(token),
   })
 
   if (!res.ok) {
+    if (res.status === 404) return null
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(
       (err as { error?: string }).error || 'Không thể lấy thông tin vận chuyển'

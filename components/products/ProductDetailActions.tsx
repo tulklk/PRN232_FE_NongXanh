@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 import QuantitySelector from '@/components/common/QuantitySelector'
 import SuccessPopup from '@/components/common/SuccessPopup'
 import { useCart } from '@/contexts/CartContext'
@@ -26,6 +27,8 @@ export default function ProductDetailActions({
   const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const [addSuccess, setAddSuccess] = useState(false)
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [isBuyingNow, setIsBuyingNow] = useState(false)
   const selectedVariant =
     variants.find((v) => v.variantId === selectedVariantId) ?? variants[0]
   const selectedStock = Number(selectedVariant?.stockQuantity ?? 0)
@@ -47,6 +50,7 @@ export default function ProductDetailActions({
   }, [productId])
 
   const handleAddToCart = async () => {
+    if (isAddingToCart || isBuyingNow) return
     if (!isAuthenticated) {
       router.push(`/login?from=${encodeURIComponent(`/products/${productId}`)}`)
       return
@@ -62,16 +66,20 @@ export default function ProductDetailActions({
     }
     setError(null)
     setAddSuccess(false)
+    setIsAddingToCart(true)
     try {
       await addItem(vid, quantity)
       setAddSuccess(true)
       setTimeout(() => setAddSuccess(false), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể thêm vào giỏ')
+    } finally {
+      setIsAddingToCart(false)
     }
   }
 
   const handleBuyNow = async () => {
+    if (isAddingToCart || isBuyingNow) return
     if (!isAuthenticated) {
       router.push(`/login?from=${encodeURIComponent(`/products/${productId}`)}`)
       return
@@ -86,11 +94,14 @@ export default function ProductDetailActions({
       return
     }
     setError(null)
+    setIsBuyingNow(true)
     try {
       await addItem(vid, quantity)
       router.push('/checkout')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể thêm vào giỏ')
+    } finally {
+      setIsBuyingNow(false)
     }
   }
 
@@ -150,18 +161,32 @@ export default function ProductDetailActions({
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={loading || variants.length === 0}
+              disabled={loading || isAddingToCart || isBuyingNow || variants.length === 0}
               className="flex-1 border border-primary-green text-primary-green py-2 px-4 rounded text-xs font-medium hover:bg-green-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
-              THÊM VÀO GIỎ HÀNG
+              {isAddingToCart ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  ĐANG THÊM...
+                </>
+              ) : (
+                'THÊM VÀO GIỎ HÀNG'
+              )}
             </button>
             <button
               type="button"
               onClick={handleBuyNow}
-              disabled={loading || variants.length === 0}
-              className="flex-1 bg-primary-green text-white py-2 px-4 rounded text-xs font-medium hover:bg-primary-green-dark transition-colors disabled:opacity-50"
+              disabled={loading || isAddingToCart || isBuyingNow || variants.length === 0}
+              className="flex-1 bg-primary-green text-white py-2 px-4 rounded text-xs font-medium hover:bg-primary-green-dark transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
             >
-              MUA NGAY
+              {isBuyingNow ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  ĐANG XỬ LÝ...
+                </>
+              ) : (
+                'MUA NGAY'
+              )}
             </button>
           </>
         )}

@@ -151,7 +151,7 @@ export interface AddCartItemRequest {
 }
 
 export interface UpdateCartItemRequest {
-  cartItemId: number
+  cartItemId: number | string
   quantity: number
 }
 

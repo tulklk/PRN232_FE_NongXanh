@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { X, ArrowLeft } from 'lucide-react'
+import { X, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
 import type { User } from '@/contexts/UserContext'
 import type { AuthTokens } from '@/contexts/UserContext'
@@ -37,6 +37,8 @@ export default function RegisterModal({
     const [step, setStep] = useState<'form' | 'otp'>('form')
     const [otp, setOtp] = useState('')
     const [otpError, setOtpError] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [pendingRegistration, setPendingRegistration] = useState<{
         email: string
         displayName: string
@@ -372,18 +374,29 @@ export default function RegisterModal({
 
                             {/* Password */}
                             <div className="animate-scaleIn" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="Mật khẩu"
-                                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md ${
-                                        errors.password ? 'border-red-500 animate-shake' : 'border-gray-300'
-                                    }`}
-                                    disabled={loading}
-                                    required
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        placeholder="Mật khẩu"
+                                        className={`w-full px-4 py-3 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md ${
+                                            errors.password ? 'border-red-500 animate-shake' : 'border-gray-300'
+                                        }`}
+                                        disabled={loading}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((prev) => !prev)}
+                                        className="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-gray-700"
+                                        disabled={loading}
+                                        aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                                 {errors.password && (
                                     <p className="mt-1 text-sm text-red-500 animate-shake">{errors.password}</p>
                                 )}
@@ -391,18 +404,29 @@ export default function RegisterModal({
 
                             {/* Confirm Password */}
                             <div className="animate-scaleIn" style={{ animationDelay: '0.6s', animationFillMode: 'both' }}>
-                                <input
-                                    type="password"
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
-                                    onChange={handleChange}
-                                    placeholder="Xác nhận mật khẩu"
-                                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md ${
-                                        errors.confirmPassword ? 'border-red-500 animate-shake' : 'border-gray-300'
-                                    }`}
-                                    disabled={loading}
-                                    required
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showConfirmPassword ? 'text' : 'password'}
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        placeholder="Xác nhận mật khẩu"
+                                        className={`w-full px-4 py-3 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A923C] focus:border-transparent text-sm transition-all duration-200 focus:scale-[1.02] focus:shadow-md ${
+                                            errors.confirmPassword ? 'border-red-500 animate-shake' : 'border-gray-300'
+                                        }`}
+                                        disabled={loading}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                        className="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-gray-700"
+                                        disabled={loading}
+                                        aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                                 {errors.confirmPassword && (
                                     <p className="mt-1 text-sm text-red-500 animate-shake">{errors.confirmPassword}</p>
                                 )}

@@ -157,7 +157,7 @@ export async function addCartItem(
 }
 
 export async function updateCartItem(
-  cartItemId: number,
+  cartItemId: number | string,
   quantity: number,
   token: string
 ): Promise<ApiCart> {
@@ -181,17 +181,19 @@ export async function updateCartItem(
 }
 
 export async function removeCartItem(
-  cartItemId: number,
+  cartItemId: number | string,
   token: string
 ): Promise<void> {
   const res = await fetch(
-    `${getBase()}/api/carts/items/${cartItemId}`,
+    `${getBase()}/api/carts/items/${encodeURIComponent(String(cartItemId))}`,
     {
       method: 'DELETE',
       headers: getHeaders(token),
     }
   )
   if (!res.ok) {
+    // Idempotent delete: item đã bị xóa trước đó.
+    if (res.status === 404) return
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(
       (err as { error?: string }).error || 'Không thể xóa sản phẩm khỏi giỏ'

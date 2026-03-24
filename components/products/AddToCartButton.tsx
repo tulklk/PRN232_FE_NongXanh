@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ShoppingCart } from 'lucide-react'
+import { Loader2, ShoppingCart } from 'lucide-react'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
 import { getProductVariants } from '@/lib/api/productVariants'
@@ -24,13 +24,16 @@ export default function AddToCartButton({
   const { isAuthenticated } = useUser()
   const { addItem, loading } = useCart()
   const [error, setError] = useState<string | null>(null)
+  const [isAdding, setIsAdding] = useState(false)
 
   const handleClick = async () => {
+    if (isAdding) return
     if (!isAuthenticated) {
       setError('Vui lòng đăng nhập')
       return
     }
     setError(null)
+    setIsAdding(true)
     try {
       let variantId = prefetchedVariantId
       if (variantId == null) {
@@ -47,6 +50,8 @@ export default function AddToCartButton({
       await addItem(variantId, 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể thêm vào giỏ')
+    } finally {
+      setIsAdding(false)
     }
   }
 
@@ -58,10 +63,19 @@ export default function AddToCartButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={loading}
+        disabled={loading || isAdding}
         className={`bg-[#0A923C] text-white rounded-md hover:bg-[#087a32] transition-colors shadow-sm disabled:opacity-50 ${sizeClass} ${className}`}
       >
-        {showIcon ? <ShoppingCart size={iconSize} /> : 'Thêm vào giỏ'}
+        {isAdding ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 size={iconSize} className="animate-spin" />
+            {!showIcon && 'Đang thêm...'}
+          </span>
+        ) : showIcon ? (
+          <ShoppingCart size={iconSize} />
+        ) : (
+          'Thêm vào giỏ'
+        )}
       </button>
       {error && (
         <span className="text-xs text-red-500 mt-1">{error}</span>

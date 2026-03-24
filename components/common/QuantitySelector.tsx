@@ -46,6 +46,7 @@ export default function QuantitySelector({
   return (
     <div className={`inline-flex items-center border border-gray-300 rounded w-fit ${className}`}>
       <button
+        type="button"
         onClick={handleDecrease}
         disabled={quantity <= min}
         className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -61,6 +62,7 @@ export default function QuantitySelector({
         className="w-12 text-center border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
+        type="button"
         onClick={handleIncrease}
         disabled={quantity >= max}
         className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"

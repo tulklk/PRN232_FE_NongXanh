@@ -22,6 +22,8 @@ export function getVnPayStatusLabel(vnPayStatus?: string | null): string {
     paid: 'Đã thanh toán',
     failed: 'Thanh toán thất bại',
     refunded: 'Đã hoàn tiền',
+    notapplicable: 'Chưa thanh toán',
+    noapplicable: 'Chưa thanh toán',
   }
   return labels[s] ?? raw
 }

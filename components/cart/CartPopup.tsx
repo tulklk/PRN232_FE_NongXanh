@@ -11,8 +11,8 @@ interface CartPopupProps {
   items: ApiCartItem[]
   totalAmount: number
   loading?: boolean
-  onUpdateQuantity: (cartItemId: number, quantity: number) => void
-  onRemoveItem: (cartItemId: number) => void
+  onUpdateQuantity: (cartItemId: number | string, quantity: number) => void
+  onRemoveItem: (cartItemId: number | string) => void
   onClose: () => void
 }
 
@@ -27,8 +27,8 @@ function getImageSrc(item: ApiCartItem): string {
   return item.imageUrl && item.imageUrl.startsWith('http') ? item.imageUrl : '/images/logo.png'
 }
 
-function getCartItemNumericId(item: ApiCartItem): number {
-  return Number(item.cartItemId)
+function getCartItemKey(item: ApiCartItem): string {
+  return String(item.cartItemId)
 }
 
 export default function CartPopup({
@@ -39,24 +39,25 @@ export default function CartPopup({
   onRemoveItem,
   onClose,
 }: CartPopupProps) {
-  const [localQuantities, setLocalQuantities] = useState<Record<number, number>>(
-    () => Object.fromEntries(items.map((i) => [getCartItemNumericId(i), i.quantity]))
+  const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
+    () => Object.fromEntries(items.map((i) => [getCartItemKey(i), i.quantity]))
   )
 
   useEffect(() => {
-    setLocalQuantities(Object.fromEntries(items.map((i) => [getCartItemNumericId(i), i.quantity])))
+    setLocalQuantities(Object.fromEntries(items.map((i) => [getCartItemKey(i), i.quantity])))
   }, [items])
 
-  const handleQtyChange = (cartItemId: number, delta: number) => {
-    const current = localQuantities[cartItemId] ?? 1
+  const handleQtyChange = (cartItemId: number | string, delta: number) => {
+    const cartItemKey = String(cartItemId)
+    const current = localQuantities[cartItemKey] ?? 1
     const next = Math.max(1, Math.min(999, current + delta))
-    setLocalQuantities((prev) => ({ ...prev, [cartItemId]: next }))
+    setLocalQuantities((prev) => ({ ...prev, [cartItemKey]: next }))
     onUpdateQuantity(cartItemId, next)
   }
 
   const displayTotal =
     items.reduce(
-      (sum, i) => sum + i.priceAtTime * (localQuantities[getCartItemNumericId(i)] ?? i.quantity),
+      (sum, i) => sum + i.priceAtTime * (localQuantities[getCartItemKey(i)] ?? i.quantity),
       0
     )
 
@@ -81,8 +82,8 @@ export default function CartPopup({
         ) : (
           <div className="space-y-4">
             {items.map((item) => {
-              const cartItemId = getCartItemNumericId(item)
-              const hasValidCartItemId = Number.isFinite(cartItemId)
+              const cartItemId = item.cartItemId
+              const cartItemKey = String(cartItemId)
               return (
               <div
                 key={item.cartItemId}
@@ -105,11 +106,7 @@ export default function CartPopup({
                     </p>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!hasValidCartItemId) return
-                        onRemoveItem(cartItemId)
-                      }}
-                      disabled={!hasValidCartItemId}
+                      onClick={() => onRemoveItem(cartItemId)}
                       className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                       aria-label="Xóa"
                     >
@@ -120,32 +117,25 @@ export default function CartPopup({
                     <div className="inline-flex items-center border border-gray-300 rounded text-sm bg-white">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!hasValidCartItemId) return
-                          handleQtyChange(cartItemId, -1)
-                        }}
-                        disabled={!hasValidCartItemId || (localQuantities[cartItemId] ?? item.quantity) <= 1}
+                        onClick={() => handleQtyChange(cartItemId, -1)}
+                        disabled={(localQuantities[cartItemKey] ?? item.quantity) <= 1}
                         className="p-1.5 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="px-3 py-1 min-w-[2rem] text-center font-medium text-gray-900 bg-gray-50 border-x border-gray-200">
-                        {localQuantities[cartItemId] ?? item.quantity}
+                        {localQuantities[cartItemKey] ?? item.quantity}
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!hasValidCartItemId) return
-                          handleQtyChange(cartItemId, 1)
-                        }}
-                        disabled={!hasValidCartItemId}
-                        className="p-1.5 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => handleQtyChange(cartItemId, 1)}
+                        className="p-1.5 hover:bg-gray-100 text-gray-700"
                       >
                         <Plus size={12} />
                       </button>
                     </div>
                     <span className="text-sm font-semibold text-[#0A923C]">
-                      {formatCurrency(item.priceAtTime * (localQuantities[cartItemId] ?? item.quantity))}
+                      {formatCurrency(item.priceAtTime * (localQuantities[cartItemKey] ?? item.quantity))}
                     </span>
                   </div>
                 </div>

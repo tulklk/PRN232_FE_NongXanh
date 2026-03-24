@@ -15,16 +15,16 @@ function getAuthHeaders(request: NextRequest): Record<string, string> {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const provinceId = searchParams.get('provinceId')
-    if (!provinceId) {
+    const districtId = searchParams.get('districtId')
+    if (!districtId) {
       return NextResponse.json(
-        { error: 'Thiếu tham số provinceId' },
+        { error: 'Thiếu tham số districtId' },
         { status: 400 }
       )
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/api/locations/wards?provinceId=${encodeURIComponent(provinceId)}`,
+      `${API_BASE_URL}/api/locations/wards?districtId=${encodeURIComponent(districtId)}`,
       {
         headers: getAuthHeaders(request),
         next: { revalidate: 3600 },

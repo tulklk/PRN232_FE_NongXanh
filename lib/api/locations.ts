@@ -150,11 +150,11 @@ export async function fetchLocationDistricts(
 }
 
 export async function fetchLocationWards(
-  provinceId: number | string,
+  districtId: number | string,
   token?: string
 ): Promise<LocationWard[]> {
   const res = await fetch(
-    `${getBase()}/api/locations/wards?provinceId=${encodeURIComponent(String(provinceId))}`,
+    `${getBase()}/api/locations/wards?districtId=${encodeURIComponent(String(districtId))}`,
     { headers: getHeaders(token) }
   )
   if (!res.ok) {

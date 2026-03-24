@@ -14,16 +14,15 @@ function getAuthHeaders(request: NextRequest): Record<string, string> {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ cartItemId: string }> }
+  { params }: { params: { cartItemId: string } }
 ) {
   try {
-    const { cartItemId } = await params
-    const headers = getAuthHeaders(request)
+    const cartItemId = decodeURIComponent(params.cartItemId)
     const res = await fetch(
-      `${API_BASE_URL}/api/Carts/items/${cartItemId}`,
+      `${API_BASE_URL}/api/Carts/items/${encodeURIComponent(cartItemId)}`,
       {
         method: 'DELETE',
-        headers,
+        headers: getAuthHeaders(request),
       }
     )
 
@@ -33,13 +32,19 @@ export async function DELETE(
         {
           error:
             (errorData as { message?: string }).message ||
+            (errorData as { error?: string }).error ||
             'Không thể xóa sản phẩm khỏi giỏ',
         },
         { status: res.status }
       )
     }
 
-    const data = await res.json().catch(() => ({}))
+    // Endpoint delete có thể trả 204 (no content), tránh parse JSON lỗi.
+    if (res.status === 204) {
+      return NextResponse.json({ success: true })
+    }
+
+    const data = await res.json().catch(() => ({ success: true }))
     return NextResponse.json(data)
   } catch (error: unknown) {
     console.error('Carts item DELETE error:', error)
