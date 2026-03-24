@@ -107,6 +107,7 @@ export interface ApiUsersPagedResponse {
 export interface ApiProvider {
   providerId: number
   providerName: string
+  imageUrl?: string | null
   description?: string | null
   phoneNumber?: string | null
   email?: string | null

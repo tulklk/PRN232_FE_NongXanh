@@ -30,8 +30,61 @@ function getJsonHeaders(token?: string): Record<string, string> {
   return headers
 }
 
+function isNonEmptyObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function unwrapOrderPayload(json: unknown): Record<string, unknown> {
+  let cur: unknown = json
+  for (let depth = 0; depth < 5; depth++) {
+    if (!isNonEmptyObject(cur)) break
+    const o = cur as Record<string, unknown>
+
+    const hasOrderLikeId =
+      'orderId' in o ||
+      'OrderId' in o ||
+      'id' in o ||
+      'Id' in o ||
+      'order_id' in o
+    if (hasOrderLikeId) return o
+
+    if (isNonEmptyObject(o.data)) {
+      cur = o.data
+      continue
+    }
+    if (isNonEmptyObject(o.order)) {
+      cur = o.order
+      continue
+    }
+    if (isNonEmptyObject(o.item)) {
+      cur = o.item
+      continue
+    }
+    if (isNonEmptyObject(o.value)) {
+      cur = o.value
+      continue
+    }
+    if (isNonEmptyObject(o.result)) {
+      cur = o.result
+      continue
+    }
+    break
+  }
+  return isNonEmptyObject(cur) ? cur : {}
+}
+
 /** Map backend PascalCase / mixed JSON to ApiOrder fields */
 function normalizeApiOrder(raw: ApiOrder & Record<string, unknown>): ApiOrder {
+  const orderIdValue =
+    raw.orderId ??
+    (raw.OrderId as number | string | undefined) ??
+    (raw as { id?: number | string }).id ??
+    (raw as { Id?: number | string }).Id ??
+    (raw as { order_id?: number | string }).order_id
+  const orderNumberValue =
+    raw.orderNumber ??
+    (raw.OrderNumber as string | null | undefined) ??
+    (raw as { code?: string | null }).code
   const vn =
     raw.vnPayStatus ??
     (raw.VnPayStatus as string | null | undefined) ??
@@ -39,9 +92,26 @@ function normalizeApiOrder(raw: ApiOrder & Record<string, unknown>): ApiOrder {
   const st = raw.status ?? (raw.Status as string | null | undefined)
   return {
     ...raw,
+    orderId: orderIdValue as number | string,
+    orderNumber: orderNumberValue ?? raw.orderNumber,
     status: st ?? raw.status,
     vnPayStatus: vn ?? raw.vnPayStatus,
   }
+}
+
+function ensureOrderHasId(order: ApiOrder): ApiOrder {
+  const value = String(order.orderId ?? '').trim().toLowerCase()
+  if (
+    order.orderId === undefined ||
+    order.orderId === null ||
+    value === '' ||
+    value === 'undefined' ||
+    value === 'null' ||
+    value === 'nan'
+  ) {
+    throw new Error('Không lấy được orderId từ phản hồi tạo đơn hàng')
+  }
+  return order
 }
 
 async function fetchWithTimeout(
@@ -126,9 +196,10 @@ export async function createOrder(
       (err as { error?: string }).error || 'Không thể tạo đơn hàng'
     )
   }
-  const json = (await res.json()) as { data?: ApiOrder } & ApiOrder
-  const order = (json?.data ?? json) as ApiOrder
-  return order
+  const json = (await res.json()) as unknown
+  const orderRaw = unwrapOrderPayload(json) as ApiOrder & Record<string, unknown>
+  const order = normalizeApiOrder(orderRaw)
+  return ensureOrderHasId(order)
 }
 
 export async function syncOrderShipment(
@@ -351,8 +422,10 @@ export async function checkoutOrder(
     )
   }
 
-  const json = (await res.json()) as { data?: ApiOrder } & ApiOrder
-  return (json?.data ?? json) as ApiOrder
+  const json = (await res.json()) as unknown
+  const orderRaw = unwrapOrderPayload(json) as ApiOrder & Record<string, unknown>
+  const order = normalizeApiOrder(orderRaw)
+  return ensureOrderHasId(order)
 }
 
 export async function getOrderShipment(

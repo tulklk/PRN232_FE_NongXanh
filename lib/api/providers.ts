@@ -86,6 +86,7 @@ export async function getProviderById(
 
 export interface CreateProviderInput {
   providerName: string
+  imageUrl?: string | null
   description?: string | null
   phoneNumber?: string | null
   email?: string | null
@@ -99,6 +100,7 @@ export async function createProvider(
 ): Promise<ApiProvider> {
   const body = {
     providerName: data.providerName,
+    imageUrl: data.imageUrl ?? null,
     description: data.description ?? null,
     phoneNumber: data.phoneNumber ?? null,
     email: data.email ?? null,
@@ -130,6 +132,7 @@ export async function createProvider(
 
 export interface UpdateProviderInput {
   providerName?: string
+  imageUrl?: string | null
   description?: string | null
   phoneNumber?: string | null
   email?: string | null
@@ -144,6 +147,7 @@ export async function updateProvider(
 ): Promise<ApiProvider> {
   const body: Record<string, unknown> = {}
   if (data.providerName !== undefined) body.providerName = data.providerName
+  if (data.imageUrl !== undefined) body.imageUrl = data.imageUrl
   if (data.description !== undefined) body.description = data.description
   if (data.phoneNumber !== undefined) body.phoneNumber = data.phoneNumber
   if (data.email !== undefined) body.email = data.email

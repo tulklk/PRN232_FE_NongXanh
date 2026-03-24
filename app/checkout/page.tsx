@@ -516,10 +516,15 @@ export default function CheckoutPage() {
         )
       }
 
+      const resolvedOrderId = order?.orderId != null ? String(order.orderId) : ''
+      if (!resolvedOrderId) {
+        throw new Error('Không lấy được orderId để tạo thanh toán VNPay')
+      }
+
       if (paymentMethod === 'vnpay') {
         const { paymentUrl } = await createVNPayPaymentUrl(
           {
-            orderId: String(order.orderId),
+            orderId: resolvedOrderId,
             clientIp: '',
           },
           tokens.idToken

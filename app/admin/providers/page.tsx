@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Plus, Edit, Trash2, Loader2, X } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
 import StatusBadge from '@/components/admin/StatusBadge'
+import { uploadImageToCloudinary } from '@/lib/api/cloudinary'
 import {
   getProviders,
   createProvider,
@@ -21,6 +22,29 @@ function getStatusDisplay(status?: string | null): 'active' | 'inactive' {
   const s = (status ?? '').toLowerCase()
   if (s === 'active' || s === 'hoạt động') return 'active'
   return 'inactive'
+}
+
+function resolveProviderImageSrc(provider: ApiProvider): string | null {
+  const rawValue =
+    (
+      provider.imageUrl ??
+      (provider as ApiProvider & { image?: string | null; logoUrl?: string | null }).image ??
+      (provider as ApiProvider & { image?: string | null; logoUrl?: string | null }).logoUrl ??
+      ''
+    )
+      .toString()
+      .trim()
+
+  if (!rawValue) return null
+  if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
+    return rawValue
+  }
+
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (!cloudName) return null
+
+  // Hỗ trợ dữ liệu chỉ lưu public_id trên BE, FE tự build URL ảnh Cloudinary.
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${rawValue}`
 }
 
 export default function ProvidersPage() {
@@ -173,6 +197,9 @@ export default function ProvidersPage() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                    Ảnh
+                  </th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-900">
                     Tên nhà cung cấp
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-900">
@@ -196,11 +223,34 @@ export default function ProvidersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProviders.map((p) => (
-                  <tr
-                    key={p.providerId}
-                    className="border-b border-gray-100 hover:bg-gray-50"
-                  >
+                {filteredProviders.map((p) => {
+                  const imageSrc = resolveProviderImageSrc(p)
+                  return (
+                    <tr
+                      key={p.providerId}
+                      className="border-b border-gray-100 hover:bg-gray-50"
+                    >
+                    <td className="py-3 px-4">
+                      {imageSrc ? (
+                        <img
+                          src={imageSrc}
+                          alt={p.providerName}
+                          className="h-10 w-10 rounded-md object-cover border border-gray-200"
+                          onError={(e) => {
+                            ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                            const fallback = e.currentTarget
+                              .nextElementSibling as HTMLSpanElement | null
+                            if (fallback) fallback.style.display = 'inline'
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="text-gray-400"
+                        style={{ display: imageSrc ? 'none' : 'inline' }}
+                      >
+                        -
+                      </span>
+                    </td>
                     <td className="py-3 px-4">
                       <span className="font-medium text-gray-900">
                         {p.providerName}
@@ -251,8 +301,9 @@ export default function ProvidersPage() {
                         </button>
                       </div>
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -372,17 +423,42 @@ function ProviderFormModal({
   error,
 }: ProviderFormModalProps) {
   const [providerName, setProviderName] = useState(initialData?.providerName ?? '')
+  const [imageUrl, setImageUrl] = useState(initialData?.imageUrl ?? '')
   const [phoneNumber, setPhoneNumber] = useState(initialData?.phoneNumber ?? '')
   const [email, setEmail] = useState(initialData?.email ?? '')
   const [address, setAddress] = useState(initialData?.address ?? '')
   const [description, setDescription] = useState(initialData?.description ?? '')
   const [status, setStatus] = useState(initialData?.status ?? 'Active')
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadImageError, setUploadImageError] = useState<string | null>(null)
+
+  const handleImageFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadImageError(null)
+    setUploadingImage(true)
+    try {
+      const uploadedUrl = await uploadImageToCloudinary(file)
+      setImageUrl(uploadedUrl)
+    } catch (err) {
+      setUploadImageError(
+        err instanceof Error ? err.message : 'Không thể upload ảnh lên Cloudinary'
+      )
+    } finally {
+      setUploadingImage(false)
+      e.target.value = ''
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!providerName.trim()) return
+    if (!providerName.trim() || uploadingImage) return
     onSubmit({
       providerName: providerName.trim(),
+      imageUrl: imageUrl.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
       email: email.trim() || null,
       address: address.trim() || null,
@@ -418,6 +494,9 @@ function ProviderFormModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <p className="text-red-600 text-sm">{error}</p>}
+          {uploadImageError && (
+            <p className="text-red-600 text-sm">{uploadImageError}</p>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -432,6 +511,47 @@ function ProviderFormModal({
               disabled={loading}
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ảnh nhà cung cấp
+            </label>
+            <div className="space-y-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
+                disabled={loading || uploadingImage}
+                className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-green file:text-white hover:file:bg-primary-green-dark disabled:opacity-50"
+              />
+              {uploadingImage && (
+                <p className="text-xs text-primary-green flex items-center gap-1">
+                  <Loader2 size={14} className="animate-spin" />
+                  Đang upload ảnh lên Cloudinary...
+                </p>
+              )}
+              {imageUrl && (
+                <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-2">
+                  <img
+                    src={imageUrl}
+                    alt={providerName || 'Provider'}
+                    className="h-12 w-12 rounded-md border border-gray-200 object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs text-gray-500">{imageUrl}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    disabled={loading || uploadingImage}
+                    className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    Xóa ảnh
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -517,7 +637,7 @@ function ProviderFormModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !providerName.trim()}
+              disabled={loading || uploadingImage || !providerName.trim()}
               className="px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? <Loader2 size={18} className="animate-spin" /> : null}
