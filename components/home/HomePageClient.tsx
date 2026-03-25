@@ -180,81 +180,33 @@ export default function HomePageClient({ products }: HomePageClientProps) {
             </div>
           </div>
 
-          <div className="space-y-3 mt-4 lg:mt-0 lg:h-[400px] flex flex-col">
+          <div className="space-y-3 mt-4 lg:mt-0 flex flex-col">
             <div
-              className="bg-[#0A923C] text-white px-4 py-2 rounded-t-lg font-semibold opacity-0 animate-fadeInUp"
-              style={{ animationDelay: '0.15s', animationFillMode: 'forwards' }}
-            >
-              TIN NỔI BẬT
-            </div>
-            <div
-              className="bg-white rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
+              className="bg-white rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 aspect-video"
               style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}
             >
-              {featuredLoading ? (
-                <div className="animate-pulse">
-                  <div className="relative w-full aspect-video bg-gray-100" />
-                  <div className="p-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                    <div className="h-3 bg-gray-100 rounded w-1/2" />
-                  </div>
+              <a href="/news" className="block">
+                <div className="relative w-full h-full bg-gray-100 overflow-hidden">
+                  {/* Use native img to avoid Next Image fill/layout issues */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/images/homepage/homebanner4.png"
+                    alt="Tin nổi bật"
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                  />
                 </div>
-              ) : featuredBlog && getBlogExternalHref(featuredBlog) ? (
-                <a
-                  href={getBlogExternalHref(featuredBlog) ?? '#'}
-                  className="block"
-                >
-                  <div className="relative w-full aspect-video bg-gray-100 overflow-hidden">
-                    {normalizeExternalUrl(featuredBlog.thumbnailUrl) ? (
-                      <Image
-                        src={normalizeExternalUrl(featuredBlog.thumbnailUrl) as string}
-                        alt={featuredBlog.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 1024px) 100vw, 400px"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 py-2">
-                      {featuredBlog.source && (
-                        <p className="text-[11px] text-gray-200 mb-1 line-clamp-1">
-                          {featuredBlog.source}
-                        </p>
-                      )}
-                      <p className="text-sm font-semibold text-white mb-1 line-clamp-2">
-                        {featuredBlog.title}
-                      </p>
-                      {featuredBlog.description && (
-                        <p className="text-xs text-gray-100 line-clamp-2">
-                          {featuredBlog.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </a>
-              ) : (
-                <div>
-                  <div className="relative w-full aspect-video bg-gray-100">
-                    <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
-                  </div>
-                  <div className="p-3">
-                    <p className="text-sm text-gray-800 line-clamp-2">
-                      {featuredError
-                        ? 'Không thể tải tin nổi bật.'
-                        : 'Chưa có tin nổi bật.'}
-                    </p>
-                  </div>
-                </div>
-              )}
+              </a>
             </div>
-            <div className="relative rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 flex-1 min-h-[140px]" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
+            <div
+              className="relative rounded-lg bg-gray-100 overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 aspect-video"
+              style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}
+            >
               <Image
-                src="/images/homepage/homeimg1.jpg"
+                src="/images/homepage/homebanner5.png"
                 alt="Hồng treo gió 500G - Tặng hộp 150G - giá 269K"
                 fill
-                className="object-contain"
+                className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 400px"
               />
             </div>
