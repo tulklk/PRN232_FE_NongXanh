@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { Send, X } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
+import { getChatDiagnostic, sendChatMessage } from '@/lib/api/chat'
 
 type ChatRole = 'bot' | 'user'
 
@@ -29,22 +30,38 @@ const initialMessages: ChatMessage[] = [
   },
 ]
 
+const suggestedPrompts = [
+  'Có voucher nào đang áp dụng hôm nay?',
+  'Phí ship và thời gian giao hàng thế nào?',
+  'Gợi ý sản phẩm bán chạy nhất giúp mình.',
+]
+
 export default function ChatWidget() {
-  const { user } = useUser()
+  const { user, tokens } = useUser()
   const [open, setOpen] = useState(false)
   const [renderPanel, setRenderPanel] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const [isSending, setIsSending] = useState(false)
+  const [diagnosticChecked, setDiagnosticChecked] = useState(false)
+  const [isAiAvailable, setIsAiAvailable] = useState(true)
+  const [showSuggestions, setShowSuggestions] = useState(true)
 
-  const canSend = input.trim().length > 0
+  const canSend = !isSending && input.trim().length > 0
   const userDisplayName = user?.displayName?.trim() || 'User'
   const userInitial = userDisplayName.charAt(0).toUpperCase() || 'U'
 
   const groupedMessages = useMemo(() => messages, [messages])
 
-  const handleSend = () => {
-    const value = input.trim()
-    if (!value) return
+  const buildHistoryPayload = (history: ChatMessage[]) =>
+    history.slice(-12).map((msg) => ({
+      role: msg.role === 'bot' ? 'assistant' : 'user',
+      content: msg.text,
+    }))
+
+  const handleSend = async (prefilledText?: string) => {
+    const value = (prefilledText ?? input).trim()
+    if (!value || isSending) return
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -53,8 +70,47 @@ export default function ChatWidget() {
       time: 'Vừa xong',
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
     setInput('')
+    setShowSuggestions(false)
+    setIsSending(true)
+    try {
+      const result = await sendChatMessage(
+        {
+          message: value,
+          messages: buildHistoryPayload(nextMessages),
+        },
+        tokens?.idToken
+      )
+      const botMessage: ChatMessage = {
+        id: `bot-${Date.now()}`,
+        role: 'bot',
+        text: result.text,
+        time: 'Vừa xong',
+      }
+      setMessages((prev) => [...prev, botMessage])
+      setIsAiAvailable(true)
+    } catch (error) {
+      const fallbackMessage: ChatMessage = {
+        id: `bot-err-${Date.now()}`,
+        role: 'bot',
+        text:
+          error instanceof Error
+            ? `Xin lỗi, hiện chưa thể phản hồi: ${error.message}`
+            : 'Xin lỗi, hệ thống AI đang bận. Bạn vui lòng thử lại sau.',
+        time: 'Vừa xong',
+      }
+      setMessages((prev) => [...prev, fallbackMessage])
+      setIsAiAvailable(false)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleSuggestionClick = (prompt: string) => {
+    if (isSending) return
+    handleSend(prompt)
   }
 
   const handleTogglePanel = () => {
@@ -71,6 +127,27 @@ export default function ChatWidget() {
       setOpen(true)
     })
   }
+
+  useEffect(() => {
+    if (!open || diagnosticChecked) return
+    let cancelled = false
+    getChatDiagnostic(tokens?.idToken)
+      .then(() => {
+        if (cancelled) return
+        setIsAiAvailable(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setIsAiAvailable(false)
+      })
+      .finally(() => {
+        if (cancelled) return
+        setDiagnosticChecked(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, diagnosticChecked, tokens?.idToken])
 
   return (
     <>
@@ -123,7 +200,12 @@ export default function ChatWidget() {
             </button>
           </div>
 
-          <div className="max-h-[500px] min-h-[420px] overflow-y-auto bg-gray-50 px-3 py-3">
+          <div className="max-h-[430px] min-h-[350px] overflow-y-auto bg-gray-50 px-3 py-3">
+            {!isAiAvailable && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                Kết nối AI đang gián đoạn. Tin nhắn vẫn được gửi thử lại tự động ở lần kế tiếp.
+              </div>
+            )}
             <div className="space-y-3">
               {groupedMessages.map((message) => {
                 const isUser = message.role === 'user'
@@ -165,10 +247,44 @@ export default function ChatWidget() {
                   </div>
                 )
               })}
+              {isSending && (
+                <div className="flex items-end gap-2 justify-start">
+                  <Image
+                    src="/images/chatbox/chatboxicon.png"
+                    alt="AI"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+                  />
+                  <div className="max-w-[85%] rounded-xl rounded-bl-sm border border-gray-200 bg-white px-3 py-2 shadow-sm">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] text-gray-600">Đang trả lời</span>
+                      <span className="typing-dot h-1.5 w-1.5 rounded-full bg-gray-400" />
+                      <span className="typing-dot h-1.5 w-1.5 rounded-full bg-gray-400 [animation-delay:0.15s]" />
+                      <span className="typing-dot h-1.5 w-1.5 rounded-full bg-gray-400 [animation-delay:0.3s]" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="border-t border-gray-200 bg-white p-2.5">
+            {showSuggestions && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {suggestedPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => handleSuggestionClick(prompt)}
+                    disabled={isSending}
+                    className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700 transition-colors hover:border-[#0A923C] hover:text-[#0A923C] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <input
                 type="text"
@@ -177,7 +293,7 @@ export default function ChatWidget() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    handleSend()
+                    void handleSend()
                   }
                 }}
                 placeholder="Nhập tin nhắn..."
@@ -185,7 +301,9 @@ export default function ChatWidget() {
               />
               <button
                 type="button"
-                onClick={handleSend}
+                onClick={() => {
+                  void handleSend()
+                }}
                 disabled={!canSend}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A923C] text-white transition-colors hover:bg-[#087a32] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Gửi tin nhắn"
@@ -205,6 +323,21 @@ export default function ChatWidget() {
           50% {
             transform: scale(1.08);
           }
+        }
+        @keyframes typingBounce {
+          0%,
+          80%,
+          100% {
+            transform: translateY(0);
+            opacity: 0.35;
+          }
+          40% {
+            transform: translateY(-3px);
+            opacity: 1;
+          }
+        }
+        .typing-dot {
+          animation: typingBounce 1.05s infinite ease-in-out;
         }
       `}</style>
     </>
