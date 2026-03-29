@@ -23,6 +23,7 @@ const menuItems = [
   { href: '/account/vouchers', label: 'Voucher của tôi', icon: Ticket },
   { href: '/account/wishlist', label: 'Sản phẩm yêu thích', icon: Heart },
   { href: '/account/reviews', label: 'Nhận xét của tôi', icon: MessageSquare },
+  { href: '/account/support-chat', label: 'Chat hỗ trợ', icon: MessageSquare },
   { href: '/account/notifications', label: 'Thông báo của tôi', icon: Bell },
 ]
 

@@ -13,6 +13,7 @@ import { formatCurrency, calculateDiscount } from '@/lib/utils'
 import { getProductById, getProducts } from '@/lib/api/products'
 import ProductImagesGallery from '@/components/products/ProductImagesGallery'
 import { getReviewsByProduct, mapApiReviewToCardModel } from '@/lib/api/reviews'
+import { getProviderById } from '@/lib/api/providers'
 
 interface ProductDetailPageProps {
   params: Promise<{
@@ -26,6 +27,16 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   if (!product) {
     notFound()
+  }
+
+  let providerName: string | null = null
+  if (product.providerId) {
+    try {
+      const provider = await getProviderById(product.providerId)
+      providerName = provider?.providerName ?? null
+    } catch {
+      providerName = null
+    }
   }
 
   let rawReviews: Awaited<ReturnType<typeof getReviewsByProduct>> = []
@@ -122,14 +133,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               )}
             </div>
 
-            <div className="space-y-2.5 text-xs mb-4">
-              <div className="flex flex-wrap gap-1">
-                <span className="text-gray-500 w-28 shrink-0">Vận chuyển đến:</span>
-                <Link href="#" className="text-primary-green hover:underline">Quận 1 - Tp. HCM &gt;</Link>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <span className="text-gray-500 w-28 shrink-0">Phí vận chuyển:</span>
-                <span className="text-primary-green font-medium">35.000 ₫</span>
+            <div className="mb-4">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-sm text-gray-600 shrink-0">Nhà cung cấp:</span>
+                <span className="text-base font-semibold text-primary-green leading-tight">
+                  {providerName || product.seller || 'Nông Xanh'}
+                </span>
               </div>
             </div>
 

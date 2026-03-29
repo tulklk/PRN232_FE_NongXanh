@@ -1,142 +1,301 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import Image from 'next/image'
-import Link from 'next/link'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import ProductCard from '@/components/products/ProductCard'
-import HotDealCard from '@/components/products/HotDealCard'
-import type { Product } from '@/data/products'
-import { useInView } from '@/lib/hooks/useInView'
-import { getBlogs } from '@/lib/api/blogs'
-import type { ApiBlog } from '@/lib/types/api'
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import ProductCard from "@/components/products/ProductCard";
+import HotDealCard from "@/components/products/HotDealCard";
+import type { Product } from "@/data/products";
+import { useInView } from "@/lib/hooks/useInView";
+import { getBlogs } from "@/lib/api/blogs";
+import type { ApiBlog } from "@/lib/types/api";
+import { getReviewsByProduct } from "@/lib/api/reviews";
+import { getCategories } from "@/lib/api/categories";
 
 function normalizeExternalUrl(url?: string | null): string | null {
-  if (!url) return null
-  const trimmed = url.trim()
-  if (!trimmed || trimmed.toLowerCase() === 'string') return null
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
-  if (trimmed.startsWith('/')) return trimmed
-  return trimmed
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed.toLowerCase() === "string") return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+    return trimmed;
+  if (trimmed.startsWith("/")) return trimmed;
+  return trimmed;
 }
 
 function getBlogExternalHref(blog: ApiBlog): string | null {
-  const fromUrl = normalizeExternalUrl(blog.url)
-  if (fromUrl) return fromUrl
+  const fromUrl = normalizeExternalUrl(blog.url);
+  if (fromUrl) return fromUrl;
 
-  const content = (blog.content ?? '').trim()
-  if (content.startsWith('http://') || content.startsWith('https://')) {
-    return content
+  const content = (blog.content ?? "").trim();
+  if (content.startsWith("http://") || content.startsWith("https://")) {
+    return content;
   }
 
-  return null
+  return null;
 }
 
 function formatBlogPostDate(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 const AGRISHOW_NAV_LINKS: { label: string; href: string }[] = [
-  { label: 'Nông Nghiệp 360', href: '/news' },
-  { label: 'Câu Chuyện Và Nhân Vật', href: '/news' },
-  { label: 'Podcast - Agrishow', href: '/news' },
-  { label: 'Trải Nghiệm Nông Nghiệp', href: '/news' },
-  { label: 'Agritech', href: '/news' },
-  { label: 'Nông Nghiệp Bền Vững', href: '/news' },
-  { label: 'Xuất Nhập Khẩu', href: '/news' },
-  { label: 'Trồng Cây Nuôi Con', href: '/news' },
-]
+  { label: "Nông Nghiệp 360", href: "/news" },
+  { label: "Câu Chuyện Và Nhân Vật", href: "/news" },
+  { label: "Podcast - Agrishow", href: "/news" },
+  { label: "Trải Nghiệm Nông Nghiệp", href: "/news" },
+  { label: "Agritech", href: "/news" },
+  { label: "Nông Nghiệp Bền Vững", href: "/news" },
+  { label: "Xuất Nhập Khẩu", href: "/news" },
+  { label: "Trồng Cây Nuôi Con", href: "/news" },
+];
 
 interface HomePageClientProps {
-  products: Product[]
+  products: Product[];
 }
 
 export default function HomePageClient({ products }: HomePageClientProps) {
-  const [activeTab, setActiveTab] = useState<'new' | 'bestseller'>('new')
-  const [featuredBlog, setFeaturedBlog] = useState<ApiBlog | null>(null)
-  const [homepageNewsBlogs, setHomepageNewsBlogs] = useState<ApiBlog[]>([])
-  const [featuredLoading, setFeaturedLoading] = useState(true)
-  const [featuredError, setFeaturedError] = useState<string | null>(null)
-  const newProducts = products.slice(0, 8)
-  const bestsellerProducts = [...products]
-    .sort((a, b) => (b.salesCount ?? 0) - (a.salesCount ?? 0))
-    .slice(0, 8)
-  const tabProducts = activeTab === 'new' ? newProducts : bestsellerProducts
+  const [activeTab, setActiveTab] = useState<"new" | "bestseller">("new");
+  const [featuredBlog, setFeaturedBlog] = useState<ApiBlog | null>(null);
+  const [homepageNewsBlogs, setHomepageNewsBlogs] = useState<ApiBlog[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredError, setFeaturedError] = useState<string | null>(null);
+  const [fruitParentCategoryId, setFruitParentCategoryId] = useState<
+    string | null
+  >(null);
+  const [fruitChildCategories, setFruitChildCategories] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedFruitCategoryId, setSelectedFruitCategoryId] = useState<
+    "all" | string
+  >("all");
+  const [ratingOverrides, setRatingOverrides] = useState<
+    Record<string, { rating: number; reviewCount: number }>
+  >({});
 
-  const tetProducts = products.slice(0, 10)
-  const fruitProducts = products.slice(0, 7)
+  const productsWithOverrides = useMemo(() => {
+    if (!ratingOverrides || Object.keys(ratingOverrides).length === 0)
+      return products;
+    return products.map((p) => {
+      const ov = ratingOverrides[p.id];
+      return ov ? { ...p, ...ov } : p;
+    });
+  }, [products, ratingOverrides]);
+
+  const newProducts = useMemo(() => {
+    const toTime = (iso?: string) => {
+      if (!iso) return 0;
+      const t = new Date(iso).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    };
+    const sorted = [...productsWithOverrides].sort(
+      (a, b) => toTime(b.createdAt) - toTime(a.createdAt),
+    );
+    return sorted.slice(0, 8);
+  }, [productsWithOverrides]);
+  const bestsellerProducts = useMemo(() => {
+    const sorted = [...productsWithOverrides].sort(
+      (a, b) => (b.salesCount ?? 0) - (a.salesCount ?? 0),
+    );
+    return sorted.slice(0, 8);
+  }, [productsWithOverrides]);
+  const tabProducts = activeTab === "new" ? newProducts : bestsellerProducts;
+
+  const tetProducts = useMemo(
+    () => productsWithOverrides.slice(0, 10),
+    [productsWithOverrides],
+  );
+  const fruitProducts = useMemo(() => {
+    const childIds = fruitChildCategories.map((c) => c.id);
+    if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
+    let filtered = productsWithOverrides.filter((p) =>
+      childIds.includes(String(p.category)),
+    );
+    if (selectedFruitCategoryId !== "all") {
+      filtered = filtered.filter(
+        (p) => String(p.category) === selectedFruitCategoryId,
+      );
+    }
+    return filtered.slice(0, 7);
+  }, [productsWithOverrides, fruitChildCategories, selectedFruitCategoryId]);
 
   const banners = [
-    '/images/homepage/homebanner1.jpg',
-    '/images/homepage/homebanner2.jpg',
-    '/images/homepage/homebanner3.jpg',
-  ]
+    "/images/homepage/homebanner1.jpg",
+    "/images/homepage/homebanner2.jpg",
+    "/images/homepage/homebanner3.jpg",
+  ];
 
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const hotDealsInView = useInView({ threshold: 0.1 })
-  const tetSectionInView = useInView({ threshold: 0.1 })
-  const fruitsSectionInView = useInView({ threshold: 0.1 })
-  const agrishowInView = useInView({ threshold: 0.05 })
+  const hotDealsInView = useInView({ threshold: 0.1 });
+  const tetSectionInView = useInView({ threshold: 0.1 });
+  const fruitsSectionInView = useInView({ threshold: 0.1 });
+  const agrishowInView = useInView({ threshold: 0.05 });
 
   const handleNextBanner = () => {
-    setCurrentIndex((prev) => (prev + 1) % banners.length)
-  }
+    setCurrentIndex((prev) => (prev + 1) % banners.length);
+  };
 
   const handlePrevBanner = () => {
-    setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length)
-  }
+    setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % banners.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [banners.length])
+      setCurrentIndex((prev) => (prev + 1) % banners.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
 
   useEffect(() => {
-    let cancelled = false
-    setFeaturedLoading(true)
-    setFeaturedError(null)
+    let cancelled = false;
+    getCategories()
+      .then((cats) => {
+        if (cancelled) return;
+
+        const normalize = (s?: string | null) => (s ?? "").trim().toLowerCase();
+
+        const parent = cats.find(
+          (c) => normalize(c.categoryName) === "trái cây",
+        );
+        const children = parent?.children ?? [];
+
+        setFruitParentCategoryId(parent ? String(parent.categoryId) : null);
+        setFruitChildCategories(
+          children.map((c) => ({
+            id: String(c.categoryId),
+            name: c.categoryName,
+          })),
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFruitParentCategoryId(null);
+        setFruitChildCategories([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFeaturedLoading(true);
+    setFeaturedError(null);
 
     getBlogs({ pageNumber: 1, pageSize: 15 })
       .then((res) => {
-        if (cancelled) return
-        const items = (res.items ?? []).filter((b) => getBlogExternalHref(b)).slice(0, 15)
-        setHomepageNewsBlogs(items)
+        if (cancelled) return;
+        const items = (res.items ?? [])
+          .filter((b) => getBlogExternalHref(b))
+          .slice(0, 15);
+        setHomepageNewsBlogs(items);
         if (items.length > 0) {
-          const randomIndex = Math.floor(Math.random() * items.length)
-          setFeaturedBlog(items[randomIndex])
+          const randomIndex = Math.floor(Math.random() * items.length);
+          setFeaturedBlog(items[randomIndex]);
         } else {
-          setFeaturedBlog(null)
+          setFeaturedBlog(null);
         }
       })
       .catch((err) => {
-        if (cancelled) return
-        setHomepageNewsBlogs([])
-        setFeaturedBlog(null)
-        setFeaturedError(err instanceof Error ? err.message : 'Không thể tải tin nổi bật')
+        if (cancelled) return;
+        setHomepageNewsBlogs([]);
+        setFeaturedBlog(null);
+        setFeaturedError(
+          err instanceof Error ? err.message : "Không thể tải tin nổi bật",
+        );
       })
       .finally(() => {
-        if (!cancelled) setFeaturedLoading(false)
-      })
+        if (!cancelled) setFeaturedLoading(false);
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
-  const homepageNewsMain = homepageNewsBlogs[0] ?? null
-  const homepageNewsSupplementary = homepageNewsBlogs.slice(1, 3)
-  const homepageNewsMedium = homepageNewsBlogs.slice(3, 5)
-  const homepageNewsMini = homepageNewsBlogs.slice(5, 10)
+  useEffect(() => {
+    // If Products API returns rating=0 but reviews exist, hydrate for homepage cards.
+    let cancelled = false;
+
+    const visibleIds = Array.from(
+      new Set(
+        [...tabProducts, ...tetProducts, ...fruitProducts].map((p) => p.id),
+      ),
+    );
+    const targets = visibleIds
+      .map((id) => productsWithOverrides.find((p) => p.id === id))
+      .filter((p): p is Product => Boolean(p))
+      .filter((p) => (p.rating ?? 0) === 0 && (p.reviewCount ?? 0) === 0)
+      .slice(0, 20);
+
+    const load = async () => {
+      const updates: Record<string, { rating: number; reviewCount: number }> =
+        {};
+      for (const p of targets) {
+        try {
+          const cacheKey = `nx_review_stats_${p.id}`;
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached) as {
+              rating: number;
+              reviewCount: number;
+            };
+            if (
+              parsed &&
+              typeof parsed.rating === "number" &&
+              typeof parsed.reviewCount === "number"
+            ) {
+              updates[p.id] = parsed;
+              continue;
+            }
+          }
+
+          const items = await getReviewsByProduct(p.id);
+          const count = items.length;
+          if (count <= 0) {
+            sessionStorage.setItem(
+              cacheKey,
+              JSON.stringify({ rating: 0, reviewCount: 0 }),
+            );
+            continue;
+          }
+          const avg =
+            items.reduce((sum, r) => sum + Number(r.rating || 0), 0) / count;
+          const next = {
+            rating: Number.isFinite(avg) ? Math.round(avg * 10) / 10 : 0,
+            reviewCount: count,
+          };
+          updates[p.id] = next;
+          sessionStorage.setItem(cacheKey, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+
+      if (cancelled) return;
+      if (Object.keys(updates).length === 0) return;
+      setRatingOverrides((prev) => ({ ...prev, ...updates }));
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [tabProducts, tetProducts, fruitProducts, productsWithOverrides]);
+
+  const homepageNewsMain = homepageNewsBlogs[0] ?? null;
+  const homepageNewsSupplementary = homepageNewsBlogs.slice(1, 3);
+  const homepageNewsMedium = homepageNewsBlogs.slice(3, 5);
+  const homepageNewsMini = homepageNewsBlogs.slice(5, 10);
 
   return (
     <div className="bg-[#F5F5F5]">
@@ -151,7 +310,10 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                   style={{ transform: `translateX(-${currentIndex * 100}%)` }}
                 >
                   {banners.map((src) => (
-                    <div key={src} className="relative h-full w-full flex-shrink-0">
+                    <div
+                      key={src}
+                      className="relative h-full w-full flex-shrink-0"
+                    >
                       <Image
                         src={src}
                         alt="Nongxanh homepage banner"
@@ -180,10 +342,10 @@ export default function HomePageClient({ products }: HomePageClientProps) {
             </div>
           </div>
 
-          <div className="space-y-3 mt-4 lg:mt-0 flex flex-col">
+          <div className="hidden lg:flex flex-col space-y-3">
             <div
               className="bg-white rounded-lg overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 aspect-video"
-              style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}
+              style={{ animationDelay: "0.2s", animationFillMode: "forwards" }}
             >
               <a href="/news" className="block">
                 <div className="relative w-full h-full bg-gray-100 overflow-hidden">
@@ -200,7 +362,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
             </div>
             <div
               className="relative rounded-lg bg-gray-100 overflow-hidden shadow-sm opacity-0 animate-fadeInUp hover:shadow-md hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 aspect-video"
-              style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}
+              style={{ animationDelay: "0.3s", animationFillMode: "forwards" }}
             >
               <Image
                 src="/images/homepage/homebanner5.png"
@@ -217,44 +379,50 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       {/* New & Bestseller Tabs Section */}
       <section ref={hotDealsInView.ref} className="bg-white py-4 sm:py-6">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 transition-all duration-700 ${hotDealsInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 transition-all duration-700 ${hotDealsInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          >
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setActiveTab('new')}
+                onClick={() => setActiveTab("new")}
                 className={`px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-bold text-[15px] sm:text-lg transition-colors ${
-                  activeTab === 'new'
-                    ? 'bg-[#0A923C] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  activeTab === "new"
+                    ? "bg-[#0A923C] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
                 SẢN PHẨM MỚI
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('bestseller')}
+                onClick={() => setActiveTab("bestseller")}
                 className={`px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-bold text-[15px] sm:text-lg transition-colors ${
-                  activeTab === 'bestseller'
-                    ? 'bg-[#0A923C] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  activeTab === "bestseller"
+                    ? "bg-[#0A923C] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
                 BÁN CHẠY NHẤT
               </button>
             </div>
             <Link
-              href={activeTab === 'new' ? '/products?sort=newest' : '/products?sort=bestseller'}
+              href={
+                activeTab === "new"
+                  ? "/products?sort=newest"
+                  : "/products?sort=bestseller"
+              }
               className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm sm:text-base"
             >
               Xem tất cả <ChevronRight size={16} />
             </Link>
           </div>
           <div className="relative">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
               {tabProducts.map((product, i) => (
                 <div
                   key={product.id}
-                  className={`transition-all duration-500 ${hotDealsInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                  className={`transition-all duration-500 ${hotDealsInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
                   style={{ transitionDelay: `${150 + i * 80}ms` }}
                 >
                   <HotDealCard product={product} />
@@ -274,19 +442,36 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       {/* TET Collections Section */}
       <section ref={tetSectionInView.ref} className="py-6 sm:py-8">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${tetSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800">TẾT BÌNH NGỌ COLLECTIONS</h2>
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${tetSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          >
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+              TẾT BÌNH NGỌ COLLECTIONS
+            </h2>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Bánh/Hạt</button>
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Khô/Thịt</button>
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Mứt/Trái cây sấy</button>
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Trà Cà Phê</button>
-              <Link href="/products?category=tet" className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm">
+              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">
+                Bánh/Hạt
+              </button>
+              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">
+                Khô/Thịt
+              </button>
+              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">
+                Mứt/Trái cây sấy
+              </button>
+              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">
+                Trà Cà Phê
+              </button>
+              <Link
+                href="/products?category=tet"
+                className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
+              >
                 Xem tất cả <ChevronRight size={16} />
               </Link>
             </div>
           </div>
-          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${tetSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div
+            className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${tetSectionInView.isInView ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          >
             <Image
               src="/images/homepage/homeimg3.jpg"
               alt="Tuyển chọn hương vị ngày Tết"
@@ -300,7 +485,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               {tetProducts.map((product, i) => (
                 <div
                   key={product.id}
-                  className={`transition-all duration-500 ${tetSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                  className={`transition-all duration-500 ${tetSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
                   style={{ transitionDelay: `${200 + i * 50}ms` }}
                 >
                   <ProductCard product={product} showWishlist={false} />
@@ -320,18 +505,55 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       {/* Fresh Fruits Section */}
       <section ref={fruitsSectionInView.ref} className="py-6 sm:py-8 bg-white">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${fruitsSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800">TRÁI CÂY TƯƠI NGON</h2>
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${fruitsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          >
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+              TRÁI CÂY TƯƠI NGON
+            </h2>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Nội địa</button>
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Nhập khẩu</button>
-              <button className="text-gray-600 hover:text-[#0A923C] text-sm font-medium">Trái cây sấy</button>
-              <Link href="/products?category=fruits" className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm">
+              {fruitChildCategories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedFruitCategoryId("all")}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedFruitCategoryId === "all"
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  Tất cả
+                </button>
+              )}
+              {fruitChildCategories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedFruitCategoryId(c.id)}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedFruitCategoryId === c.id
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+              <Link
+                href={
+                  fruitParentCategoryId
+                    ? `/products?category=${encodeURIComponent(fruitParentCategoryId)}`
+                    : "/products?category=fruits"
+                }
+                className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
+              >
                 Xem tất cả <ChevronRight size={16} />
               </Link>
             </div>
           </div>
-          <div className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${fruitsSectionInView.isInView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div
+            className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${fruitsSectionInView.isInView ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          >
             <Image
               src="/images/homepage/homeimg4.png"
               alt="Trái cây tươi ngon"
@@ -344,7 +566,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
             {fruitProducts.map((product, i) => (
               <div
                 key={product.id}
-                className={`transition-all duration-500 ${fruitsSectionInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                className={`transition-all duration-500 ${fruitsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
                 style={{ transitionDelay: `${200 + i * 50}ms` }}
               >
                 <ProductCard product={product} showWishlist={false} />
@@ -358,7 +580,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       <section ref={agrishowInView.ref} className="py-8">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
           <div
-            className={`rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm transition-all duration-700 ${agrishowInView.isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            className={`rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm transition-all duration-700 ${agrishowInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
           >
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5">
               {/* Cột 1: AGRISHOW */}
@@ -373,7 +595,10 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                     <ul className="space-y-2.5 text-sm text-gray-800">
                       {AGRISHOW_NAV_LINKS.map((item) => (
                         <li key={item.label}>
-                          <Link href={item.href} className="hover:text-[#0A923C] transition-colors">
+                          <Link
+                            href={item.href}
+                            className="hover:text-[#0A923C] transition-colors"
+                          >
                             {item.label}
                           </Link>
                         </li>
@@ -395,18 +620,25 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                         <div className="h-3 bg-gray-100 rounded w-2/3" />
                       </div>
                     </div>
-                  ) : homepageNewsMain && getBlogExternalHref(homepageNewsMain) ? (
+                  ) : homepageNewsMain &&
+                    getBlogExternalHref(homepageNewsMain) ? (
                     <>
                       <a
-                        href={getBlogExternalHref(homepageNewsMain) ?? '#'}
+                        href={getBlogExternalHref(homepageNewsMain) ?? "#"}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block shrink-0"
                       >
                         <div className="relative aspect-[16/9] max-h-[320px] w-full bg-gray-100">
-                          {normalizeExternalUrl(homepageNewsMain.thumbnailUrl) ? (
+                          {normalizeExternalUrl(
+                            homepageNewsMain.thumbnailUrl,
+                          ) ? (
                             <Image
-                              src={normalizeExternalUrl(homepageNewsMain.thumbnailUrl) as string}
+                              src={
+                                normalizeExternalUrl(
+                                  homepageNewsMain.thumbnailUrl,
+                                ) as string
+                              }
                               alt={homepageNewsMain.title}
                               fill
                               className="object-cover"
@@ -420,7 +652,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                       </a>
                       <div className="p-4 flex-1 flex flex-col">
                         <a
-                          href={getBlogExternalHref(homepageNewsMain) ?? '#'}
+                          href={getBlogExternalHref(homepageNewsMain) ?? "#"}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block"
@@ -430,29 +662,33 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                           </h4>
                         </a>
                         <p className="mt-2 text-xs text-gray-500">
-                          {homepageNewsMain.authorName || homepageNewsMain.source
-                            ? `Đăng bởi ${homepageNewsMain.authorName || homepageNewsMain.source || 'NongXanh'}`
-                            : 'Đăng bởi NongXanh'}
-                          {formatBlogPostDate(homepageNewsMain.createdAt || homepageNewsMain.updatedAt)
+                          {homepageNewsMain.authorName ||
+                          homepageNewsMain.source
+                            ? `Đăng bởi ${homepageNewsMain.authorName || homepageNewsMain.source || "NongXanh"}`
+                            : "Đăng bởi NongXanh"}
+                          {formatBlogPostDate(
+                            homepageNewsMain.createdAt ||
+                              homepageNewsMain.updatedAt,
+                          )
                             ? ` ngày ${formatBlogPostDate(homepageNewsMain.createdAt || homepageNewsMain.updatedAt)}`
-                            : ''}
+                            : ""}
                         </p>
                         {homepageNewsSupplementary.length > 0 && (
                           <div className="mt-4 border-t border-gray-200 pt-1">
                             {homepageNewsSupplementary.map((blog, idx) => {
-                              const href = getBlogExternalHref(blog)
-                              if (!href) return null
+                              const href = getBlogExternalHref(blog);
+                              if (!href) return null;
                               return (
                                 <a
                                   key={blog.blogId}
                                   href={href}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className={`block py-3 text-sm font-medium text-gray-800 hover:text-[#0A923C] ${idx < homepageNewsSupplementary.length - 1 ? 'border-b border-gray-100' : ''}`}
+                                  className={`block py-3 text-sm font-medium text-gray-800 hover:text-[#0A923C] ${idx < homepageNewsSupplementary.length - 1 ? "border-b border-gray-100" : ""}`}
                                 >
                                   {blog.title}
                                 </a>
-                              )
+                              );
                             })}
                           </div>
                         )}
@@ -461,9 +697,14 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                   ) : (
                     <div className="p-6 flex-1 flex flex-col justify-center">
                       <p className="text-sm text-gray-600 mb-3">
-                        {featuredError ? 'Không thể tải tin tức từ hệ thống.' : 'Chưa có tin tức hiển thị.'}
+                        {featuredError
+                          ? "Không thể tải tin tức từ hệ thống."
+                          : "Chưa có tin tức hiển thị."}
                       </p>
-                      <Link href="/news" className="text-sm text-[#0A923C] hover:underline">
+                      <Link
+                        href="/news"
+                        className="text-sm text-[#0A923C] hover:underline"
+                      >
                         Xem thêm tin tức tại NongXanh
                       </Link>
                     </div>
@@ -491,9 +732,9 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                   </>
                 ) : (
                   homepageNewsMedium.map((blog) => {
-                    const href = getBlogExternalHref(blog)
-                    const thumb = normalizeExternalUrl(blog.thumbnailUrl)
-                    if (!href) return null
+                    const href = getBlogExternalHref(blog);
+                    const thumb = normalizeExternalUrl(blog.thumbnailUrl);
+                    if (!href) return null;
                     return (
                       <a
                         key={blog.blogId}
@@ -522,7 +763,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                           </h4>
                         </div>
                       </a>
-                    )
+                    );
                   })
                 )}
               </div>
@@ -541,9 +782,9 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                   ))
                 ) : homepageNewsMini.length > 0 ? (
                   homepageNewsMini.map((blog) => {
-                    const href = getBlogExternalHref(blog)
-                    const thumb = normalizeExternalUrl(blog.thumbnailUrl)
-                    if (!href) return null
+                    const href = getBlogExternalHref(blog);
+                    const thumb = normalizeExternalUrl(blog.thumbnailUrl);
+                    if (!href) return null;
                     return (
                       <a
                         key={blog.blogId}
@@ -570,7 +811,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                           {blog.title}
                         </p>
                       </a>
-                    )
+                    );
                   })
                 ) : (
                   <Link href="/news" className="flex gap-2.5 group">
@@ -583,7 +824,10 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </div>
             </div>
             <div className="mt-4 text-right border-t border-gray-100 pt-3">
-              <Link href="/news" className="text-sm font-medium text-[#0A923C] hover:underline">
+              <Link
+                href="/news"
+                className="text-sm font-medium text-[#0A923C] hover:underline"
+              >
                 Xem tất cả tin tức
               </Link>
             </div>
@@ -591,5 +835,5 @@ export default function HomePageClient({ products }: HomePageClientProps) {
         </div>
       </section>
     </div>
-  )
+  );
 }

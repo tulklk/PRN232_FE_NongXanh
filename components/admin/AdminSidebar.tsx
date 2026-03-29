@@ -13,12 +13,14 @@ import {
   BarChart3,
   Users,
   Truck,
+  MessageSquare,
   Home,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LucideIcon } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
+import SidebarNotificationBell from '@/components/layout/SidebarNotificationBell'
 
 interface MenuItem {
   label: string
@@ -31,6 +33,7 @@ const menuItems: MenuItem[] = [
   { label: 'Categories', href: '/admin/categories', icon: FolderTree },
   { label: 'Products', href: '/admin/products', icon: ShoppingBag },
   { label: 'Orders', href: '/admin/orders', icon: ShoppingCart },
+  { label: 'Support Chat', href: '/admin/support-chat', icon: MessageSquare },
   { label: 'News', href: '/admin/news', icon: Newspaper },
   { label: 'Vouchers', href: '/admin/vouchers', icon: Ticket },
   { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
@@ -92,11 +95,14 @@ export default function AdminSidebar() {
 
       {/* User Info & Actions */}
       <div className="p-4 border-t border-gray-200">
-        <div className="mb-4 p-3 bg-white rounded-lg">
-          <div className="font-semibold text-gray-900">
-            {user?.displayName || 'Nông Xanh Shop'}
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-white p-3">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-gray-900">
+              {user?.displayName || 'Nông Xanh Shop'}
+            </div>
+            <div className="text-sm text-gray-500">{user?.email || 'admin@nongxanh.vn'}</div>
           </div>
-          <div className="text-sm text-gray-500">{user?.email || 'admin@nongxanh.vn'}</div>
+          <SidebarNotificationBell href="/admin/notifications" />
         </div>
         <div className="space-y-2">
           <Link

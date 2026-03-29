@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Bell } from 'lucide-react'
+import { Bell, Trash2 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import {
+  deleteNotification,
   getNotifications,
   markNotificationRead,
   type NotificationModel,
@@ -11,7 +12,7 @@ import {
 import { createSignalrClient } from '@/lib/realtime/signalr'
 import { formatDate } from '@/lib/utils'
 
-export default function NotificationsPage() {
+export default function StaffNotificationsPage() {
   const { tokens, isAuthenticated } = useUser()
   const [items, setItems] = useState<NotificationModel[]>([])
   const [pageNumber, setPageNumber] = useState(1)
@@ -56,7 +57,6 @@ export default function NotificationsPage() {
     if (!isAuthenticated || !tokens?.idToken) return
     const client = createSignalrClient(tokens.idToken)
     const off = client.onReceiveNotification(() => {
-      // refetch current page when a new notification arrives
       void fetchPage(pageNumber)
     })
     void client.start().catch(() => {})
@@ -72,33 +72,51 @@ export default function NotificationsPage() {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
     try {
       await markNotificationRead(id, tokens.idToken)
+      window.dispatchEvent(new Event('notifications-updated'))
     } catch {
-      // rollback best-effort
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: false } : n)))
     }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!tokens?.idToken) return
+    const before = items
+    setItems((prev) => prev.filter((n) => n.id !== id))
+    try {
+      await deleteNotification(id, tokens.idToken)
+      setTotalCount((c) => Math.max(0, c - 1))
+      window.dispatchEvent(new Event('notifications-updated'))
+    } catch (e) {
+      setItems(before)
+      setError(e instanceof Error ? e.message : 'Không thể xóa thông báo')
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-5">
+        <p className="text-gray-600">Vui lòng đăng nhập Admin/Staff.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <Bell size={18} className="text-[#0A923C]" />
-        <h2 className="text-base font-bold text-gray-900">Thông báo của tôi</h2>
+        <h2 className="text-base font-bold text-gray-900">Thông báo</h2>
       </div>
 
-      {!isAuthenticated && (
-        <p className="text-sm text-gray-600">Vui lòng đăng nhập để xem thông báo.</p>
-      )}
-
-      {loading && <p className="text-sm text-gray-500 py-10 text-center">Đang tải...</p>}
+      {loading && <p className="py-10 text-center text-sm text-gray-500">Đang tải...</p>}
       {error && (
         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
           {error}
         </div>
       )}
 
-      {!loading && isAuthenticated && items.length === 0 && (
+      {!loading && items.length === 0 && (
         <div className="flex items-center justify-center py-14">
-          <p className="text-base text-gray-500">Bạn chưa có thông báo nào!</p>
+          <p className="text-base text-gray-500">Chưa có thông báo nào.</p>
         </div>
       )}
 
@@ -110,35 +128,45 @@ export default function NotificationsPage() {
               n.isRead ? 'border-gray-200 bg-white' : 'border-green-200 bg-green-50'
             }`}
           >
-            <button
-              type="button"
-              onClick={() => void handleRead(n.id)}
-              className="text-left w-full min-w-0"
-            >
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-gray-900 line-clamp-1">
-                  {n.title || 'Thông báo'}
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => void handleRead(n.id)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <p className="line-clamp-1 text-sm font-semibold text-gray-900">
+                    {n.title || 'Thông báo'}
+                  </p>
+                  {!n.isRead && (
+                    <span className="h-2 w-2 rounded-full bg-[#0A923C]" aria-label="Chưa đọc" />
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {formatDate(n.createdAt)} • {n.type || 'System'}
                 </p>
-                {!n.isRead && (
-                  <span className="h-2 w-2 rounded-full bg-[#0A923C]" aria-label="Chưa đọc" />
-                )}
-              </div>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {formatDate(n.createdAt)} • {n.type || 'System'}
-              </p>
-              <p className="text-sm text-gray-700 mt-2 whitespace-pre-line">{n.content}</p>
-            </button>
+                <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{n.content}</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete(n.id)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                aria-label="Xóa thông báo"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
-      {isAuthenticated && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
             disabled={pageNumber <= 1}
-            className="px-3 py-1.5 rounded border border-gray-200 text-sm disabled:opacity-50"
+            className="rounded border border-gray-200 px-3 py-1.5 text-sm disabled:opacity-50"
           >
             Trước
           </button>
@@ -149,7 +177,7 @@ export default function NotificationsPage() {
             type="button"
             onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
             disabled={pageNumber >= totalPages}
-            className="px-3 py-1.5 rounded border border-gray-200 text-sm disabled:opacity-50"
+            className="rounded border border-gray-200 px-3 py-1.5 text-sm disabled:opacity-50"
           >
             Sau
           </button>

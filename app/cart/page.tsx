@@ -156,13 +156,35 @@ export default function CartPage() {
               <h2 className="text-lg font-bold mb-4">Thông tin đơn hàng</h2>
 
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">Địa điểm</p>
-                <Link
-                  href="/account/addresses"
-                  className="text-primary-green hover:underline font-semibold"
-                >
-                  Thêm địa chỉ giao hàng
-                </Link>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-gray-900">Sản phẩm ({items.length})</p>
+                </div>
+
+                {items.length === 0 ? (
+                  <p className="mt-2 text-sm text-gray-500">Chưa có sản phẩm nào.</p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {items.map((item) => {
+                      const displayName =
+                        [item.productName, item.variantName]
+                          .filter(Boolean)
+                          .join(' - ') || 'Sản phẩm'
+                      return (
+                        <div key={item.cartItemId} className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                              {displayName}
+                            </p>
+                            <p className="text-xs text-gray-500">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                            {formatCurrency(item.subTotal)}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-b border-gray-200 py-4 space-y-2 mb-4">

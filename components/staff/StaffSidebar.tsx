@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   FolderTree,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LucideIcon } from 'lucide-react'
+import { useUser } from '@/contexts/UserContext'
+import SidebarNotificationBell from '@/components/layout/SidebarNotificationBell'
 
 interface MenuItem {
   label: string
@@ -35,6 +37,13 @@ const menuItems: MenuItem[] = [
 
 export default function StaffSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout } = useUser()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/')
+  }
 
   return (
     <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-screen">
@@ -80,9 +89,15 @@ export default function StaffSidebar() {
 
       {/* User Info & Actions */}
       <div className="p-4 border-t border-gray-200">
-        <div className="mb-4 p-3 bg-white rounded-lg">
-          <div className="font-semibold text-gray-900">Nhân viên</div>
-          <div className="text-sm text-gray-500">staff@nongxanh.vn</div>
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-white p-3">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-gray-900">{user?.displayName || 'Nhân viên'}</div>
+            <div className="text-sm text-gray-500">{user?.email || 'staff@nongxanh.vn'}</div>
+          </div>
+          <SidebarNotificationBell
+            href="/staff/notifications"
+            activeClassName="bg-[#0A923C]/10 text-[#0A923C]"
+          />
         </div>
         <div className="space-y-2">
           <Link
@@ -92,7 +107,11 @@ export default function StaffSidebar() {
             <Home size={18} />
             <span className="text-sm">Quay về trang chủ</span>
           </Link>
-          <button className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left text-gray-700 transition-colors hover:bg-gray-100"
+          >
             <LogOut size={18} />
             <span className="text-sm">Đăng xuất</span>
           </button>
