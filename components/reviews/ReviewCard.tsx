@@ -1,9 +1,9 @@
 import RatingStars from '@/components/common/RatingStars'
 import { formatDate } from '@/lib/utils'
-import { Review } from '@/data/reviews'
+import { ReviewCardModel } from '@/lib/api/reviews'
 
 interface ReviewCardProps {
-  review: Review
+  review: ReviewCardModel
 }
 
 export default function ReviewCard({ review }: ReviewCardProps) {

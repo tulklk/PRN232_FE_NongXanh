@@ -35,7 +35,7 @@ export default function HotDealCard({ product }: HotDealCardProps) {
           </h3>
         </Link>
         <div className="flex items-center gap-1.5 mb-2">
-          <RatingStars rating={product.rating} size={14} />
+          <RatingStars rating={product.rating} size={14} showNumber />
           <span className="text-xs text-gray-500">({product.reviewCount})</span>
         </div>
         <div className="mb-3">

@@ -56,7 +56,7 @@ export default function ProductCard({ product, showCart = true, showWishlist = t
           </h3>
         </Link>
         <div className="flex items-center gap-1 mb-1">
-          <RatingStars rating={product.rating} size={14} />
+          <RatingStars rating={product.rating} size={14} showNumber />
           <span className="text-xs text-gray-500">({product.reviewCount})</span>
         </div>
         <p className="text-xs text-gray-500 mb-1.5">{product.salesCount} Đã bán</p>

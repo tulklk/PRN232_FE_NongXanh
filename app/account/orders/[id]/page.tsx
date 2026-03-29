@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -10,6 +10,7 @@ import { getOrderById } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getOrderStatusLabel, getVnPayStatusLabel } from '@/lib/orderDisplay'
+import ReviewModal from '@/components/reviews/ReviewModal'
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -19,6 +20,18 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<ApiOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeReview, setActiveReview] = useState<{
+    productId: string
+    productName: string
+  } | null>(null)
+  const [reviewedProductIds, setReviewedProductIds] = useState<Set<string>>(
+    () => new Set()
+  )
+
+  const isDelivered = useMemo(() => {
+    const s = (order?.status ?? '').trim().toLowerCase()
+    return s === 'delivered' || s === 'shipping' || s === 'shipped'
+  }, [order?.status])
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.idToken || !id) {
@@ -130,7 +143,15 @@ export default function OrderDetailPage() {
               | undefined
             const productName =
               (raw.productName ?? raw.ProductName ?? detail.variantName ?? 'Sản phẩm') as string
+            const productIdRaw = (raw.productId ??
+              raw.ProductId ??
+              detail.productId) as string | number | null | undefined
+            const productId = productIdRaw != null ? String(productIdRaw) : null
             const imageSrc = imageUrl?.startsWith('http') ? imageUrl : '/images/logo.png'
+            const canReview =
+              isDelivered &&
+              !!productId &&
+              !reviewedProductIds.has(productId)
             return (
               <div
                 key={detail.orderDetailId}
@@ -151,6 +172,33 @@ export default function OrderDetailPage() {
                   <p className="text-sm text-gray-500">
                     {detail.variantName && `${detail.variantName} • `}x{detail.quantity}
                   </p>
+                  {isDelivered && (
+                    <div className="mt-2">
+                      {productId ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            canReview &&
+                            setActiveReview({ productId, productName })
+                          }
+                          disabled={!canReview}
+                          className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            canReview
+                              ? 'bg-[#0A923C] text-white hover:bg-[#087a32]'
+                              : 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          {reviewedProductIds.has(productId)
+                            ? 'Đã đánh giá'
+                            : 'Đánh giá'}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">
+                          Không thể đánh giá sản phẩm này.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <span className="font-semibold text-primary-green flex-shrink-0">
                   {formatCurrency(detail.subTotal)}
@@ -183,6 +231,22 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {activeReview && (
+        <ReviewModal
+          open={true}
+          productId={activeReview.productId}
+          productName={activeReview.productName}
+          onClose={() => setActiveReview(null)}
+          onSubmitted={() => {
+            setReviewedProductIds((prev) => {
+              const next = new Set(prev)
+              next.add(activeReview.productId)
+              return next
+            })
+          }}
+        />
+      )}
     </div>
   )
 }

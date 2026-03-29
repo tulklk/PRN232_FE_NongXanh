@@ -39,43 +39,91 @@ function getJsonHeaders(token?: string): Record<string, string> {
   return headers
 }
 
+/** Backend sometimes returns root `message` as a stub while real text lives under `data`. */
+const CHAT_PLACEHOLDER_MESSAGES = new Set(
+  [
+    'ai response generated',
+    'string',
+    'success',
+    'ok',
+  ].map((s) => s.toLowerCase())
+)
+
+function isUsableChatText(value: string): boolean {
+  const t = value.trim()
+  if (!t) return false
+  if (CHAT_PLACEHOLDER_MESSAGES.has(t.toLowerCase())) return false
+  return true
+}
+
+function readStringFields(
+  obj: Record<string, unknown>,
+  keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = obj[key]
+    if (typeof value === 'string' && isUsableChatText(value)) return value.trim()
+  }
+  return null
+}
+
 function readTextFromUnknown(data: unknown): string | null {
   if (!data) return null
-  if (typeof data === 'string') return data.trim() || null
+  if (typeof data === 'string') {
+    return isUsableChatText(data) ? data.trim() : null
+  }
   if (typeof data !== 'object') return null
 
   const record = data as Record<string, unknown>
-  const directCandidates = [
+
+  /** Prefer nested payload first — avoids picking API status `message` over real reply. */
+  const dataKeys = [
+    'reply',
+    'Reply',
     'response',
-    'message',
+    'Response',
     'content',
+    'Content',
     'answer',
+    'Answer',
     'output',
+    'Output',
     'text',
+    'Text',
+    'result',
+    'Result',
+    'message',
+    'Message',
+    'assistantMessage',
+    'completion',
+    'Completion',
   ]
-  for (const key of directCandidates) {
-    const value = record[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
 
   const nestedData = record.data
+  if (typeof nestedData === 'string' && isUsableChatText(nestedData)) {
+    return nestedData.trim()
+  }
   if (nestedData && typeof nestedData === 'object') {
     const nested = nestedData as Record<string, unknown>
-    for (const key of directCandidates) {
-      const value = nested[key]
-      if (typeof value === 'string' && value.trim()) return value.trim()
-    }
+    const fromNested = readStringFields(nested, dataKeys)
+    if (fromNested) return fromNested
   }
+
+  const rootKeys = [...dataKeys, 'message']
+  const fromRoot = readStringFields(record, rootKeys)
+  if (fromRoot) return fromRoot
 
   const choices = record.choices
   if (Array.isArray(choices) && choices.length > 0) {
     const firstChoice = choices[0] as Record<string, unknown>
     const choiceText = firstChoice?.text
-    if (typeof choiceText === 'string' && choiceText.trim()) return choiceText.trim()
+    if (typeof choiceText === 'string' && isUsableChatText(choiceText)) {
+      return choiceText.trim()
+    }
     const choiceMessage = firstChoice?.message
     if (choiceMessage && typeof choiceMessage === 'object') {
       const content = (choiceMessage as Record<string, unknown>).content
-      if (typeof content === 'string' && content.trim()) return content.trim()
+      if (typeof content === 'string' && isUsableChatText(content)) return content.trim()
     }
   }
 

@@ -9,10 +9,10 @@ import RatingStars from '@/components/common/RatingStars'
 import ProductDetailActions from '@/components/products/ProductDetailActions'
 import WishlistToggleButton from '@/components/products/WishlistToggleButton'
 import ReviewCard from '@/components/reviews/ReviewCard'
-import { reviews } from '@/data/reviews'
 import { formatCurrency, calculateDiscount } from '@/lib/utils'
 import { getProductById, getProducts } from '@/lib/api/products'
 import ProductImagesGallery from '@/components/products/ProductImagesGallery'
+import { getReviewsByProduct, mapApiReviewToCardModel } from '@/lib/api/reviews'
 
 interface ProductDetailPageProps {
   params: Promise<{
@@ -28,10 +28,17 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     notFound()
   }
 
-  const productReviews = reviews.filter((r) => r.productId === product.id)
+  let rawReviews: Awaited<ReturnType<typeof getReviewsByProduct>> = []
+  try {
+    rawReviews = await getReviewsByProduct(id)
+  } catch {
+    rawReviews = []
+  }
+
+  const reviewCards = rawReviews.map(mapApiReviewToCardModel)
   const averageRating =
-    productReviews.length > 0
-      ? productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length
+    reviewCards.length > 0
+      ? reviewCards.reduce((sum, r) => sum + r.rating, 0) / reviewCards.length
       : product.rating
 
   const discount = product.originalPrice
@@ -87,7 +94,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               <RatingStars rating={averageRating} size={14} showNumber />
               <span className="text-gray-400">|</span>
               <Link href="#reviews" className="text-primary-green hover:underline">
-                Xem {product.reviewCount} đánh giá
+                Xem {reviewCards.length} đánh giá
               </Link>
               <span className="text-gray-400">|</span>
               <span className="text-gray-600">{product.salesCount} đã bán</span>
@@ -208,50 +215,36 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <h2 className="text-sm font-semibold">Đánh giá sản phẩm</h2>
           </div>
           <div className="border border-gray-200 rounded-b-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-2xl font-bold text-primary-green mb-1.5">
-                  {averageRating.toFixed(1)}★
-                </div>
-                <div className="space-y-1">
-                  {[5, 4, 3, 2, 1].map((star) => {
-                    const count = productReviews.filter((r) => r.rating === star).length
-                    const percentage = productReviews.length > 0 ? (count / productReviews.length) * 100 : 0
-                    return (
-                      <div key={star} className="flex items-center gap-1.5 text-xs">
-                        <span className="w-6">{star}★</span>
-                        <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-yellow-400"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-gray-500 w-6">{count}</span>
-                      </div>
-                    )
-                  })}
-                </div>
+            <div className="mb-4">
+              <div className="text-2xl font-bold text-primary-green mb-1.5">
+                {averageRating.toFixed(1)}★
               </div>
-              <button className="bg-primary-green text-white px-4 py-1.5 rounded text-xs hover:bg-primary-green-dark">
-                GỬI ĐÁNH GIÁ CỦA BẠN
-              </button>
+              <div className="space-y-1">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = reviewCards.filter((r) => r.rating === star).length
+                  const percentage =
+                    reviewCards.length > 0 ? (count / reviewCards.length) * 100 : 0
+                  return (
+                    <div key={star} className="flex items-center gap-1.5 text-xs">
+                      <span className="w-6">{star}★</span>
+                      <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-400"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <span className="text-gray-500 w-6">{count}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
             <div className="space-y-3">
-              {productReviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </div>
-            <div className="flex items-center justify-center gap-1.5 mt-4">
-              <button className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">
-                Trước
-              </button>
-              <button className="px-3 py-1 bg-primary-green text-white rounded text-xs">1</button>
-              <button className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">
-                2
-              </button>
-              <button className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">
-                Sau
-              </button>
+              {reviewCards.length > 0 ? (
+                reviewCards.map((review) => <ReviewCard key={review.id} review={review} />)
+              ) : (
+                <div className="text-xs text-gray-500">Chưa có đánh giá nào.</div>
+              )}
             </div>
           </div>
         </section>

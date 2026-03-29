@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
     "@react-oauth/google": "^0.13.4",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",

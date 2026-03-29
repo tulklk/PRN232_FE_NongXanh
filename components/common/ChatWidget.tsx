@@ -1,18 +1,29 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { Send, X } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { getChatDiagnostic, sendChatMessage } from '@/lib/api/chat'
+import { getProducts } from '@/lib/api/products'
+import { formatCurrency } from '@/lib/utils'
+import type { Product } from '@/data/products'
+import RatingStars from '@/components/common/RatingStars'
 
 type ChatRole = 'bot' | 'user'
+
+type MiniProduct = Pick<
+  Product,
+  'id' | 'name' | 'image' | 'currentPrice' | 'rating' | 'reviewCount'
+>
 
 interface ChatMessage {
   id: string
   role: ChatRole
   text: string
   time: string
+  products?: MiniProduct[]
 }
 
 const initialMessages: ChatMessage[] = [
@@ -36,6 +47,64 @@ const suggestedPrompts = [
   'Gợi ý sản phẩm bán chạy nhất giúp mình.',
 ]
 
+function stripDiacritics(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+}
+
+function normalizeForMatch(input: string): string {
+  return stripDiacritics(input)
+    .toLowerCase()
+    .replace(/[_*`~]/g, ' ')
+    // Avoid unicode property escapes for older TS targets.
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractCandidateProductNames(aiText: string, limit = 5): string[] {
+  const text = (aiText ?? '').trim()
+  if (!text) return []
+
+  // Split by common separators seen in AI replies.
+  const rawLines = text
+    .split(/\r?\n| - |\s-\s|\s•\s|\s\|\s/gi)
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  const candidates: string[] = []
+  const seen = new Set<string>()
+
+  for (const line of rawLines) {
+    if (candidates.length >= limit) break
+
+    // Remove leading list markers.
+    const cleaned = line.replace(/^[-•\d.)\s]+/g, '').trim()
+    if (!cleaned) continue
+
+    // Heuristic: take text before ':' as name, otherwise take full line.
+    const beforeColon = cleaned.includes(':') ? cleaned.split(':')[0].trim() : cleaned
+
+    // Remove trailing price fragments like "65000 đ", "65.000đ", "65000 vnd".
+    const nameOnly = beforeColon
+      .replace(/\b\d[\d.\s]*\s*(đ|d|vnd|vnđ)\b/gi, '')
+      .replace(/\b(price|giá)\b/gi, '')
+      .trim()
+
+    if (nameOnly.length < 3) continue
+
+    const key = normalizeForMatch(nameOnly)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    candidates.push(nameOnly)
+  }
+
+  return candidates
+}
+
 export default function ChatWidget() {
   const { user, tokens } = useUser()
   const [open, setOpen] = useState(false)
@@ -46,6 +115,9 @@ export default function ChatWidget() {
   const [diagnosticChecked, setDiagnosticChecked] = useState(false)
   const [isAiAvailable, setIsAiAvailable] = useState(true)
   const [showSuggestions, setShowSuggestions] = useState(true)
+
+  const productCacheRef = useRef<Product[] | null>(null)
+  const productCachePromiseRef = useRef<Promise<Product[]> | null>(null)
 
   const canSend = !isSending && input.trim().length > 0
   const userDisplayName = user?.displayName?.trim() || 'User'
@@ -58,6 +130,62 @@ export default function ChatWidget() {
       role: msg.role === 'bot' ? 'assistant' : 'user',
       content: msg.text,
     }))
+
+  const ensureProductsCache = async (): Promise<Product[]> => {
+    if (productCacheRef.current) return productCacheRef.current
+    if (productCachePromiseRef.current) return productCachePromiseRef.current
+    productCachePromiseRef.current = getProducts({ pageNumber: 1, pageSize: 200 })
+      .then((res) => {
+        productCacheRef.current = res.items ?? []
+        return productCacheRef.current
+      })
+      .catch(() => {
+        productCacheRef.current = []
+        return []
+      })
+      .finally(() => {
+        productCachePromiseRef.current = null
+      })
+    return productCachePromiseRef.current
+  }
+
+  const matchProductsByNames = async (names: string[]): Promise<MiniProduct[]> => {
+    if (!names || names.length === 0) return []
+    const all = await ensureProductsCache()
+    if (!all || all.length === 0) return []
+
+    const normalizedAll = all.map((p) => ({
+      p,
+      key: normalizeForMatch(p.name),
+    }))
+
+    const picked: MiniProduct[] = []
+    const pickedIds = new Set<string>()
+
+    for (const name of names) {
+      const key = normalizeForMatch(name)
+      if (!key) continue
+
+      const exact = normalizedAll.find((x) => x.key === key)
+      const starts = normalizedAll.find((x) => x.key.startsWith(key))
+      const includes = normalizedAll.find((x) => x.key.includes(key))
+      const found = exact?.p ?? starts?.p ?? includes?.p ?? null
+      if (!found) continue
+      if (pickedIds.has(found.id)) continue
+      pickedIds.add(found.id)
+      picked.push({
+        id: found.id,
+        name: found.name,
+        image: found.image,
+        currentPrice: found.currentPrice,
+        rating: found.rating,
+        reviewCount: found.reviewCount,
+      })
+      if (picked.length >= 5) break
+    }
+
+    return picked
+  }
 
   const handleSend = async (prefilledText?: string) => {
     const value = (prefilledText ?? input).trim()
@@ -83,11 +211,17 @@ export default function ChatWidget() {
         },
         tokens?.idToken
       )
+
+      const candidateNames = extractCandidateProductNames(result.text, 5)
+      const matchedProducts =
+        candidateNames.length > 0 ? await matchProductsByNames(candidateNames) : []
+
       const botMessage: ChatMessage = {
         id: `bot-${Date.now()}`,
         role: 'bot',
         text: result.text,
         time: 'Vừa xong',
+        ...(matchedProducts.length > 0 ? { products: matchedProducts } : {}),
       }
       setMessages((prev) => [...prev, botMessage])
       setIsAiAvailable(true)
@@ -231,6 +365,43 @@ export default function ChatWidget() {
                       }`}
                     >
                       <p>{message.text}</p>
+                      {message.role === 'bot' &&
+                        message.products &&
+                        message.products.length > 0 && (
+                          <div className="mt-2 grid grid-cols-1 gap-2">
+                            {message.products.map((p) => (
+                              <Link
+                                key={p.id}
+                                href={`/products/${p.id}`}
+                                className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-2 hover:border-[#0A923C] hover:shadow-sm transition-colors"
+                              >
+                                <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-gray-100">
+                                  <Image
+                                    src={p.image}
+                                    alt={p.name}
+                                    fill
+                                    className="object-cover"
+                                    sizes="48px"
+                                  />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="line-clamp-1 text-[12px] font-semibold text-gray-900">
+                                    {p.name}
+                                  </div>
+                                  <div className="mt-0.5 flex items-center gap-1.5">
+                                    <RatingStars rating={p.rating} size={12} showNumber />
+                                    <span className="text-[11px] text-gray-500">
+                                      ({p.reviewCount})
+                                    </span>
+                                  </div>
+                                  <div className="mt-0.5 text-[12px] font-bold text-[#0A923C]">
+                                    {formatCurrency(p.currentPrice)}
+                                  </div>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
                       <p
                         className={`mt-1 text-[10px] ${
                           isUser ? 'text-green-100' : 'text-gray-400'
