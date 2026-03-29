@@ -37,6 +37,10 @@ import { formatCurrency } from "@/lib/utils";
 export default function Header() {
   const router = useRouter();
   const { user, isAuthenticated, login, logout } = useUser();
+  const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(min-width: 768px)").matches;
+  });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [categorySubmenuHovered, setCategorySubmenuHovered] = useState<
     number | null
@@ -110,6 +114,18 @@ export default function Header() {
       }
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setIsDesktopLayout(mql.matches);
+    onChange();
+    if ("addEventListener" in mql) {
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    }
+    // Older browsers: no-op cleanup (layout will still work)
+    return;
   }, []);
 
   // Login states
@@ -329,76 +345,78 @@ export default function Header() {
         {/* Main header - Green */}
         <div className="bg-[#0A923C] text-white">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-3">
-            {/* Mobile header row */}
-            <div className="flex items-center justify-between gap-3 md:hidden">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Mở danh mục"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/20 hover:bg-white/10 transition-colors"
-                  onClick={() => setMobileDrawerOpen(true)}
-                >
-                  <Menu size={20} />
-                </button>
-                <Link href="/" className="flex items-center flex-shrink-0">
-                  <div className="relative w-32 h-10">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Nông Xanh Logo"
-                      fill
-                      className="object-contain object-left"
-                      sizes="128px"
-                      priority
-                    />
-                  </div>
-                </Link>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  aria-label="Tìm kiếm"
-                  className="hover:text-yellow-300 transition-colors"
-                  onClick={() => setMobileSearchOpen(true)}
-                >
-                  <Search size={20} />
-                </button>
-                <Link
-                  href="/cart"
-                  aria-label="Giỏ hàng"
-                  className="relative hover:text-yellow-300 transition-colors inline-flex"
-                >
-                  <ShoppingCart size={20} />
-                  {cartCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center font-bold">
-                      {cartCount}
-                    </span>
-                  )}
-                </Link>
-                {isAuthenticated && user ? (
-                  <Link
-                    href="/account"
-                    aria-label="Tài khoản"
-                    className="hover:text-yellow-300 transition-colors"
-                  >
-                    <User size={20} />
-                  </Link>
-                ) : (
+            {/* Header row (responsive) */}
+            {!isDesktopLayout && (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    aria-label="Đăng nhập"
-                    className="hover:text-yellow-300 transition-colors"
-                    onClick={() => setIsLoginOpen(true)}
+                    aria-label="Mở danh mục"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/20 hover:bg-white/10 transition-colors"
+                    onClick={() => setMobileDrawerOpen(true)}
                   >
-                    <User size={20} />
+                    <Menu size={20} />
                   </button>
-                )}
-                <HeaderNotificationBell />
+                  <Link href="/" className="flex items-center flex-shrink-0">
+                    <div className="relative w-32 h-10">
+                      <Image
+                        src="/images/logo.png"
+                        alt="Nông Xanh Logo"
+                        fill
+                        className="object-contain object-left"
+                        sizes="128px"
+                        priority
+                      />
+                    </div>
+                  </Link>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    aria-label="Tìm kiếm"
+                    className="hover:text-yellow-300 transition-colors"
+                    onClick={() => setMobileSearchOpen(true)}
+                  >
+                    <Search size={20} />
+                  </button>
+                  <Link
+                    href="/cart"
+                    aria-label="Giỏ hàng"
+                    className="relative hover:text-yellow-300 transition-colors inline-flex"
+                  >
+                    <ShoppingCart size={20} />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center font-bold">
+                        {cartCount}
+                      </span>
+                    )}
+                  </Link>
+                  {isAuthenticated && user ? (
+                    <Link
+                      href="/account"
+                      aria-label="Tài khoản"
+                      className="hover:text-yellow-300 transition-colors"
+                    >
+                      <User size={20} />
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label="Đăng nhập"
+                      className="hover:text-yellow-300 transition-colors"
+                      onClick={() => setIsLoginOpen(true)}
+                    >
+                      <User size={20} />
+                    </button>
+                  )}
+                  <HeaderNotificationBell />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Mobile search panel */}
-            {mobileSearchOpen && (
-              <div className="mt-3 md:hidden" ref={mobileSearchWrapperRef}>
+            {!isDesktopLayout && mobileSearchOpen && (
+              <div className="mt-3" ref={mobileSearchWrapperRef}>
                 <div className="relative">
                   <input
                     type="text"
@@ -477,180 +495,182 @@ export default function Header() {
             )}
 
             {/* Desktop header row */}
-            <div className="hidden md:flex md:items-center md:gap-8">
-              {/* Logo */}
-              <Link href="/" className="flex items-center flex-shrink-0">
-                <div className="relative w-44 h-12">
-                  <Image
-                    src="/images/logo.png"
-                    alt="Nông Xanh Logo"
-                    fill
-                    className="object-contain object-left"
-                    sizes="176px"
-                    priority
-                  />
-                </div>
-              </Link>
+            {isDesktopLayout && (
+              <div className="flex items-center gap-8">
+                {/* Logo */}
+                <Link href="/" className="flex items-center flex-shrink-0">
+                  <div className="relative w-44 h-12">
+                    <Image
+                      src="/images/logo.png"
+                      alt="Nông Xanh Logo"
+                      fill
+                      className="object-contain object-left"
+                      sizes="176px"
+                      priority
+                    />
+                  </div>
+                </Link>
 
-              {/* Search bar */}
-              <div className="w-full md:flex-1 md:max-w-2xl">
-                <div className="relative" ref={desktopSearchWrapperRef}>
-                  <input
-                    type="text"
-                    placeholder="Nhập nội dung tìm kiếm"
-                    className="w-full px-4 py-2.5 pr-12 text-gray-900 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    onKeyDown={handleSearchKeyDown}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-0 top-0 h-full px-4 bg-white hover:bg-gray-50 rounded-r-md transition-colors border-l border-gray-200"
-                    onClick={triggerFullSearch}
-                  >
-                    <Search size={20} className="text-gray-500" />
-                  </button>
-                  {showSuggestions && searchTerm.trim() && (
-                    <div className="absolute left-0 right-0 mt-1 z-50">
-                      <div className="bg-white rounded-lg shadow-lg max-h-80 overflow-y-auto border border-gray-100">
-                        {searchLoading ? (
-                          <div className="px-4 py-3 text-sm text-gray-500">
-                            Đang tìm kiếm...
-                          </div>
-                        ) : searchResults.length === 0 ? (
-                          <div className="px-4 py-3 text-sm text-gray-500">
-                            Không tìm thấy sản phẩm phù hợp
-                          </div>
-                        ) : (
-                          searchResults.map((product) => (
-                            <Link
-                              key={product.id}
-                              href={`/products/${product.id}`}
-                              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
-                              onClick={() => setShowSuggestions(false)}
-                            >
-                              <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
-                                <Image
-                                  src={product.image}
-                                  alt={product.name}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                                  {product.name}
-                                </p>
-                                <p className="text-xs text-primary-green font-semibold mt-0.5">
-                                  {formatCurrency(product.currentPrice)}
-                                </p>
-                              </div>
-                            </Link>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right side actions */}
-              <div className="ml-auto flex items-center justify-end gap-6 flex-shrink-0">
-                {/* Notifications */}
-                <HeaderNotificationBell />
-
-                {/* User - mở menu khi hover */}
-                {isAuthenticated && user ? (
-                  <div
-                    className="relative"
-                    onMouseEnter={handleUserMenuEnter}
-                    onMouseLeave={handleUserMenuLeave}
-                  >
+                {/* Search bar */}
+                <div className="w-full md:flex-1 md:max-w-2xl">
+                  <div className="relative" ref={desktopSearchWrapperRef}>
+                    <input
+                      type="text"
+                      placeholder="Nhập nội dung tìm kiếm"
+                      className="w-full px-4 py-2.5 pr-12 text-gray-900 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
+                      value={searchTerm}
+                      onChange={handleSearchChange}
+                      onKeyDown={handleSearchKeyDown}
+                    />
                     <button
                       type="button"
-                      className="flex items-center gap-2 hover:text-yellow-300 transition-colors"
+                      className="absolute right-0 top-0 h-full px-4 bg-white hover:bg-gray-50 rounded-r-md transition-colors border-l border-gray-200"
+                      onClick={triggerFullSearch}
                     >
-                      <User size={20} />
-                      <span className="text-sm hidden lg:inline">
-                        {user.displayName || "Tài khoản"}
-                      </span>
+                      <Search size={20} className="text-gray-500" />
                     </button>
-                    {showUserMenu && (
-                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                        <Link
-                          href="/account"
-                          onClick={() => setShowUserMenu(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Tài khoản của tôi
-                        </Link>
-                        <Link
-                          href="/account/orders"
-                          onClick={() => setShowUserMenu(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Đơn hàng
-                        </Link>
-                        {(user.role === "Admin" ||
-                          user.role?.toLowerCase() === "staff") && (
-                          <Link
-                            href={user.role === "Admin" ? "/admin" : "/staff"}
-                            onClick={() => setShowUserMenu(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          >
-                            Quản trị
-                          </Link>
-                        )}
-                        <button
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                        >
-                          <LogOut size={16} />
-                          Đăng xuất
-                        </button>
+                    {showSuggestions && searchTerm.trim() && (
+                      <div className="absolute left-0 right-0 mt-1 z-50">
+                        <div className="bg-white rounded-lg shadow-lg max-h-80 overflow-y-auto border border-gray-100">
+                          {searchLoading ? (
+                            <div className="px-4 py-3 text-sm text-gray-500">
+                              Đang tìm kiếm...
+                            </div>
+                          ) : searchResults.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-gray-500">
+                              Không tìm thấy sản phẩm phù hợp
+                            </div>
+                          ) : (
+                            searchResults.map((product) => (
+                              <Link
+                                key={product.id}
+                                href={`/products/${product.id}`}
+                                className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                                onClick={() => setShowSuggestions(false)}
+                              >
+                                <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                                  <Image
+                                    src={product.image}
+                                    alt={product.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                    {product.name}
+                                  </p>
+                                  <p className="text-xs text-primary-green font-semibold mt-0.5">
+                                    {formatCurrency(product.currentPrice)}
+                                  </p>
+                                </div>
+                              </Link>
+                            ))
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setIsLoginOpen(true)}
-                    className="flex items-center gap-2 hover:text-yellow-300 transition-colors"
-                  >
-                    <User size={20} />
-                    <span className="text-sm">Đăng nhập</span>
-                  </button>
-                )}
+                </div>
 
-                {/* Cart */}
-                <div
-                  className="relative"
-                  onMouseEnter={handleCartMouseEnter}
-                  onMouseLeave={handleCartMouseLeave}
-                >
-                  <Link
-                    href="/cart"
-                    className="relative hover:text-yellow-300 transition-colors inline-flex"
-                  >
-                    <ShoppingCart size={24} />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                        {cartCount}
-                      </span>
-                    )}
-                  </Link>
-                  {showCartPopup && (
-                    <CartPopup
-                      items={cart?.cartItems ?? []}
-                      totalAmount={cart?.totalAmount ?? 0}
-                      loading={cartLoading}
-                      onUpdateQuantity={updateItem}
-                      onRemoveItem={removeItem}
-                      onClose={() => setShowCartPopup(false)}
-                    />
+                {/* Right side actions */}
+                <div className="ml-auto flex items-center justify-end gap-6 flex-shrink-0">
+                  {/* Notifications */}
+                  <HeaderNotificationBell />
+
+                  {/* User - mở menu khi hover */}
+                  {isAuthenticated && user ? (
+                    <div
+                      className="relative"
+                      onMouseEnter={handleUserMenuEnter}
+                      onMouseLeave={handleUserMenuLeave}
+                    >
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 hover:text-yellow-300 transition-colors"
+                      >
+                        <User size={20} />
+                        <span className="text-sm hidden lg:inline">
+                          {user.displayName || "Tài khoản"}
+                        </span>
+                      </button>
+                      {showUserMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                          <Link
+                            href="/account"
+                            onClick={() => setShowUserMenu(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Tài khoản của tôi
+                          </Link>
+                          <Link
+                            href="/account/orders"
+                            onClick={() => setShowUserMenu(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Đơn hàng
+                          </Link>
+                          {(user.role === "Admin" ||
+                            user.role?.toLowerCase() === "staff") && (
+                            <Link
+                              href={user.role === "Admin" ? "/admin" : "/staff"}
+                              onClick={() => setShowUserMenu(false)}
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              Quản trị
+                            </Link>
+                          )}
+                          <button
+                            onClick={handleLogout}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          >
+                            <LogOut size={16} />
+                            Đăng xuất
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setIsLoginOpen(true)}
+                      className="flex items-center gap-2 hover:text-yellow-300 transition-colors"
+                    >
+                      <User size={20} />
+                      <span className="text-sm">Đăng nhập</span>
+                    </button>
                   )}
+
+                  {/* Cart */}
+                  <div
+                    className="relative"
+                    onMouseEnter={handleCartMouseEnter}
+                    onMouseLeave={handleCartMouseLeave}
+                  >
+                    <Link
+                      href="/cart"
+                      className="relative hover:text-yellow-300 transition-colors inline-flex"
+                    >
+                      <ShoppingCart size={24} />
+                      {cartCount > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                          {cartCount}
+                        </span>
+                      )}
+                    </Link>
+                    {showCartPopup && (
+                      <CartPopup
+                        items={cart?.cartItems ?? []}
+                        totalAmount={cart?.totalAmount ?? 0}
+                        loading={cartLoading}
+                        onUpdateQuantity={updateItem}
+                        onRemoveItem={removeItem}
+                        onClose={() => setShowCartPopup(false)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -819,30 +839,28 @@ export default function Header() {
                           const hasChildren = children.length > 0;
 
                           return (
-                            <>
-                              <button
-                                key={cat.categoryId}
-                                type="button"
-                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 ${
-                                  categorySubmenuHovered === cat.categoryId
-                                    ? "bg-gray-100 text-[#0A923C]"
-                                    : "text-gray-700"
-                                }`}
-                                onMouseEnter={() => {
-                                  setCategorySubmenuHovered(cat.categoryId);
-                                }}
-                                onClick={() => {
-                                  // Cate cha/cate con đều cho phép click để điều hướng trang sản phẩm.
-                                  setIsMenuOpen(false);
-                                  setCategorySubmenuHovered(null);
-                                  router.push(
-                                    `/products?category=${cat.categoryId}`,
-                                  );
-                                }}
-                              >
-                                {cat.categoryName}
-                              </button>
-                            </>
+                            <button
+                              key={cat.categoryId}
+                              type="button"
+                              className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 ${
+                                categorySubmenuHovered === cat.categoryId
+                                  ? "bg-gray-100 text-[#0A923C]"
+                                  : "text-gray-700"
+                              }`}
+                              onMouseEnter={() => {
+                                setCategorySubmenuHovered(cat.categoryId);
+                              }}
+                              onClick={() => {
+                                // Cate cha/cate con đều cho phép click để điều hướng trang sản phẩm.
+                                setIsMenuOpen(false);
+                                setCategorySubmenuHovered(null);
+                                router.push(
+                                  `/products?category=${cat.categoryId}`,
+                                );
+                              }}
+                            >
+                              {cat.categoryName}
+                            </button>
                           );
                         })}
                         {topLevelCategories.length === 0 && (

@@ -319,6 +319,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                         alt="Nongxanh homepage banner"
                         fill
                         className="object-cover"
+                        sizes="(max-width: 1024px) 100vw, 75vw"
                         priority
                       />
                     </div>
