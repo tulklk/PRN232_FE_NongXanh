@@ -37,10 +37,8 @@ import { formatCurrency } from "@/lib/utils";
 export default function Header() {
   const router = useRouter();
   const { user, isAuthenticated, login, logout } = useUser();
-  const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(min-width: 768px)").matches;
-  });
+  /** Always false on first paint (SSR + hydration) so markup matches; sync in useEffect. */
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [categorySubmenuHovered, setCategorySubmenuHovered] = useState<
     number | null
