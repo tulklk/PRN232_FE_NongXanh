@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Edit, Trash2, Loader2, X, ChevronRight, ChevronDown } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
+import SuccessPopup from '@/components/common/SuccessPopup'
 import {
   getCategories,
   createCategory,
@@ -205,22 +206,33 @@ export default function CategoriesPage() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
+  const [refreshing, setRefreshing] = useState(false)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  const fetchCategories = async () => {
-    setLoading(true)
-    setError(null)
+  const closeSuccessPopup = useCallback(() => setShowSuccessPopup(false), [])
+
+  const fetchCategories = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const data = await getCategories()
       setCategories(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tải danh mục')
     } finally {
-      setLoading(false)
+      if (silent) setRefreshing(false)
+      else setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchCategories()
+    void fetchCategories()
   }, [])
 
   const categoryTree = getCategoryTree(categories)
@@ -253,7 +265,9 @@ export default function CategoriesPage() {
         }
       }
       setShowAddModal(false)
-      await fetchCategories()
+      await fetchCategories({ silent: true })
+      setSuccessMessage('Đã thêm danh mục')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể tạo danh mục')
     } finally {
@@ -291,7 +305,9 @@ export default function CategoriesPage() {
         }
       }
       setEditCategory(null)
-      await fetchCategories()
+      await fetchCategories({ silent: true })
+      setSuccessMessage('Đã cập nhật danh mục')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể cập nhật danh mục')
     } finally {
@@ -306,7 +322,9 @@ export default function CategoriesPage() {
     try {
       await deleteCategory(String(deleteTarget.categoryId), token)
       setDeleteTarget(null)
-      await fetchCategories()
+      await fetchCategories({ silent: true })
+      setSuccessMessage('Đã xóa danh mục')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể xóa danh mục')
     } finally {
@@ -316,6 +334,11 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-6">
+      <SuccessPopup
+        message={successMessage}
+        isOpen={showSuccessPopup}
+        onClose={closeSuccessPopup}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -357,36 +380,46 @@ export default function CategoriesPage() {
           <div className="text-center py-12">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={fetchCategories}
+              onClick={() => void fetchCategories()}
               className="bg-primary-green text-white px-4 py-2 rounded-lg hover:bg-primary-green-dark"
             >
               Thử lại
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">Tên</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">Mô tả</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-900">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTree.map((category) => (
-                  <CategoryRow
-                    key={category.categoryId}
-                    category={category}
-                    level={0}
-                    expandedIds={expandedIds}
-                    onToggleExpand={toggleExpand}
-                    onEdit={setEditCategory}
-                    onDelete={setDeleteTarget}
-                  />
-                ))}
-              </tbody>
-            </table>
+          <div className="relative min-h-[120px] rounded-lg border border-gray-100">
+            {refreshing && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/60 backdrop-blur-[1px]"
+                aria-busy="true"
+              >
+                <Loader2 className="animate-spin text-primary-green" size={28} />
+              </div>
+            )}
+            <div className="max-h-[min(65vh,560px)] overflow-auto overscroll-contain">
+              <table className="w-full">
+                <thead className="sticky top-0 z-[1] bg-white shadow-[0_1px_0_0_rgb(229,231,235)]">
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Tên</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Mô tả</th>
+                    <th className="text-right py-3 px-4 font-semibold text-gray-900">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTree.map((category) => (
+                    <CategoryRow
+                      key={category.categoryId}
+                      category={category}
+                      level={0}
+                      expandedIds={expandedIds}
+                      onToggleExpand={toggleExpand}
+                      onEdit={setEditCategory}
+                      onDelete={setDeleteTarget}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

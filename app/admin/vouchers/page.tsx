@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Plus, Copy, Edit, Trash2, Loader2, X } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
 import StatusBadge from '@/components/admin/StatusBadge'
+import SuccessPopup from '@/components/common/SuccessPopup'
 import {
   getVouchers,
   createVoucher,
@@ -44,17 +45,28 @@ export default function VouchersPage() {
   const [deleteTarget, setDeleteTarget] = useState<ApiVoucher | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  const fetchVouchers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const closeSuccessPopup = useCallback(() => setShowSuccessPopup(false), [])
+
+  const fetchVouchers = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const data = await getVouchers(1, 100, token)
       setVouchers(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tải voucher')
     } finally {
-      setLoading(false)
+      if (silent) setRefreshing(false)
+      else setLoading(false)
     }
   }, [token])
 
@@ -87,7 +99,9 @@ export default function VouchersPage() {
         token
       )
       setShowAddModal(false)
-      await fetchVouchers()
+      await fetchVouchers({ silent: true })
+      setSuccessMessage('Đã tạo voucher')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể tạo voucher')
     } finally {
@@ -101,7 +115,9 @@ export default function VouchersPage() {
     try {
       await updateVoucher(id, data, token)
       setEditVoucher(null)
-      await fetchVouchers()
+      await fetchVouchers({ silent: true })
+      setSuccessMessage('Đã cập nhật voucher')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể cập nhật voucher')
     } finally {
@@ -116,7 +132,9 @@ export default function VouchersPage() {
     try {
       await deleteVoucher(String(deleteTarget.voucherId), token)
       setDeleteTarget(null)
-      await fetchVouchers()
+      await fetchVouchers({ silent: true })
+      setSuccessMessage('Đã xóa voucher')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể xóa voucher')
     } finally {
@@ -126,6 +144,11 @@ export default function VouchersPage() {
 
   return (
     <div className="space-y-6">
+      <SuccessPopup
+        message={successMessage}
+        isOpen={showSuccessPopup}
+        onClose={closeSuccessPopup}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -200,14 +223,22 @@ export default function VouchersPage() {
           <div className="text-center py-12">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={fetchVouchers}
+              onClick={() => void fetchVouchers()}
               className="bg-primary-green text-white px-4 py-2 rounded-lg hover:bg-primary-green-dark"
             >
               Thử lại
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto relative min-h-[120px]">
+            {refreshing && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/60 backdrop-blur-[1px]"
+                aria-busy="true"
+              >
+                <Loader2 className="animate-spin text-primary-green" size={28} />
+              </div>
+            )}
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">

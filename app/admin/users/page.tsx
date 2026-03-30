@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Plus, Edit, Trash2, Loader2, X } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
 import StatusBadge from '@/components/admin/StatusBadge'
+import SuccessPopup from '@/components/common/SuccessPopup'
 import {
   getUsers,
   createUser,
@@ -41,10 +42,20 @@ export default function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<ApiUser | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const closeSuccessPopup = useCallback(() => setShowSuccessPopup(false), [])
+
+  const fetchUsers = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const data = await getUsers(1, 100, token)
       setUsers(data)
@@ -53,7 +64,8 @@ export default function UsersPage() {
         err instanceof Error ? err.message : 'Không thể tải danh sách người dùng'
       )
     } finally {
-      setLoading(false)
+      if (silent) setRefreshing(false)
+      else setLoading(false)
     }
   }, [token])
 
@@ -74,7 +86,9 @@ export default function UsersPage() {
     try {
       await createUser(data, token)
       setShowAddModal(false)
-      await fetchUsers()
+      await fetchUsers({ silent: true })
+      setSuccessMessage('Đã thêm người dùng')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể tạo người dùng'
@@ -90,7 +104,9 @@ export default function UsersPage() {
     try {
       await updateUser(id, data, token)
       setEditUser(null)
-      await fetchUsers()
+      await fetchUsers({ silent: true })
+      setSuccessMessage('Đã cập nhật người dùng')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể cập nhật người dùng'
@@ -107,7 +123,9 @@ export default function UsersPage() {
     try {
       await deleteUser(deleteTarget.id, token)
       setDeleteTarget(null)
-      await fetchUsers()
+      await fetchUsers({ silent: true })
+      setSuccessMessage('Đã xóa người dùng')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể xóa người dùng'
@@ -119,6 +137,11 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
+      <SuccessPopup
+        message={successMessage}
+        isOpen={showSuccessPopup}
+        onClose={closeSuccessPopup}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -163,14 +186,22 @@ export default function UsersPage() {
           <div className="text-center py-12">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={fetchUsers}
+              onClick={() => void fetchUsers()}
               className="bg-primary-green text-white px-4 py-2 rounded-lg hover:bg-primary-green-dark"
             >
               Thử lại
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto relative min-h-[120px]">
+            {refreshing && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/60 backdrop-blur-[1px]"
+                aria-busy="true"
+              >
+                <Loader2 className="animate-spin text-primary-green" size={28} />
+              </div>
+            )}
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">

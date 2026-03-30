@@ -14,6 +14,16 @@ function getAuthHeaders(request: NextRequest): Record<string, string> {
   return headers
 }
 
+function getJsonHeaders(request: NextRequest): Record<string, string> {
+  const auth = request.headers.get('Authorization')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json; charset=utf-8',
+    Accept: 'application/json',
+  }
+  if (auth) headers['Authorization'] = auth
+  return headers
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -58,16 +68,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => null)
+    // Forward raw JSON — tránh parse/stringify làm lệch payload (vd. ingredients).
+    const rawBody = await request.text()
     const url = `${API_BASE_URL}/api/Recipes`
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        ...getAuthHeaders(request),
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : '{}',
+      headers: getJsonHeaders(request),
+      body: rawBody.trim() ? rawBody : '{}',
       cache: 'no-store',
     })
 

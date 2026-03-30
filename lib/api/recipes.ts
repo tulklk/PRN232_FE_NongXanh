@@ -28,6 +28,8 @@ type CreateRecipeRequest = {
   title: string
   description?: string
   instructions: string
+  /** BE Swagger có field này; gửi null nếu không có ảnh để bind đủ DTO */
+  imageUrl?: string | null
   cookingTimeMinutes: number
   servings: number
   ingredients: Array<{
@@ -36,6 +38,16 @@ type CreateRecipeRequest = {
     quantity: number
     unit: string
   }>
+}
+
+function normalizeRecipeDto(raw: RecipeModel | null | undefined): RecipeModel | null {
+  if (!raw || typeof raw !== 'object') return raw ?? null
+  const r = raw as Record<string, unknown>
+  const ing = r.ingredients ?? r.Ingredients
+  if (Array.isArray(ing)) {
+    return { ...r, ingredients: ing } as RecipeModel
+  }
+  return raw
 }
 
 export async function getRecipes(
@@ -62,13 +74,14 @@ export async function getRecipes(
   }
 
   const payload = json as unknown as RecipesResponse
-  if (Array.isArray(payload)) return payload
+  const mapList = (list: RecipeModel[]) => list.map((x) => normalizeRecipeDto(x) ?? x)
+  if (Array.isArray(payload)) return mapList(payload)
   if (payload && typeof payload === 'object') {
     const p = payload as { data?: RecipeModel[] }
-    if (Array.isArray(p.data)) return p.data
+    if (Array.isArray(p.data)) return mapList(p.data)
     const p2 = payload as { items?: RecipeModel[]; data?: { items?: RecipeModel[] } }
-    if (Array.isArray(p2.items)) return p2.items
-    if (p2.data && Array.isArray(p2.data.items)) return p2.data.items
+    if (Array.isArray(p2.items)) return mapList(p2.items)
+    if (p2.data && Array.isArray(p2.data.items)) return mapList(p2.data.items)
   }
   return []
 }
@@ -92,9 +105,9 @@ export async function getRecipeById(id: string, token: string): Promise<RecipeMo
   const payload = json as unknown as RecipeResponse
   if (payload && typeof payload === 'object' && 'data' in payload) {
     const d = (payload as { data?: RecipeModel }).data
-    if (d) return d
+    if (d) return normalizeRecipeDto(d) ?? d
   }
-  return payload as RecipeModel
+  return normalizeRecipeDto(payload as RecipeModel) ?? (payload as RecipeModel)
 }
 
 export async function addRecipeIngredientsToCart(
@@ -130,13 +143,24 @@ export async function createRecipe(
   payload: CreateRecipeRequest,
   token: string
 ): Promise<RecipeModel> {
+  const body = {
+    ...payload,
+    imageUrl: payload.imageUrl ?? null,
+    ingredients: payload.ingredients.map((row) => ({
+      productId: String(row.productId).trim(),
+      ingredientName: String(row.ingredientName).trim(),
+      quantity: Number(row.quantity),
+      unit: String(row.unit).trim(),
+    })),
+  }
+
   const res = await fetch(`${getBase()}/api/recipes`, {
     method: 'POST',
     headers: {
       ...getHeaders(token),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   })
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
@@ -149,7 +173,7 @@ export async function createRecipe(
   }
 
   const data = (json as { data?: RecipeModel }).data
-  if (data) return data
-  return json as unknown as RecipeModel
+  if (data) return normalizeRecipeDto(data) ?? data
+  return normalizeRecipeDto(json as RecipeModel) ?? (json as unknown as RecipeModel)
 }
 

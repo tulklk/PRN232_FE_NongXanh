@@ -86,10 +86,16 @@ export default function ProductsPage() {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [variantProduct, setVariantProduct] = useState<ApiProduct | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const fetchProducts = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const data = await getAdminProducts(
         1,
@@ -101,7 +107,8 @@ export default function ProductsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tải danh sách sản phẩm')
     } finally {
-      setLoading(false)
+      if (silent) setRefreshing(false)
+      else setLoading(false)
     }
   }, [selectedCategory, token])
 
@@ -109,18 +116,19 @@ export default function ProductsPage() {
     fetchProducts()
   }, [fetchProducts])
 
-  useEffect(() => {
-    const loadMeta = async () => {
-      try {
-        const [cats, provs] = await Promise.all([getCategories(), getProviders(1, 100, token)])
-        setCategories(cats)
-        setProviders(provs)
-      } catch (err) {
-        console.error('Failed to load categories/providers', err)
-      }
+  const loadMeta = useCallback(async () => {
+    try {
+      const [cats, provs] = await Promise.all([getCategories(), getProviders(1, 100, token)])
+      setCategories(cats)
+      setProviders(provs)
+    } catch (err) {
+      console.error('Failed to load categories/providers', err)
     }
-    loadMeta()
   }, [token])
+
+  useEffect(() => {
+    loadMeta()
+  }, [loadMeta])
 
   const filteredProducts = products.filter((p) => {
     const q = searchQuery.toLowerCase()
@@ -142,7 +150,7 @@ export default function ProductsPage() {
     try {
       await createProduct(data, token)
       setShowAddModal(false)
-      await fetchProducts()
+      await Promise.all([fetchProducts({ silent: true }), loadMeta()])
       setSuccessMessage('Thêm sản phẩm thành công')
       setShowSuccessPopup(true)
     } catch (err) {
@@ -158,7 +166,7 @@ export default function ProductsPage() {
     try {
       await updateProduct(String(id), data, token)
       setEditProduct(null)
-      await fetchProducts()
+      await Promise.all([fetchProducts({ silent: true }), loadMeta()])
       setSuccessMessage('Cập nhật sản phẩm thành công')
       setShowSuccessPopup(true)
     } catch (err) {
@@ -175,7 +183,9 @@ export default function ProductsPage() {
     try {
       await deleteProduct(String(deleteTarget.productId), token)
       setDeleteTarget(null)
-      await fetchProducts()
+      await fetchProducts({ silent: true })
+      setSuccessMessage('Đã xóa sản phẩm')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể xóa sản phẩm')
     } finally {
@@ -259,14 +269,22 @@ export default function ProductsPage() {
           <div className="text-center py-12">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={fetchProducts}
+              onClick={() => void fetchProducts()}
               className="bg-primary-green text-white px-4 py-2 rounded-lg hover:bg-primary-green-dark"
             >
               Thử lại
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto relative min-h-[120px]">
+            {refreshing && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/60 backdrop-blur-[1px]"
+                aria-busy="true"
+              >
+                <Loader2 className="animate-spin text-primary-green" size={28} />
+              </div>
+            )}
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">

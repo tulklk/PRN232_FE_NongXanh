@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Plus, Edit, Trash2, Loader2, X } from 'lucide-react'
 import SearchBar from '@/components/admin/SearchBar'
 import StatusBadge from '@/components/admin/StatusBadge'
+import SuccessPopup from '@/components/common/SuccessPopup'
 import { uploadImageToCloudinary } from '@/lib/api/cloudinary'
 import {
   getProviders,
@@ -77,10 +78,20 @@ export default function ProvidersPage() {
   const [deleteTarget, setDeleteTarget] = useState<ApiProvider | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  const fetchProviders = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const closeSuccessPopup = useCallback(() => setShowSuccessPopup(false), [])
+
+  const fetchProviders = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const data = await getProviders(1, 100, token)
       setProviders(data)
@@ -89,7 +100,8 @@ export default function ProvidersPage() {
         err instanceof Error ? err.message : 'Không thể tải danh sách nhà cung cấp'
       )
     } finally {
-      setLoading(false)
+      if (silent) setRefreshing(false)
+      else setLoading(false)
     }
   }, [token])
 
@@ -112,7 +124,9 @@ export default function ProvidersPage() {
     try {
       await createProvider(data, token)
       setShowAddModal(false)
-      await fetchProviders()
+      await fetchProviders({ silent: true })
+      setSuccessMessage('Đã thêm nhà cung cấp')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể tạo nhà cung cấp'
@@ -128,7 +142,9 @@ export default function ProvidersPage() {
     try {
       await updateProvider(id, data, token)
       setEditProvider(null)
-      await fetchProviders()
+      await fetchProviders({ silent: true })
+      setSuccessMessage('Đã cập nhật nhà cung cấp')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể cập nhật nhà cung cấp'
@@ -145,7 +161,9 @@ export default function ProvidersPage() {
     try {
       await deleteProvider(deleteTarget.providerId, token)
       setDeleteTarget(null)
-      await fetchProviders()
+      await fetchProviders({ silent: true })
+      setSuccessMessage('Đã xóa nhà cung cấp')
+      setShowSuccessPopup(true)
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Không thể xóa nhà cung cấp'
@@ -157,6 +175,11 @@ export default function ProvidersPage() {
 
   return (
     <div className="space-y-6">
+      <SuccessPopup
+        message={successMessage}
+        isOpen={showSuccessPopup}
+        onClose={closeSuccessPopup}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -201,14 +224,22 @@ export default function ProvidersPage() {
           <div className="text-center py-12">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={fetchProviders}
+              onClick={() => void fetchProviders()}
               className="bg-primary-green text-white px-4 py-2 rounded-lg hover:bg-primary-green-dark"
             >
               Thử lại
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto relative min-h-[120px]">
+            {refreshing && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/60 backdrop-blur-[1px]"
+                aria-busy="true"
+              >
+                <Loader2 className="animate-spin text-primary-green" size={28} />
+              </div>
+            )}
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Search, Trash2 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { createRecipe } from '@/lib/api/recipes'
-import { searchProducts } from '@/lib/api/products'
+import { prefetchProductSearchCatalog, searchProducts } from '@/lib/api/products'
 import type { Product } from '@/data/products'
 
 type IngredientRow = {
@@ -48,6 +48,10 @@ export default function StaffRecipeCreatePage() {
   const productSeqRef = useRef(0)
 
   useEffect(() => {
+    prefetchProductSearchCatalog()
+  }, [])
+
+  useEffect(() => {
     if (!productQuery.trim()) {
       setProductResults([])
       setProductOpen(false)
@@ -71,7 +75,7 @@ export default function StaffRecipeCreatePage() {
           if (productSeqRef.current !== seq) return
           setProductLoading(false)
         })
-    }, 250)
+    }, 120)
     return () => clearTimeout(t)
   }, [productQuery])
 

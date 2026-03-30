@@ -84,6 +84,11 @@ export interface GetProductsParams {
   categoryId?: string
   /** Lọc theo nhà cung cấp (BE có thể hỗ trợ providerId / provider) */
   providerId?: string
+  /**
+   * Bỏ qua gọi API sold-quantity cho từng SP (rất chậm khi pageSize lớn).
+   * Dùng cho tìm kiếm / autocomplete — không cần salesCount chính xác.
+   */
+  skipSoldQuantityHydration?: boolean
 }
 
 export interface GetProductsResult {
@@ -238,7 +243,8 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
   const mapped = items.map(mapApiProductToProduct)
 
   const rawData = data ?? json
-  const hydrated = await hydrateSoldQuantitiesForProducts(mapped)
+  const skipHydrate = params?.skipSoldQuantityHydration === true
+  const hydrated = skipHydrate ? mapped : await hydrateSoldQuantitiesForProducts(mapped)
   return {
     items: hydrated,
     totalCount: rawData?.totalCount ?? data?.totalCount,
@@ -298,6 +304,54 @@ export async function getProductById(id: string): Promise<Product | null> {
   return product
 }
 
+const SEARCH_CATALOG_TTL_MS = 10 * 60 * 1000
+let searchCatalogCache: Product[] | null = null
+let searchCatalogLoadedAt = 0
+let searchCatalogPromise: Promise<Product[]> | null = null
+
+/** Tải catalog một lần (nhẹ, không hydrate sold-quantity), có TTL. */
+async function loadSearchCatalog(): Promise<Product[]> {
+  const now = Date.now()
+  if (searchCatalogCache && now - searchCatalogLoadedAt < SEARCH_CATALOG_TTL_MS) {
+    return searchCatalogCache
+  }
+  if (searchCatalogPromise) return searchCatalogPromise
+
+  searchCatalogPromise = (async () => {
+    const merged: Product[] = []
+    let page = 1
+    const pageSize = 100
+
+    for (let safety = 0; safety < 20; safety++) {
+      const res = await getProducts({
+        pageNumber: page,
+        pageSize,
+        skipSoldQuantityHydration: true,
+      })
+      merged.push(...res.items)
+      const doneByShortPage = res.items.length < pageSize
+      const doneByTotal =
+        res.totalCount != null && merged.length >= res.totalCount
+      if (doneByShortPage || doneByTotal) break
+      page += 1
+    }
+
+    searchCatalogCache = merged
+    searchCatalogLoadedAt = Date.now()
+    searchCatalogPromise = null
+    return merged
+  })()
+
+  return searchCatalogPromise
+}
+
+/**
+ * Gọi sớm (vd. mount trang tạo công thức) để lần gõ đầu không phải chờ fetch.
+ */
+export function prefetchProductSearchCatalog(): void {
+  void loadSearchCatalog()
+}
+
 export async function searchProducts(
   keyword: string,
   limit = 10
@@ -306,10 +360,10 @@ export async function searchProducts(
   if (!trimmed) return []
 
   try {
-    const res = await getProducts({ pageNumber: 1, pageSize: 200 })
+    const items = await loadSearchCatalog()
     const lower = trimmed.toLowerCase()
 
-    const filtered = res.items.filter((p) => {
+    const filtered = items.filter((p) => {
       const nameMatch = p.name.toLowerCase().includes(lower)
       const descMatch = p.description
         ? p.description.toLowerCase().includes(lower)
