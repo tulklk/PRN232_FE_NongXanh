@@ -14,6 +14,9 @@ const getBase = () =>
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000'
 
+const soldQuantityCache = new Map<string, number>()
+const soldQuantityPromiseCache = new Map<string, Promise<number>>()
+
 function getHeaders(token?: string): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
@@ -91,6 +94,114 @@ export interface GetProductsResult {
   totalPages?: number
 }
 
+function normalizeSoldQuantityJson(json: unknown): number {
+  if (typeof json === 'number' && Number.isFinite(json)) return Math.trunc(json)
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return 0
+
+  const o = json as Record<string, unknown>
+
+  // Common wrapper patterns: { data: number|object } or { data: { soldQuantity } }
+  const wrapped = o.data ?? o.Data ?? o.value ?? o.Value
+  if (wrapped !== undefined) return normalizeSoldQuantityJson(wrapped)
+
+  const candidates = [
+    o.soldQuantity,
+    o.SoldQuantity,
+    o.salesCount,
+    o.SalesCount,
+    o.quantity,
+    o.Quantity,
+    o.count,
+    o.Count,
+  ]
+
+  for (const c of candidates) {
+    if (typeof c === 'number' && Number.isFinite(c)) return Math.trunc(c)
+    if (typeof c === 'string') {
+      const n = Number(c)
+      if (Number.isFinite(n)) return Math.trunc(n)
+    }
+  }
+
+  return 0
+}
+
+export async function getSoldQuantity(
+  productId: string,
+  token?: string
+): Promise<number> {
+  const id = String(productId)
+  const cached = soldQuantityCache.get(id)
+  if (cached !== undefined) return cached
+
+  const inFlight = soldQuantityPromiseCache.get(id)
+  if (inFlight) return inFlight
+
+  const p = (async () => {
+    const isServer = typeof window === 'undefined'
+    const url = isServer
+      ? `${BACKEND_URL}/api/Products/${id}/sold-quantity`
+      : `${getBase()}/api/products/${id}/sold-quantity`
+
+    const res = await fetch(url, {
+      headers: getHeaders(token),
+      cache: isServer ? 'no-store' : undefined,
+    })
+
+    if (!res.ok) {
+      throw new Error('Không thể lấy số lượng đã bán')
+    }
+
+    const json = await res.json().catch(() => ({}))
+    const q = normalizeSoldQuantityJson(json)
+    soldQuantityCache.set(id, q)
+    return q
+  })()
+
+  soldQuantityPromiseCache.set(id, p)
+  try {
+    return await p
+  } finally {
+    soldQuantityPromiseCache.delete(id)
+  }
+}
+
+async function hydrateSoldQuantitiesForProducts(
+  products: Product[],
+  token?: string
+): Promise<Product[]> {
+  const targets = products.filter((p) => (p.salesCount ?? 0) <= 0).map((p) => p.id)
+  if (targets.length === 0) return products
+
+  const uniqueIds = Array.from(new Set(targets.map(String)))
+
+  // Concurrency limit to avoid blasting the API.
+  const CHUNK_SIZE = 10
+  const idToQty = new Map<string, number>()
+
+  for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+    const chunk = uniqueIds.slice(i, i + CHUNK_SIZE)
+    const results = await Promise.all(
+      chunk.map(async (id) => {
+        try {
+          return await getSoldQuantity(id, token)
+        } catch {
+          return 0
+        }
+      })
+    )
+    results.forEach((qty, idx) => {
+      idToQty.set(chunk[idx], qty)
+    })
+  }
+
+  return products.map((p) => {
+    const q = idToQty.get(String(p.id))
+    if (q === undefined) return p
+    return { ...p, salesCount: q }
+  })
+}
+
 export async function getProducts(params?: GetProductsParams): Promise<GetProductsResult> {
   const pageNumber = params?.pageNumber ?? 1
   const pageSize = params?.pageSize ?? 10
@@ -127,8 +238,9 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
   const mapped = items.map(mapApiProductToProduct)
 
   const rawData = data ?? json
+  const hydrated = await hydrateSoldQuantitiesForProducts(mapped)
   return {
-    items: mapped,
+    items: hydrated,
     totalCount: rawData?.totalCount ?? data?.totalCount,
     pageNumber: rawData?.pageNumber ?? data?.pageNumber ?? pageNumber,
     pageSize: rawData?.pageSize ?? data?.pageSize ?? pageSize,
@@ -172,7 +284,18 @@ export async function getProductById(id: string): Promise<Product | null> {
     (json as ApiProduct)
   const apiProduct = (data ?? direct ?? null) as ApiProduct | null
   if (!apiProduct || !apiProduct.productId) return null
-  return mapApiProductToProduct(apiProduct)
+  const product = mapApiProductToProduct(apiProduct)
+
+  if ((product.salesCount ?? 0) <= 0) {
+    try {
+      const sold = await getSoldQuantity(product.id)
+      return { ...product, salesCount: sold }
+    } catch {
+      return product
+    }
+  }
+
+  return product
 }
 
 export async function searchProducts(

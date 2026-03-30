@@ -12,6 +12,7 @@ import {
   Ticket,
   Users,
   Home,
+  MessageSquare,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ const menuItems: MenuItem[] = [
   { label: 'Tin tức', href: '/staff/news', icon: Newspaper },
   { label: 'Vouchers', href: '/staff/vouchers', icon: Ticket },
   { label: 'Khách hàng', href: '/staff/customers', icon: Users },
+  { label: 'Chat hỗ trợ', href: '/staff/support-chat', icon: MessageSquare },
 ]
 
 export default function StaffSidebar() {
