@@ -2,6 +2,7 @@ import {
   HubConnection,
   HubConnectionBuilder,
   HubConnectionState,
+  HttpTransportType,
   LogLevel,
 } from '@microsoft/signalr'
 
@@ -19,23 +20,55 @@ export interface SignalrClient {
   onReceiveNotification: (handler: ReceiveNotificationHandler) => () => void
 }
 
+type SharedEntry = {
+  connection: HubConnection
+  refCount: number
+}
+
+// Shared per accessToken to avoid opening multiple concurrent connections
+// (important on Azure Free/Shared tiers).
+const sharedByToken = new Map<string, SharedEntry>()
+
 export function createSignalrClient(accessToken: string): SignalrClient {
-  const connection = new HubConnectionBuilder()
-    .withUrl(HUB_URL, {
-      accessTokenFactory: () => accessToken,
-    })
-    .withAutomaticReconnect()
-    .configureLogging(LogLevel.Warning)
-    .build()
+  const tokenKey = accessToken || ''
+  let entry = sharedByToken.get(tokenKey)
+  if (!entry) {
+    const connection = new HubConnectionBuilder()
+      .withUrl(HUB_URL, {
+        accessTokenFactory: () => accessToken,
+        // Azure Free/Shared can be flaky with WebSockets; LongPolling is more reliable.
+        // Also: fewer concurrent WS connections when multiple components mount.
+        transport: HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build()
+
+    entry = { connection, refCount: 0 }
+    sharedByToken.set(tokenKey, entry)
+  }
+
+  const connection = entry.connection
 
   const start = async () => {
+    // reference-counted start: only open a physical connection once
+    entry!.refCount += 1
     if (connection.state === HubConnectionState.Connected) return
+    if (connection.state === HubConnectionState.Connecting) return
     await connection.start()
   }
 
   const stop = async () => {
-    if (connection.state === HubConnectionState.Disconnected) return
-    await connection.stop()
+    // reference-counted stop: only tear down when no one uses it
+    entry!.refCount = Math.max(0, entry!.refCount - 1)
+    if (entry!.refCount > 0) return
+
+    if (connection.state === HubConnectionState.Disconnected) {
+      sharedByToken.delete(tokenKey)
+      return
+    }
+    await connection.stop().catch(() => {})
+    sharedByToken.delete(tokenKey)
   }
 
   const onReceiveMessage = (handler: ReceiveMessageHandler) => {
