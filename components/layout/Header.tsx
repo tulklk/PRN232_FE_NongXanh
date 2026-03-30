@@ -709,6 +709,20 @@ export default function Header() {
               >
                 Trang chủ
               </Link>
+              <Link
+                href="/meal-combos"
+                className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                onClick={() => setMobileDrawerOpen(false)}
+              >
+                Giỏ rau theo tuần
+              </Link>
+              <Link
+                href="/recipes"
+                className="block border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
+                onClick={() => setMobileDrawerOpen(false)}
+              >
+                Nấu ăn
+              </Link>
               <button
                 type="button"
                 className="flex w-full items-center justify-between border-b border-gray-200 px-4 py-4 text-[15px] font-semibold text-gray-800 uppercase"
@@ -912,16 +926,6 @@ export default function Header() {
                     : "overflow-x-auto"
                 }`}
               >
-                <Link
-                  href="/products"
-                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
-                >
-                  <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
-                    <ShoppingCart size={10} className="text-white" />
-                  </div>
-                  <span>ĐI CHỢ ONLINE</span>
-                  <ChevronDown size={12} className="text-gray-400" />
-                </Link>
                 {topLevelCategories.slice(0, 4).map((cat) => {
                   const children = buildChildrenForCategory(cat);
                   const hasChildren = children.length > 0;
@@ -1023,6 +1027,24 @@ export default function Header() {
                     <Leaf size={10} className="text-white" />
                   </div>
                   <span>TIN TỨC</span>
+                </Link>
+                <Link
+                  href="/meal-combos"
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
+                >
+                  <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                    <Download size={10} className="text-white" />
+                  </div>
+                  <span>GIỎ RAU THEO TUẦN</span>
+                </Link>
+                <Link
+                  href="/recipes"
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
+                >
+                  <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
+                    <QrCode size={10} className="text-white" />
+                  </div>
+                  <span>NẤU ĂN</span>
                 </Link>
                 <Link
                   href="/contact"

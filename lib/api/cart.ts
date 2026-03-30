@@ -96,6 +96,8 @@ async function enrichCartItems(cart: ApiCart): Promise<ApiCart> {
     const variantMap = new Map(variants.map((v) => [String(v.variantId), v]))
     const productIdSet = new Set<string>()
     for (const item of cart.cartItems!) {
+      if (item.mealComboId) continue
+      if (item.variantId == null) continue
       const v = variantMap.get(String(item.variantId))
       if (v?.productId != null) productIdSet.add(String(v.productId))
     }
@@ -107,6 +109,12 @@ async function enrichCartItems(cart: ApiCart): Promise<ApiCart> {
       })
     }
     const enrichedItems: ApiCartItem[] = cart.cartItems!.map((item) => {
+      if (item.mealComboId) {
+        return item
+      }
+      if (item.variantId == null) {
+        return item
+      }
       const key = String(item.variantId)
       const v = variantMap.get(key)
       const productId = v?.productId != null ? String(v.productId) : null

@@ -91,15 +91,28 @@ export default function CartPage() {
             ) : (
               <div className="space-y-4">
                 {items.map((item) => {
-                  const displayName =
-                    [item.productName, item.variantName].filter(Boolean).join(' - ') || 'Sản phẩm'
-                  const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
+                  const isCombo = !!item.mealComboId
+                  const displayName = isCombo
+                    ? item.mealComboName || 'Combo'
+                    : [item.productName, item.variantName].filter(Boolean).join(' - ') ||
+                      'Sản phẩm'
+                  const href = isCombo
+                    ? `/meal-combos/${encodeURIComponent(String(item.mealComboId))}`
+                    : item.variantId != null
+                      ? `/products?variantId=${encodeURIComponent(String(item.variantId))}`
+                      : '/products'
+                  const imageSrc = item.imageUrl?.startsWith('http')
+                    ? item.imageUrl
+                    : '/images/logo.png'
                   return (
                   <div
                     key={item.cartItemId}
                     className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-4 border border-gray-200 rounded-lg"
                   >
-                    <div className="relative w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                    <Link
+                      href={href}
+                      className="relative w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden"
+                    >
                       <Image
                         src={imageSrc}
                         alt={displayName}
@@ -108,11 +121,14 @@ export default function CartPage() {
                         sizes="80px"
                         unoptimized={imageSrc.startsWith('http')}
                       />
-                    </div>
+                    </Link>
                     <div className="flex-1 w-full">
-                      <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">
+                      <Link
+                        href={href}
+                        className="font-semibold text-gray-900 mb-1 text-sm sm:text-base hover:underline inline-block"
+                      >
                         {displayName}
-                      </h3>
+                      </Link>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-lg font-bold text-primary-green">
                           {formatCurrency(item.priceAtTime)}
@@ -165,10 +181,11 @@ export default function CartPage() {
                 ) : (
                   <div className="mt-3 space-y-3">
                     {items.map((item) => {
-                      const displayName =
-                        [item.productName, item.variantName]
-                          .filter(Boolean)
-                          .join(' - ') || 'Sản phẩm'
+                      const displayName = item.mealComboId
+                        ? item.mealComboName || 'Combo'
+                        : [item.productName, item.variantName]
+                            .filter(Boolean)
+                            .join(' - ') || 'Sản phẩm'
                       return (
                         <div key={item.cartItemId} className="flex items-start justify-between gap-3">
                           <div className="min-w-0">

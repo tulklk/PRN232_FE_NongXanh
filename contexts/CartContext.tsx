@@ -19,6 +19,7 @@ interface CartContextType {
   error: string | null
   refreshCart: () => Promise<void>
   addItem: (variantId: number, quantity?: number) => Promise<void>
+  addMealCombo: (mealComboId: string, quantity?: number) => Promise<void>
   updateItem: (cartItemId: number | string, quantity: number) => Promise<void>
   removeItem: (cartItemId: number | string) => Promise<void>
   clearCart: () => Promise<void>
@@ -74,6 +75,36 @@ export function CartProvider({ children }: { children: ReactNode }) {
       cartRequestVersionRef.current += 1
       try {
         const updated = await cartApi.addCartItem({ variantId, quantity }, token)
+        setCart(updated)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Không thể thêm vào giỏ')
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [token]
+  )
+
+  const addMealCombo = useCallback(
+    async (mealComboId: string, quantity = 1) => {
+      if (!token) {
+        setError('Vui lòng đăng nhập để thêm vào giỏ')
+        return
+      }
+      const id = String(mealComboId ?? '').trim()
+      if (!id) {
+        setError('Không lấy được mealComboId')
+        return
+      }
+      setLoading(true)
+      setError(null)
+      cartRequestVersionRef.current += 1
+      try {
+        const updated = await cartApi.addCartItem(
+          { variantId: null, mealComboId: id, quantity },
+          token
+        )
         setCart(updated)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không thể thêm vào giỏ')
@@ -169,6 +200,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     error,
     refreshCart,
     addItem,
+    addMealCombo,
     updateItem,
     removeItem,
     clearCart,

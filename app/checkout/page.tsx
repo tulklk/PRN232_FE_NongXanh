@@ -21,6 +21,7 @@ import {
   checkoutOrder,
   previewCheckout,
 } from '@/lib/api/orders'
+import { createSubscription } from '@/lib/api/subscriptions'
 import { getVoucherByCode, getVouchers } from '@/lib/api/vouchers'
 import type { ApiVoucher, CheckoutPreviewResponse } from '@/lib/types/api'
 import { createPayment, createVNPayPaymentUrl } from '@/lib/api/payments'
@@ -60,8 +61,15 @@ export default function CheckoutPage() {
   const [loadingDistricts, setLoadingDistricts] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>(
-    'standard'
+    'express'
   )
+  const [isSubscription, setIsSubscription] = useState(false)
+  const [subscriptionFrequency, setSubscriptionFrequency] = useState<
+    'Weekly' | 'BiWeekly' | 'Every3Days'
+  >('Weekly')
+  const [subscriptionPricingPolicy, setSubscriptionPricingPolicy] = useState<
+    'FixedPrice' | 'MarketPrice'
+  >('MarketPrice')
   const [discountCode, setDiscountCode] = useState('')
   const [appliedVoucher, setAppliedVoucher] = useState<ApiVoucher | null>(null)
   const [voucherError, setVoucherError] = useState<string | null>(null)
@@ -462,6 +470,44 @@ export default function CheckoutPage() {
 
       const voucherCode =
         (appliedVoucher?.code ?? discountCode.trim()) || ''
+
+      if (isSubscription) {
+        const hasCombo = cartItems.some((i) => !!(i as any).mealComboId)
+        if (hasCombo) {
+          throw new Error('Giỏ hàng có Combo nên chưa thể đăng ký giao hàng định kỳ.')
+        }
+        const subItems = cartItems.map((item) => {
+          const raw = item as unknown as Record<string, unknown>
+          const productId =
+            (raw.productId ?? raw.ProductId ?? raw.productID ?? raw.ProductID) as
+              | string
+              | number
+              | null
+              | undefined
+          if (productId == null || String(productId).trim() === '') {
+            throw new Error(
+              'Không lấy được productId từ giỏ hàng để tạo Subscription. Vui lòng thử lại hoặc chọn mua 1 lần.'
+            )
+          }
+          return { productId: String(productId), quantity: item.quantity }
+        })
+
+        await createSubscription(
+          {
+            frequency: subscriptionFrequency,
+            pricingPolicy: subscriptionPricingPolicy,
+            shippingAddress: shippingAddress || '',
+            recipientName: formData.fullName,
+            recipientPhone: normalizePhoneNumber(formData.phone) || formData.phone,
+            items: subItems,
+          },
+          tokens.idToken
+        )
+
+        await clearCart()
+        router.push('/account/subscriptions')
+        return
+      }
       let order
       if (shippingMethod === 'express') {
         const districtNumericId = Math.trunc(Number(formData.districtId))
@@ -500,20 +546,47 @@ export default function CheckoutPage() {
           tokens.idToken
         )
       } else {
-        const orderDetails = cartItems.map((item) => ({
-          variantId: item.variantId,
-          quantity: item.quantity,
-        }))
-        order = await createOrder(
-          {
-            shippingFee: FIXED_SHIPPING_FEE,
-            shippingAddress: shippingAddress || undefined,
-            userId: user.userId,
-            orderDetails,
-            voucherId: appliedVoucher?.voucherId ?? undefined,
-          },
-          tokens.idToken
-        )
+        const hasCombo = cartItems.some((i) => !!(i as any).mealComboId)
+        const hasNullVariant = cartItems.some((i) => (i as any).variantId == null)
+
+        // Nếu có combo (hoặc item không có variantId), phải checkout theo cartItemIds để BE xử lý.
+        if (hasCombo || hasNullVariant) {
+          const districtNumericId = Math.trunc(Number(formData.districtId || districtIdFromWard))
+          order = await checkoutOrder(
+            {
+              cartItemIds,
+              shippingAddress: shippingAddress || '',
+              shippingMethod: 'STANDARD',
+              paymentMethod: paymentMethod === 'cod' ? 'COD' : 'VNPay',
+              recipientName: formData.fullName,
+              recipientPhone: normalizePhoneNumber(formData.phone) || formData.phone,
+              toWardCode: formData.wardCode,
+              provinceCode: formData.provinceCode,
+              provinceId: Number(formData.provinceId),
+              ...(Number.isFinite(districtNumericId) && districtNumericId > 0
+                ? { toDistrictId: districtNumericId }
+                : {}),
+              insuranceValue: 0,
+              voucherCode,
+            },
+            tokens.idToken
+          )
+        } else {
+          const orderDetails = cartItems.map((item) => ({
+            variantId: item.variantId as number,
+            quantity: item.quantity,
+          }))
+          order = await createOrder(
+            {
+              shippingFee: FIXED_SHIPPING_FEE,
+              shippingAddress: shippingAddress || undefined,
+              userId: user.userId,
+              orderDetails,
+              voucherId: appliedVoucher?.voucherId ?? undefined,
+            },
+            tokens.idToken
+          )
+        }
       }
 
       const resolvedOrderId = order?.orderId != null ? String(order.orderId) : ''
@@ -589,6 +662,74 @@ export default function CheckoutPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
               {/* Left Column */}
               <div className="lg:col-span-2 space-y-6">
+                {/* Subscription toggle */}
+                <div className="bg-white rounded-lg p-4 sm:p-6">
+                  <h2 className="text-xl font-bold mb-4">
+                    Hình thức mua hàng
+                  </h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Đăng ký giao hàng định kỳ
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        FixedPrice: giữ giá tại thời điểm đăng ký. MarketPrice: áp dụng giá thị trường tại ngày giao.
+                      </p>
+                    </div>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isSubscription}
+                        onChange={(e) => setIsSubscription(e.target.checked)}
+                        className="h-4 w-4 accent-[#0A923C]"
+                      />
+                      <span className="text-sm font-medium text-gray-800">
+                        {isSubscription ? 'Đang bật' : 'Tắt'}
+                      </span>
+                    </label>
+                  </div>
+
+                  {isSubscription && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">
+                          Tần suất
+                        </label>
+                        <select
+                          value={subscriptionFrequency}
+                          onChange={(e) =>
+                            setSubscriptionFrequency(
+                              e.target.value as 'Weekly' | 'BiWeekly' | 'Every3Days'
+                            )
+                          }
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
+                        >
+                          <option value="Weekly">Hàng tuần</option>
+                          <option value="BiWeekly">2 tuần / lần</option>
+                          <option value="Every3Days">3 ngày / lần</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">
+                          Chính sách giá
+                        </label>
+                        <select
+                          value={subscriptionPricingPolicy}
+                          onChange={(e) =>
+                            setSubscriptionPricingPolicy(
+                              e.target.value as 'FixedPrice' | 'MarketPrice'
+                            )
+                          }
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green"
+                        >
+                          <option value="MarketPrice">MarketPrice (giá thị trường)</option>
+                          <option value="FixedPrice">FixedPrice (giữ giá)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Shipping Information */}
                 <div className="bg-white rounded-lg p-4 sm:p-6">
                   <h2 className="text-xl font-bold mb-4">Thông tin nhận hàng</h2>
@@ -758,66 +899,13 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  <div className="flex gap-4">
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="addressType"
-                        value="home"
-                        checked={formData.addressType === 'home'}
-                        onChange={(e) => setFormData({ ...formData, addressType: e.target.value })}
-                        className="mr-2 text-primary-green focus:ring-primary-green"
-                      />
-                      <span>Nhà riêng</span>
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="addressType"
-                        value="office"
-                        checked={formData.addressType === 'office'}
-                        onChange={(e) => setFormData({ ...formData, addressType: e.target.value })}
-                        className="mr-2 text-primary-green focus:ring-primary-green"
-                      />
-                      <span>Văn phòng</span>
-                    </label>
-                  </div>
+                  {/* Removed address type selector (home/office) */}
                 </div>
 
                 {/* Payment Method */}
                 <div className="bg-white rounded-lg p-4 sm:p-6">
                   <h2 className="text-xl font-bold mb-4">Phương thức giao hàng</h2>
                   <div className="space-y-3">
-                    <label
-                      className={`flex items-center p-4 border-2 rounded-lg cursor-pointer ${
-                        shippingMethod === 'standard'
-                          ? 'border-primary-green bg-primary-green-light'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="shippingMethod"
-                        value="standard"
-                        checked={shippingMethod === 'standard'}
-                        onChange={(e) =>
-                          setShippingMethod(
-                            e.target.value as 'standard' | 'express'
-                          )
-                        }
-                        className="mr-4 text-primary-green focus:ring-primary-green"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Truck size={20} />
-                        <div>
-                          <p>Giao hàng tiêu chuẩn</p>
-                          <p className="text-xs text-gray-500">
-                            Giao theo thời gian thông thường
-                          </p>
-                        </div>
-                      </div>
-                    </label>
-
                     <label
                       className={`flex items-center p-4 border-2 rounded-lg cursor-pointer ${
                         shippingMethod === 'express'
@@ -950,7 +1038,11 @@ export default function CheckoutPage() {
                     <h2 className="text-lg font-bold mb-4">Thông tin đơn hàng</h2>
                     <div className="space-y-3 mb-4">
                       {cartItems.map((item) => {
-                        const displayName = [item.productName, item.variantName].filter(Boolean).join(' - ') || 'Sản phẩm'
+                        const displayName = item.mealComboId
+                          ? item.mealComboName || 'Combo'
+                          : [item.productName, item.variantName]
+                              .filter(Boolean)
+                              .join(' - ') || 'Sản phẩm'
                         const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
                         return (
                         <div key={item.cartItemId} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">

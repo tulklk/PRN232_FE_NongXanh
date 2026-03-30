@@ -10,6 +10,7 @@ import {
   Ticket,
   Heart,
   MessageSquare,
+  RefreshCcw,
   Bell,
   LogOut,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ const menuItems = [
   { href: '/account/profile', label: 'Thông tin của tôi', icon: User },
   { href: '/account/addresses', label: 'Sổ địa chỉ', icon: MapPin },
   { href: '/account/orders', label: 'Đơn hàng của tôi', icon: ShoppingCart },
+  { href: '/account/subscriptions', label: 'Giao hàng định kỳ', icon: RefreshCcw },
   { href: '/account/vouchers', label: 'Voucher của tôi', icon: Ticket },
   { href: '/account/wishlist', label: 'Sản phẩm yêu thích', icon: Heart },
   { href: '/account/reviews', label: 'Nhận xét của tôi', icon: MessageSquare },

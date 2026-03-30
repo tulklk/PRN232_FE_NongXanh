@@ -15,20 +15,42 @@ function getJsonHeaders(request: NextRequest): Record<string, string> {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const body = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Body không hợp lệ' },
+        { status: 400 }
+      )
+    }
+    // Swagger: payload có thể có cả variantId + mealComboId; combo thì variantId nên là null.
+    if (
+      body &&
+      typeof body === 'object' &&
+      'mealComboId' in body &&
+      !('variantId' in body)
+    ) {
+      ;(body as Record<string, unknown>).variantId = null
+    }
     const headers = getJsonHeaders(request)
     const res = await fetch(`${API_BASE_URL}/api/Carts/items`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      cache: 'no-store',
     })
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}))
+      const contentType = res.headers.get('content-type') || ''
+      const errorData =
+        contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : await res.text().catch(() => '')
       return NextResponse.json(
         {
           error:
+            (typeof errorData === 'string' ? errorData : null) ||
             (errorData as { message?: string }).message ||
+            (errorData as { error?: string }).error ||
             'Không thể thêm sản phẩm vào giỏ',
         },
         { status: res.status }
@@ -40,7 +62,12 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Carts items POST error:', error)
     return NextResponse.json(
-      { error: 'Đã có lỗi xảy ra khi thêm vào giỏ' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Đã có lỗi xảy ra khi thêm vào giỏ',
+      },
       { status: 500 }
     )
   }

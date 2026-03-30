@@ -163,12 +163,26 @@ export default function OrderDetailPage() {
         <div className="space-y-3">
           {order.orderDetails?.map((detail) => {
             const raw = detail as unknown as Record<string, unknown>
+            const mealComboId =
+              (raw.mealComboId ?? raw.MealComboId ?? raw.comboId ?? raw.ComboId) as
+                | string
+                | null
+                | undefined
+            const mealComboName =
+              (raw.mealComboName ?? raw.MealComboName ?? raw.comboName ?? raw.ComboName) as
+                | string
+                | null
+                | undefined
             const imageUrl =
               (raw.productImageUrl ?? raw.ProductImageUrl ?? raw.imageUrl ?? raw.ImageUrl) as
               | string
               | undefined
             const productName =
-              (raw.productName ?? raw.ProductName ?? detail.variantName ?? 'Sản phẩm') as string
+              ((mealComboId ? mealComboName : null) ??
+                raw.productName ??
+                raw.ProductName ??
+                detail.variantName ??
+                'Sản phẩm') as string
             const productIdRaw = (raw.productId ??
               raw.ProductId ??
               detail.productId) as string | number | null | undefined
@@ -196,11 +210,12 @@ export default function OrderDetailPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{productName}</p>
                   <p className="text-sm text-gray-500">
-                    {detail.variantName && `${detail.variantName} • `}x{detail.quantity}
+                    {!mealComboId && detail.variantName && `${detail.variantName} • `}
+                    x{detail.quantity}
                   </p>
                   {isDelivered && (
                     <div className="mt-2">
-                      {productId ? (
+                      {!mealComboId && productId ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -220,7 +235,7 @@ export default function OrderDetailPage() {
                         </button>
                       ) : (
                         <span className="text-xs text-gray-400">
-                          Không thể đánh giá sản phẩm này.
+                          {mealComboId ? 'Combo không hỗ trợ đánh giá.' : 'Không thể đánh giá sản phẩm này.'}
                         </span>
                       )}
                     </div>

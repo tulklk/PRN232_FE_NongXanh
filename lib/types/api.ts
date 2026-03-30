@@ -135,9 +135,13 @@ export interface ApiCartItem {
   priceAtTime: number
   subTotal: number
   cartId: number
-  variantId: number
+  /** null nếu là combo */
+  variantId: number | null
   variantName?: string | null
   productName?: string | null
+  /** present nếu là combo */
+  mealComboId?: string | null
+  mealComboName?: string | null
   imageUrl?: string | null
 }
 
@@ -150,7 +154,8 @@ export interface ApiCart {
 }
 
 export interface AddCartItemRequest {
-  variantId: number
+  variantId?: number | null
+  mealComboId?: string
   quantity: number
 }
 
@@ -166,11 +171,14 @@ export interface ApiOrderDetail {
   price: number
   subTotal: number
   orderId: number
-  variantId: number
+  variantId: number | null
   variantName?: string | null
   productId?: string | number | null
   productName?: string | null
   productImageUrl?: string | null
+  mealComboId?: string | null
+  mealComboName?: string | null
+  imageUrl?: string | null
 }
 
 export interface ApiOrder {
@@ -276,6 +284,76 @@ export interface ApiBlogsPagedResponse {
   pageNumber: number
   pageSize: number
   totalPages?: number
+}
+
+// MealCombos / Weekly Basket suggestions
+export interface MealComboSuggestionItem {
+  productId: string
+  productName: string
+  quantity: number
+  unit: string
+  price: number
+}
+
+export interface MealComboSuggestion {
+  mealComboId: string
+  name: string
+  description?: string | null
+  basePrice: number
+  items: MealComboSuggestionItem[]
+}
+
+// Subscriptions
+export type SubscriptionFrequency = 'Weekly' | 'BiWeekly' | 'Every3Days'
+export type SubscriptionPricingPolicy = 'FixedPrice' | 'MarketPrice'
+
+export interface CreateSubscriptionRequest {
+  frequency: SubscriptionFrequency
+  shippingAddress: string
+  recipientName: string
+  recipientPhone: string
+  pricingPolicy: SubscriptionPricingPolicy
+  items: Array<{ productId: string; quantity: number }>
+}
+
+export interface SubscriptionModel {
+  subscriptionId?: string | number
+  id?: string | number
+  frequency?: SubscriptionFrequency | string
+  pricingPolicy?: SubscriptionPricingPolicy | string
+  shippingAddress?: string | null
+  recipientName?: string | null
+  recipientPhone?: string | null
+  status?: string | null
+  nextDeliveryAt?: string | null
+  createdAt?: string | null
+  items?: Array<{ productId: string; productName?: string | null; quantity: number }>
+  [k: string]: unknown
+}
+
+// Recipes
+export interface RecipeIngredient {
+  productId: string
+  productName?: string | null
+  quantity: number
+  unit?: string | null
+  price?: number | null
+  [k: string]: unknown
+}
+
+export interface RecipeModel {
+  recipeId?: string
+  id?: string
+  title?: string
+  name?: string
+  description?: string | null
+  content?: string | null
+  imageUrl?: string | null
+  thumbnailUrl?: string | null
+  createdAt?: string | null
+  ingredients?: RecipeIngredient[] | null
+  items?: RecipeIngredient[] | null
+  [k: string]: unknown
 }
 
 // API Payment structure
