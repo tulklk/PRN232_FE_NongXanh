@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { getOrderById } from '@/lib/api/orders'
+import { cancelOrder, getOrderById } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getOrderStatusLabel, getVnPayStatusLabel } from '@/lib/orderDisplay'
@@ -27,11 +27,37 @@ export default function OrderDetailPage() {
   const [reviewedProductIds, setReviewedProductIds] = useState<Set<string>>(
     () => new Set()
   )
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const isDelivered = useMemo(() => {
     const s = (order?.status ?? '').trim().toLowerCase()
     return s === 'delivered' || s === 'shipping' || s === 'shipped'
   }, [order?.status])
+
+  const isPending = useMemo(() => {
+    const s = (order?.status ?? '').trim().toLowerCase()
+    return s === 'pending'
+  }, [order?.status])
+
+  async function handleCancelOrder() {
+    if (!tokens?.idToken || !id || !isPending) return
+    const ok = window.confirm(
+      'Bạn có chắc muốn hủy đơn hàng này? Thao tác không thể hoàn tác.'
+    )
+    if (!ok) return
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      await cancelOrder(id, tokens.idToken)
+      const updated = await getOrderById(id, tokens.idToken)
+      if (updated) setOrder(updated)
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : 'Không thể hủy đơn hàng')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.idToken || !id) {
@@ -229,6 +255,23 @@ export default function OrderDetailPage() {
               {formatCurrency(order.finalAmount)}
             </span>
           </div>
+          {isPending && (
+            <div className="pt-4 border-t border-gray-100 mt-2">
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                disabled={cancelling}
+                className="w-full sm:w-auto rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+              </button>
+              {cancelError && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {cancelError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

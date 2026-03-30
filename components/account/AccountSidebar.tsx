@@ -12,7 +12,6 @@ import {
   MessageSquare,
   Bell,
   LogOut,
-  Share2,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 
@@ -70,12 +69,6 @@ export default function AccountSidebar() {
           <span>Đăng xuất</span>
         </button>
       </nav>
-
-      {/* Sell Button */}
-      <button className="w-full mt-6 bg-[#0A923C] text-white py-3 px-6 rounded-md text-sm font-medium hover:bg-[#087a32] transition-colors flex items-center justify-center gap-2.5">
-        <Share2 size={20} />
-        <span>Bán hàng cùng Nông Xanh</span>
-      </button>
     </div>
   )
 }

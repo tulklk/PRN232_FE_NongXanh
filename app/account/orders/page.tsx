@@ -101,7 +101,11 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex flex-wrap justify-end gap-1.5">
                   <span
-                    className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700"
+                    className={
+                      (order.status ?? '').trim().toLowerCase() === 'cancelled'
+                        ? 'px-2 py-0.5 rounded text-xs bg-red-50 text-red-700 border border-red-100'
+                        : 'px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700'
+                    }
                     title="Trạng thái đơn hàng"
                   >
                     {getOrderStatusLabel(order.status)}
@@ -110,7 +114,7 @@ export default function OrdersPage() {
                     className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-800 border border-emerald-100"
                     title="Trạng thái thanh toán "
                   >
-                    VNPay: {getVnPayStatusLabel(order.vnPayStatus)}
+                    {getVnPayStatusLabel(order.vnPayStatus)}
                   </span>
                 </div>
               </div>
