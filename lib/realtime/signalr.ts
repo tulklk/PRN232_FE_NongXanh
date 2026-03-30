@@ -55,7 +55,13 @@ export function createSignalrClient(accessToken: string): SignalrClient {
     entry!.refCount += 1
     if (connection.state === HubConnectionState.Connected) return
     if (connection.state === HubConnectionState.Connecting) return
-    await connection.start()
+    try {
+      await connection.start()
+    } catch (e) {
+      // Roll back refCount on failed start to avoid leaks.
+      entry!.refCount = Math.max(0, entry!.refCount - 1)
+      throw e
+    }
   }
 
   const stop = async () => {
