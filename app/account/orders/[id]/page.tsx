@@ -204,6 +204,10 @@ export default function OrderDetailPage() {
                       productName?: string | null
                       quantity: number
                       unit?: string | null
+                      variantId?: string | null
+                      variantName?: string | null
+                      unitPrice?: number | null
+                      lineTotal?: number | null
                       imageUrl?: string | null
                       origin?: string | null
                     }>
@@ -247,10 +251,19 @@ export default function OrderDetailPage() {
                             {comboItems.map((it) => {
                               const img = String(it.imageUrl ?? '').trim()
                               const src = img.startsWith('http') ? img : '/images/logo.png'
-                              const name = String(it.productName ?? '').trim() || 'Sản phẩm'
+                              const baseName = String(it.productName ?? '').trim() || 'Sản phẩm'
+                              const variantName = String(it.variantName ?? '').trim()
+                              const name = [baseName, variantName].filter(Boolean).join(' - ')
+                              const unitPrice = Number(it.unitPrice ?? NaN)
+                              const lineTotal = Number(it.lineTotal ?? NaN)
+                              const hasPrices =
+                                Number.isFinite(unitPrice) &&
+                                unitPrice >= 0 &&
+                                Number.isFinite(lineTotal) &&
+                                lineTotal >= 0
                               return (
                                 <div
-                                  key={it.productId}
+                                  key={`${it.productId}-${it.variantId ?? ''}`}
                                   className="px-3 py-2 text-sm flex items-center justify-between gap-3"
                                 >
                                   <div className="flex items-center gap-3 min-w-0">
@@ -275,8 +288,13 @@ export default function OrderDetailPage() {
                                       ) : null}
                                     </div>
                                   </div>
-                                  <span className="text-gray-600 flex-shrink-0">
-                                    {it.quantity} {it.unit ?? ''}
+                                  <span className="text-gray-600 flex-shrink-0 text-right whitespace-nowrap">
+                                    <span className="block">x{it.quantity}</span>
+                                    {hasPrices ? (
+                                      <span className="block text-xs">
+                                        {formatCurrency(unitPrice)} / {formatCurrency(lineTotal)}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </div>
                               )

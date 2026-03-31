@@ -229,19 +229,27 @@ export default function CartPage() {
                           ) : combo && Array.isArray(combo.items) && combo.items.length > 0 ? (
                             <div className="max-h-[220px] overflow-auto pr-1 overscroll-contain">
                               <ul className="space-y-2">
-                                {combo.items.map((it) => (
-                                  <li
-                                    key={`${combo.mealComboId}-${it.productId}`}
-                                    className="flex items-start justify-between gap-3"
-                                  >
-                                    <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
-                                      {it.productName}
-                                    </span>
-                                    <span className="text-xs text-gray-600 whitespace-nowrap">
-                                      {it.quantity} {it.unit ?? ''}
-                                    </span>
-                                  </li>
-                                ))}
+                                {combo.items.map((it) => {
+                                  const left = [it.productName, it.variantName]
+                                    .filter(Boolean)
+                                    .join(' - ')
+                                  return (
+                                    <li
+                                      key={`${combo.mealComboId}-${it.productId}-${it.variantId ?? ''}`}
+                                      className="flex items-start justify-between gap-3"
+                                    >
+                                      <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
+                                        {left}
+                                      </span>
+                                      <span className="text-xs text-gray-600 whitespace-nowrap text-right">
+                                        <span className="block">x{it.quantity}</span>
+                                        <span className="block">
+                                          {formatCurrency(it.unitPrice)} / {formatCurrency(it.lineTotal)}
+                                        </span>
+                                      </span>
+                                    </li>
+                                  )
+                                })}
                               </ul>
                             </div>
                           ) : (

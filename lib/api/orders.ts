@@ -138,6 +138,20 @@ function ordersCacheKey(pageNumber: number, pageSize: number): string {
   return `nx_orders_${pageNumber}_${pageSize}`
 }
 
+export function invalidateOrdersCache(): void {
+  if (typeof window === 'undefined') return
+  try {
+    const keysToRemove: string[] = []
+    for (let i = 0; i < window.sessionStorage.length; i++) {
+      const k = window.sessionStorage.key(i)
+      if (k && k.startsWith('nx_orders_')) keysToRemove.push(k)
+    }
+    for (const k of keysToRemove) window.sessionStorage.removeItem(k)
+  } catch {
+    // ignore
+  }
+}
+
 function readOrdersCache(
   pageNumber: number,
   pageSize: number
@@ -148,11 +162,14 @@ function readOrdersCache(
     if (!raw) return null
     const parsed = JSON.parse(raw) as OrdersCacheEntry
     if (!parsed || typeof parsed !== 'object') return null
-    if (Date.now() - Number(parsed.savedAt ?? 0) > ORDERS_CACHE_TTL_MS) return null
     return parsed.value ?? null
   } catch {
     return null
   }
+}
+
+function isOrdersCacheFresh(savedAt: number): boolean {
+  return Date.now() - Number(savedAt ?? 0) <= ORDERS_CACHE_TTL_MS
 }
 
 function writeOrdersCache(
@@ -180,7 +197,8 @@ export async function getOrders(
     // On client: return cache immediately if available, and also race a quick fetch.
     const cached = readOrdersCache(pageNumber, pageSize)
     if (cached) {
-      // fire-and-forget refresh in background
+      // Always show cached immediately (even if stale) to avoid 8–10s blank list.
+      // Refresh in background; if cache is fresh, still refresh (cheap) but can be skipped later.
       void (async () => {
         try {
           const rr = await fetchWithTimeout(url, { headers: getHeaders(token) }, 4500)
@@ -287,6 +305,8 @@ export async function syncOrderShipment(
       (err as { error?: string }).error || 'Không thể đồng bộ giao hàng nhanh'
     )
   }
+
+  invalidateOrdersCache()
 }
 
 export interface UpdateOrderStatusInput {
@@ -314,6 +334,7 @@ export async function updateOrderStatus(
   }
 
   const json = (await res.json()) as { data?: ApiOrder } & ApiOrder
+  invalidateOrdersCache()
   return (json?.data ?? json) as ApiOrder
 }
 
@@ -332,6 +353,8 @@ export async function confirmOrder(
       (err as { error?: string }).error || 'Không thể xác nhận đơn hàng'
     )
   }
+
+  invalidateOrdersCache()
 }
 
 export async function cancelOrder(
@@ -349,6 +372,8 @@ export async function cancelOrder(
       (err as { error?: string }).error || 'Không thể hủy đơn hàng'
     )
   }
+
+  invalidateOrdersCache()
 }
 
 export async function createOrderShipping(
@@ -366,6 +391,8 @@ export async function createOrderShipping(
       (err as { error?: string }).error || 'Không thể tạo vận chuyển'
     )
   }
+
+  invalidateOrdersCache()
 }
 
 /** BE Swagger: cartItemIds là Guid string[] */
