@@ -2,10 +2,13 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Minus, Plus, X } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Loader2, Minus, Plus, X } from 'lucide-react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
 import type { ApiCartItem } from '@/lib/types/api'
+import { useUser } from '@/contexts/UserContext'
+import { getMealComboById } from '@/lib/api/mealCombos'
+import type { MealComboDto } from '@/lib/types/api'
 
 interface CartPopupProps {
   items: ApiCartItem[]
@@ -17,6 +20,7 @@ interface CartPopupProps {
 }
 
 function getDisplayName(item: ApiCartItem): string {
+  if (item.mealComboId) return item.mealComboName || 'Combo'
   const p = item.productName || ''
   const v = item.variantName || ''
   if (p && v) return `${p} - ${v}`
@@ -39,13 +43,58 @@ export default function CartPopup({
   onRemoveItem,
   onClose,
 }: CartPopupProps) {
+  const { tokens } = useUser()
   const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
     () => Object.fromEntries(items.map((i) => [getCartItemKey(i), i.quantity]))
+  )
+  const [expandedComboIds, setExpandedComboIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [comboById, setComboById] = useState<Record<string, MealComboDto | null>>(
+    {}
+  )
+  const [comboLoadingById, setComboLoadingById] = useState<Record<string, boolean>>(
+    {}
   )
 
   useEffect(() => {
     setLocalQuantities(Object.fromEntries(items.map((i) => [getCartItemKey(i), i.quantity])))
   }, [items])
+
+  const comboIdsInCart = useMemo(() => {
+    const ids = new Set<string>()
+    for (const it of items) {
+      if (it.mealComboId) ids.add(String(it.mealComboId))
+    }
+    return Array.from(ids)
+  }, [items])
+
+  useEffect(() => {
+    if (comboIdsInCart.length === 0) return
+    comboIdsInCart.forEach((id) => {
+      if (!id) return
+      if (comboById[id] !== undefined) return
+      if (comboLoadingById[id]) return
+
+      setComboLoadingById((prev) => ({ ...prev, [id]: true }))
+      getMealComboById(id, tokens?.idToken)
+        .then((combo) => setComboById((prev) => ({ ...prev, [id]: combo })))
+        .catch(() => setComboById((prev) => ({ ...prev, [id]: null })))
+        .finally(() => setComboLoadingById((prev) => ({ ...prev, [id]: false })))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comboIdsInCart.join('|'), tokens?.idToken])
+
+  const toggleCombo = useCallback((id: string) => {
+    const key = String(id ?? '').trim()
+    if (!key) return
+    setExpandedComboIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const handleQtyChange = (cartItemId: number | string, delta: number) => {
     const cartItemKey = String(cartItemId)
@@ -84,6 +133,11 @@ export default function CartPopup({
             {items.map((item) => {
               const cartItemId = item.cartItemId
               const cartItemKey = String(cartItemId)
+              const isCombo = !!item.mealComboId
+              const comboId = isCombo ? String(item.mealComboId ?? '') : ''
+              const expanded = isCombo && expandedComboIds.has(comboId)
+              const combo = isCombo ? comboById[comboId] : null
+              const comboLoading = isCombo ? comboLoadingById[comboId] : false
               return (
               <div
                 key={item.cartItemId}
@@ -101,9 +155,24 @@ export default function CartPopup({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {getDisplayName(item)}
-                    </p>
+                    {isCombo ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleCombo(comboId)}
+                        className="text-sm font-medium text-gray-900 truncate inline-flex items-center gap-1 hover:underline text-left min-w-0"
+                      >
+                        {expanded ? (
+                          <ChevronDown size={14} className="text-gray-500 flex-shrink-0" />
+                        ) : (
+                          <ChevronRight size={14} className="text-gray-500 flex-shrink-0" />
+                        )}
+                        <span className="truncate">{getDisplayName(item)}</span>
+                      </button>
+                    ) : (
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {getDisplayName(item)}
+                      </p>
+                    )}
                     <button
                       type="button"
                       onClick={() => onRemoveItem(cartItemId)}
@@ -113,6 +182,40 @@ export default function CartPopup({
                       <X size={14} />
                     </button>
                   </div>
+
+                  {isCombo && expanded && (
+                    <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+                      {comboLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-gray-600 py-1">
+                          <Loader2 className="animate-spin" size={12} />
+                          Đang tải...
+                        </div>
+                      ) : combo && Array.isArray(combo.items) && combo.items.length > 0 ? (
+                        <div className="max-h-40 overflow-auto overscroll-contain pr-1">
+                          <ul className="space-y-1.5">
+                            {combo.items.map((it) => (
+                              <li
+                                key={`${combo.mealComboId}-${it.productId}`}
+                                className="flex items-start justify-between gap-2"
+                              >
+                                <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
+                                  {it.productName}
+                                </span>
+                                <span className="text-xs text-gray-600 whitespace-nowrap">
+                                  {it.quantity} {it.unit ?? ''}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-600">
+                          Không tải được chi tiết combo.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mt-2">
                     <div className="inline-flex items-center border border-gray-300 rounded text-sm bg-white">
                       <button

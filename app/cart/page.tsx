@@ -1,16 +1,18 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react'
 import QuantitySelector from '@/components/common/QuantitySelector'
 import { formatCurrency } from '@/lib/utils'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
+import { getMealComboById } from '@/lib/api/mealCombos'
+import type { MealComboDto } from '@/lib/types/api'
 
 export default function CartPage() {
-  const { isAuthenticated } = useUser()
+  const { isAuthenticated, tokens } = useUser()
   const {
     cart,
     loading,
@@ -20,14 +22,70 @@ export default function CartPage() {
     removeItem,
   } = useCart()
 
+  const [expandedComboIds, setExpandedComboIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [comboById, setComboById] = useState<Record<string, MealComboDto | null>>(
+    {}
+  )
+  const [comboLoadingById, setComboLoadingById] = useState<Record<string, boolean>>(
+    {}
+  )
+
   useEffect(() => {
     if (isAuthenticated) {
       refreshCart()
     }
   }, [isAuthenticated, refreshCart])
 
-  const items = cart?.cartItems ?? []
+  const items = useMemo(() => cart?.cartItems ?? [], [cart?.cartItems])
   const totalAmount = cart?.totalAmount ?? 0
+
+  const comboIdsInCart = useMemo(() => {
+    const ids = new Set<string>()
+    for (const it of items) {
+      if (it.mealComboId) ids.add(String(it.mealComboId))
+    }
+    return Array.from(ids)
+  }, [items])
+
+  // Prefetch combo details for any combo items in cart (best-effort).
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (comboIdsInCart.length === 0) return
+
+    comboIdsInCart.forEach((id) => {
+      if (comboById[id] !== undefined) return
+      if (comboLoadingById[id]) return
+
+      setComboLoadingById((prev) => ({ ...prev, [id]: true }))
+      getMealComboById(id, tokens?.idToken)
+        .then((combo) => {
+          setComboById((prev) => ({ ...prev, [id]: combo }))
+        })
+        .catch(() => {
+          setComboById((prev) => ({ ...prev, [id]: null }))
+        })
+        .finally(() => {
+          setComboLoadingById((prev) => ({ ...prev, [id]: false }))
+        })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comboIdsInCart.join('|'), isAuthenticated, tokens?.idToken])
+
+  const toggleCombo = useCallback(
+    (id: string) => {
+      const key = String(id ?? '').trim()
+      if (!key) return
+      setExpandedComboIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        return next
+      })
+    },
+    []
+  )
 
   if (!isAuthenticated) {
     return (
@@ -92,6 +150,10 @@ export default function CartPage() {
               <div className="space-y-4">
                 {items.map((item) => {
                   const isCombo = !!item.mealComboId
+                  const comboId = isCombo ? String(item.mealComboId ?? '') : ''
+                  const isExpanded = isCombo && expandedComboIds.has(comboId)
+                  const combo = isCombo ? comboById[comboId] : null
+                  const comboLoading = isCombo ? comboLoadingById[comboId] : false
                   const displayName = isCombo
                     ? item.mealComboName || 'Combo'
                     : [item.productName, item.variantName].filter(Boolean).join(' - ') ||
@@ -123,12 +185,72 @@ export default function CartPage() {
                       />
                     </Link>
                     <div className="flex-1 w-full">
-                      <Link
-                        href={href}
-                        className="font-semibold text-gray-900 mb-1 text-sm sm:text-base hover:underline inline-block"
-                      >
-                        {displayName}
-                      </Link>
+                      {isCombo ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleCombo(comboId)}
+                          className="text-left font-semibold text-gray-900 mb-1 text-sm sm:text-base hover:underline inline-flex items-center gap-1"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown size={18} className="text-gray-500" />
+                          ) : (
+                            <ChevronRight size={18} className="text-gray-500" />
+                          )}
+                          <span className="min-w-0 line-clamp-2">{displayName}</span>
+                        </button>
+                      ) : (
+                        <Link
+                          href={href}
+                          className="font-semibold text-gray-900 mb-1 text-sm sm:text-base hover:underline inline-block"
+                        >
+                          {displayName}
+                        </Link>
+                      )}
+
+                      {isCombo && isExpanded && (
+                        <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <p className="text-xs font-semibold text-gray-700">
+                              Danh sách sản phẩm trong combo
+                            </p>
+                            <Link
+                              href={href}
+                              className="text-xs text-primary-green hover:underline"
+                            >
+                              Xem chi tiết
+                            </Link>
+                          </div>
+
+                          {comboLoading ? (
+                            <div className="flex items-center gap-2 text-xs text-gray-600 py-2">
+                              <Loader2 className="animate-spin" size={14} />
+                              Đang tải...
+                            </div>
+                          ) : combo && Array.isArray(combo.items) && combo.items.length > 0 ? (
+                            <div className="max-h-[220px] overflow-auto pr-1 overscroll-contain">
+                              <ul className="space-y-2">
+                                {combo.items.map((it) => (
+                                  <li
+                                    key={`${combo.mealComboId}-${it.productId}`}
+                                    className="flex items-start justify-between gap-3"
+                                  >
+                                    <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
+                                      {it.productName}
+                                    </span>
+                                    <span className="text-xs text-gray-600 whitespace-nowrap">
+                                      {it.quantity} {it.unit ?? ''}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-600">
+                              Không tải được chi tiết combo.
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-lg font-bold text-primary-green">
                           {formatCurrency(item.priceAtTime)}

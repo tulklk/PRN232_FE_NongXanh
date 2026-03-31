@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useParams } from 'next/navigation'
@@ -8,6 +8,7 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { addRecipeIngredientsToCart, getRecipeById } from '@/lib/api/recipes'
 import type { RecipeIngredient, RecipeModel } from '@/lib/types/api'
+import { getProductById } from '@/lib/api/products'
 
 function getTitle(r: RecipeModel): string {
   return String(r.title ?? r.name ?? 'Công thức')
@@ -37,6 +38,11 @@ export default function RecipeDetailPage() {
   const [adding, setAdding] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
 
+  const [productMetaById, setProductMetaById] = useState<
+    Record<string, { name: string; image: string }>
+  >({})
+  const metaLoadSeqRef = useRef(0)
+
   useEffect(() => {
     if (!tokens?.idToken || !id) {
       setLoading(false)
@@ -53,6 +59,55 @@ export default function RecipeDetailPage() {
   const ingredients = useMemo(() => (recipe ? getIngredients(recipe) : []), [recipe])
   const title = recipe ? getTitle(recipe) : ''
   const imageUrl = recipe ? getImageUrl(recipe) : null
+
+  useEffect(() => {
+    if (!ingredients.length) return
+    const nextSeq = ++metaLoadSeqRef.current
+
+    const ids = new Set<string>()
+    for (const it of ingredients) {
+      const pid = String(it.productId ?? '').trim()
+      if (pid && !productMetaById[pid]) ids.add(pid)
+    }
+    const missing = Array.from(ids)
+    if (missing.length === 0) return
+
+    const CONCURRENCY = 8
+    let cancelled = false
+
+    async function run() {
+      const acc: Record<string, { name: string; image: string }> = {}
+      for (let i = 0; i < missing.length; i += CONCURRENCY) {
+        const chunk = missing.slice(i, i + CONCURRENCY)
+        const results = await Promise.all(
+          chunk.map(async (pid) => {
+            try {
+              const p = await getProductById(pid)
+              if (!p) return null
+              return { pid, name: p.name, image: p.image ?? '' }
+            } catch {
+              return null
+            }
+          })
+        )
+        for (const r of results) {
+          if (!r) continue
+          acc[r.pid] = { name: r.name, image: r.image }
+        }
+      }
+
+      if (cancelled) return
+      if (metaLoadSeqRef.current !== nextSeq) return
+      if (Object.keys(acc).length === 0) return
+      setProductMetaById((prev) => ({ ...prev, ...acc }))
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingredients])
 
   const handleAddAll = async () => {
     if (!tokens?.idToken || !id || adding) return
@@ -185,9 +240,27 @@ export default function RecipeDetailPage() {
                       key={`${it.productId}-${idx}`}
                       className="py-2 flex items-center justify-between gap-3 text-sm"
                     >
-                      <span className="text-gray-800 line-clamp-1">
-                        {it.productName ?? `Sản phẩm #${it.productId}`}
-                      </span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative h-10 w-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
+                          {productMetaById[String(it.productId)]?.image ? (
+                            <Image
+                              src={productMetaById[String(it.productId)].image}
+                              alt={productMetaById[String(it.productId)].name}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                              unoptimized={productMetaById[String(it.productId)].image.startsWith('http')}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
+                          )}
+                        </div>
+                        <span className="text-gray-800 line-clamp-1">
+                          {it.productName ??
+                            productMetaById[String(it.productId)]?.name ??
+                            'Sản phẩm'}
+                        </span>
+                      </div>
                       <span className="text-gray-500">
                         {it.quantity}
                         {it.unit ? ` ${it.unit}` : ''}

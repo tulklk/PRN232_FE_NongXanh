@@ -1,4 +1,4 @@
-import type { MealComboSuggestion } from '@/lib/types/api'
+import type { ApiResponse, MealComboDto } from '@/lib/types/api'
 
 const getBase = () =>
   typeof window !== 'undefined'
@@ -13,28 +13,26 @@ function getHeaders(token?: string): Record<string, string> {
   return headers
 }
 
-export type DietType = 'Healthy' | 'EatClean' | 'GiaDinh'
+// Swagger defines dietType as free-form string (not enum).
+export type DietType = string
 
 export interface MealComboSuggestionsParams {
   peopleCount: number
   days: number
-  dietType: DietType
+  dietType?: DietType | '' | null
 }
-
-type SuggestionsResponse =
-  | { success?: boolean; data?: MealComboSuggestion[]; message?: string }
-  | MealComboSuggestion[]
-  | { data?: MealComboSuggestion[] }
 
 export async function getMealComboSuggestions(
   params: MealComboSuggestionsParams,
   token: string
-): Promise<MealComboSuggestion[]> {
+): Promise<MealComboDto[]> {
   const qs = new URLSearchParams({
     peopleCount: String(params.peopleCount),
     days: String(params.days),
-    dietType: params.dietType,
   })
+  const diet = params.dietType ?? ''
+  if (diet) qs.set('dietType', String(diet))
+
   const res = await fetch(`${getBase()}/api/meal-combos/suggestions?${qs.toString()}`, {
     headers: getHeaders(token),
     cache: 'no-store',
@@ -49,14 +47,43 @@ export async function getMealComboSuggestions(
     )
   }
 
-  const payload = json as unknown as SuggestionsResponse
+  // Backend chuẩn: ApiResponse<MealComboDto[]>
+  const payload = json as unknown as ApiResponse<MealComboDto[]> | MealComboDto[] | null
+  if (!payload) return []
+
   if (Array.isArray(payload)) return payload
-  if (payload && typeof payload === 'object') {
-    const p = payload as { data?: MealComboSuggestion[] }
-    if (Array.isArray(p.data)) return p.data
-    const p2 = payload as { success?: boolean; data?: MealComboSuggestion[] }
-    if (Array.isArray(p2.data)) return p2.data
+
+  const data = (payload as ApiResponse<MealComboDto[]>).data ?? []
+  if (!Array.isArray(data)) return []
+
+  // Lọc bỏ combo không có items để UI show thông báo phù hợp.
+  return data.filter((c) => Array.isArray(c.items) && c.items.length > 0)
+}
+
+export async function getMealComboById(id: string, token?: string): Promise<MealComboDto | null> {
+  const trimmed = String(id ?? '').trim()
+  if (!trimmed) return null
+
+  const res = await fetch(`${getBase()}/api/meal-combos/${encodeURIComponent(trimmed)}`, {
+    headers: getHeaders(token),
+    cache: 'no-store',
+  })
+
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    if (res.status === 404) return null
+    throw new Error(
+      (json.error as string) ||
+        (json.message as string) ||
+        'Không thể tải combo'
+    )
   }
-  return []
+
+  const payload = json as unknown as ApiResponse<MealComboDto> | MealComboDto | null
+  if (!payload) return null
+  if (!('data' in (payload as ApiResponse<MealComboDto>))) {
+    return payload as MealComboDto
+  }
+  return (payload as ApiResponse<MealComboDto>).data ?? null
 }
 

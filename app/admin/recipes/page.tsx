@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Search } from 'lucide-react'
+import { Edit, Plus, Search, Trash2 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { getRecipes } from '@/lib/api/recipes'
+import { deleteRecipe, getRecipes } from '@/lib/api/recipes'
 import type { RecipeModel } from '@/lib/types/api'
+import SuccessPopup from '@/components/common/SuccessPopup'
 
 function getRecipeId(r: RecipeModel): string {
   return String(r.recipeId ?? r.id ?? '')
@@ -21,14 +22,18 @@ export default function AdminRecipesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(
+    null
+  )
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
 
   const isAdmin = (user?.role ?? '').toLowerCase() === 'admin'
 
-  useEffect(() => {
-    if (!isAuthenticated || !tokens?.idToken || !isAdmin) {
-      setLoading(false)
-      return
-    }
+  const fetchList = () => {
+    if (!tokens?.idToken) return
     setLoading(true)
     setError(null)
     getRecipes({ pageNumber: 1, pageSize: 50 }, tokens.idToken)
@@ -38,6 +43,14 @@ export default function AdminRecipesPage() {
         setError(e instanceof Error ? e.message : 'Không thể tải recipes')
       })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated || !tokens?.idToken || !isAdmin) {
+      setLoading(false)
+      return
+    }
+    fetchList()
   }, [isAuthenticated, tokens?.idToken, isAdmin])
 
   const filtered = useMemo(() => {
@@ -76,6 +89,11 @@ export default function AdminRecipesPage() {
 
   return (
     <div className="space-y-6">
+      <SuccessPopup
+        message={toastMessage}
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+      />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -141,20 +159,111 @@ export default function AdminRecipesPage() {
                       {r.description ?? r.content ?? ''}
                     </div>
                   </div>
-                  {id ? (
-                    <Link
-                      href={`/recipes/${id}`}
-                      className="text-sm font-semibold text-primary-green hover:underline flex-shrink-0"
-                    >
-                      Xem
-                    </Link>
-                  ) : null}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {id ? (
+                      <>
+                        <Link
+                          href={`/recipes/${id}`}
+                          className="text-sm font-semibold text-primary-green hover:underline"
+                        >
+                          Xem
+                        </Link>
+                        <Link
+                          href={`/admin/recipes/${encodeURIComponent(id)}/edit`}
+                          className="p-2 text-gray-600 hover:text-primary-green hover:bg-primary-green-light rounded transition-colors"
+                          aria-label="Sửa"
+                        >
+                          <Edit size={18} />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteTarget({ id, title })
+                            setSubmitError(null)
+                          }}
+                          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          aria-label="Xóa"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+          }}
+          onClick={() => {
+            if (submitLoading) return
+            setDeleteTarget(null)
+            setSubmitError(null)
+          }}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
+            <p className="text-gray-600 mb-6">
+              Bạn có chắc muốn xóa công thức &quot;{deleteTarget.title}&quot;?
+            </p>
+            {submitError && (
+              <p className="text-red-600 text-sm mb-4">{submitError}</p>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null)
+                  setSubmitError(null)
+                }}
+                disabled={submitLoading}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!tokens?.idToken) return
+                  setSubmitLoading(true)
+                  setSubmitError(null)
+                  try {
+                    await deleteRecipe(deleteTarget.id, tokens.idToken)
+                    setDeleteTarget(null)
+                    setToastMessage('Đã xóa công thức')
+                    setToastOpen(true)
+                    fetchList()
+                  } catch (e) {
+                    setSubmitError(e instanceof Error ? e.message : 'Không thể xóa recipe')
+                  } finally {
+                    setSubmitLoading(false)
+                  }
+                }}
+                disabled={submitLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {submitLoading ? 'Đang xóa...' : 'Xóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

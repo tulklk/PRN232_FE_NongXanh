@@ -286,22 +286,39 @@ export interface ApiBlogsPagedResponse {
   totalPages?: number
 }
 
+// Generic ApiResponse wrapper used by many NongXanh endpoints.
+export interface ApiResponse<T> {
+  success: boolean
+  message: string
+  data: T
+  errors?: string[]
+  role?: string | null
+}
+
 // MealCombos / Weekly Basket suggestions
-export interface MealComboSuggestionItem {
+export interface MealComboItemDto {
   productId: string
   productName: string
   quantity: number
-  unit: string
+  unit?: string | null
   price: number
 }
 
-export interface MealComboSuggestion {
+export interface MealComboDto {
   mealComboId: string
   name: string
   description?: string | null
+  targetPeopleCount: number
+  durationDays: number
+  dietType?: string | null
   basePrice: number
-  items: MealComboSuggestionItem[]
+  imageUrl?: string | null
+  items: MealComboItemDto[]
 }
+
+// Backward-compat alias for existing code using MealComboSuggestion.
+export type MealComboSuggestionItem = MealComboItemDto
+export type MealComboSuggestion = MealComboDto
 
 // Subscriptions
 export type SubscriptionFrequency = 'Weekly' | 'BiWeekly' | 'Every3Days'

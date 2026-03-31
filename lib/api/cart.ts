@@ -151,10 +151,14 @@ export async function addCartItem(
     body: JSON.stringify(data),
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(
-      (err as { error?: string }).error || 'Không thể thêm sản phẩm vào giỏ'
-    )
+    const errBody = await res
+      .json()
+      .catch(() => ({ error: res.statusText })) as { error?: string; message?: string }
+    const message =
+      errBody.error || errBody.message || 'Không thể thêm sản phẩm vào giỏ'
+    const error = new Error(message) as Error & { status?: number }
+    error.status = res.status
+    throw error
   }
   const raw = (await res.json()) as ApiCart | { data?: ApiCart }
   const cart = (raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw) as ApiCart

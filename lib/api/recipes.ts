@@ -40,6 +40,10 @@ type CreateRecipeRequest = {
   }>
 }
 
+type UpdateRecipeRequest = Partial<Omit<CreateRecipeRequest, 'ingredients'>> & {
+  ingredients?: CreateRecipeRequest['ingredients']
+}
+
 function normalizeRecipeDto(raw: RecipeModel | null | undefined): RecipeModel | null {
   if (!raw || typeof raw !== 'object') return raw ?? null
   const r = raw as Record<string, unknown>
@@ -175,5 +179,74 @@ export async function createRecipe(
   const data = (json as { data?: RecipeModel }).data
   if (data) return normalizeRecipeDto(data) ?? data
   return normalizeRecipeDto(json as RecipeModel) ?? (json as unknown as RecipeModel)
+}
+
+export async function updateRecipe(
+  id: string,
+  payload: UpdateRecipeRequest,
+  token: string
+): Promise<RecipeModel> {
+  const rid = String(id ?? '').trim()
+  if (!rid) throw new Error('Thiếu recipeId')
+
+  const body = {
+    ...payload,
+    imageUrl: payload.imageUrl ?? null,
+    ...(payload.ingredients
+      ? {
+          ingredients: payload.ingredients.map((row) => ({
+            productId: String(row.productId).trim(),
+            ingredientName: String(row.ingredientName).trim(),
+            quantity: Number(row.quantity),
+            unit: String(row.unit).trim(),
+          })),
+        }
+      : {}),
+  }
+
+  const res = await fetch(`${getBase()}/api/recipes/${encodeURIComponent(rid)}`, {
+    method: 'PUT',
+    headers: {
+      ...getHeaders(token),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    throw new Error(
+      (json.error as string) ||
+        (json.message as string) ||
+        'Không thể cập nhật recipe'
+    )
+  }
+
+  const data = (json as { data?: RecipeModel }).data
+  if (data) return normalizeRecipeDto(data) ?? data
+  return normalizeRecipeDto(json as RecipeModel) ?? (json as unknown as RecipeModel)
+}
+
+export async function deleteRecipe(id: string, token: string): Promise<boolean> {
+  const rid = String(id ?? '').trim()
+  if (!rid) throw new Error('Thiếu recipeId')
+
+  const res = await fetch(`${getBase()}/api/recipes/${encodeURIComponent(rid)}`, {
+    method: 'DELETE',
+    headers: getHeaders(token),
+  })
+
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    throw new Error(
+      (json.error as string) ||
+        (json.message as string) ||
+        'Không thể xóa recipe'
+    )
+  }
+
+  if (typeof (json as any) === 'boolean') return Boolean(json)
+  if (typeof (json as any)?.success === 'boolean') return Boolean((json as any).success)
+  return true
 }
 
