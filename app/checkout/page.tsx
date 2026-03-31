@@ -1046,12 +1046,12 @@ export default function CheckoutPage() {
                         const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
                         return (
                         <div key={item.cartItemId} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
-                          <div className="relative w-12 h-12 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                          <div className="relative w-12 h-12 bg-white rounded-lg flex-shrink-0 overflow-hidden border border-gray-100">
                             <Image
                               src={imageSrc}
                               alt={displayName}
                               fill
-                              className="object-cover rounded-lg"
+                              className="object-contain p-1 rounded-lg"
                               sizes="48px"
                               unoptimized={imageSrc.startsWith('http')}
                             />

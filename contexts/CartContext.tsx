@@ -119,20 +119,54 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateItem = useCallback(
     async (cartItemId: number | string, quantity: number) => {
       if (!token) return
+      const targetId = String(cartItemId)
+      const previousCart = cart
       setLoading(true)
       setError(null)
       cartRequestVersionRef.current += 1
+
+      // Optimistic UI: cập nhật quantity + subtotal + total ngay, không đợi API.
+      setCart((prev) => {
+        if (!prev?.cartItems?.length) return prev
+        const nextItems = prev.cartItems.map((it) => {
+          if (String(it.cartItemId) !== targetId) return it
+          const nextQty = Math.max(1, Math.min(999, Math.trunc(quantity) || 1))
+          const unit = Number(it.priceAtTime ?? 0)
+          const nextSub = Number.isFinite(unit) ? unit * nextQty : it.subTotal
+          return {
+            ...it,
+            quantity: nextQty,
+            subTotal: nextSub,
+          }
+        })
+        const nextTotal = nextItems.reduce(
+          (sum, it) =>
+            sum +
+            Number(
+              it.subTotal ?? ((it.priceAtTime ?? 0) as number) * (it.quantity ?? 0)
+            ),
+          0
+        )
+        return {
+          ...prev,
+          cartItems: nextItems,
+          totalAmount: nextTotal,
+        }
+      })
+
       try {
         const updated = await cartApi.updateCartItem(cartItemId, quantity, token)
         setCart(updated)
       } catch (err) {
+        // Rollback nếu backend trả lỗi
+        setCart(previousCart)
         setError(err instanceof Error ? err.message : 'Không thể cập nhật giỏ')
         throw err
       } finally {
         setLoading(false)
       }
     },
-    [token]
+    [token, cart]
   )
 
   const removeItem = useCallback(

@@ -9,7 +9,8 @@ import RatingStars from '@/components/common/RatingStars'
 import ProductDetailActions from '@/components/products/ProductDetailActions'
 import WishlistToggleButton from '@/components/products/WishlistToggleButton'
 import ReviewCard from '@/components/reviews/ReviewCard'
-import { formatCurrency, calculateDiscount } from '@/lib/utils'
+import ProductPurchasePanel from '@/components/products/ProductPurchasePanel'
+import { calculateDiscount } from '@/lib/utils'
 import { getProductById, getProducts } from '@/lib/api/products'
 import ProductImagesGallery from '@/components/products/ProductImagesGallery'
 import { getReviewsByProduct, mapApiReviewToCardModel } from '@/lib/api/reviews'
@@ -52,9 +53,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       ? reviewCards.reduce((sum, r) => sum + r.rating, 0) / reviewCards.length
       : product.rating
 
-  const discount = product.originalPrice
-    ? calculateDiscount(product.originalPrice, product.currentPrice)
-    : 0
+  const discount = product.originalPrice ? calculateDiscount(product.originalPrice, product.currentPrice) : 0
 
   const relatedRes = await getProducts({
     pageNumber: 1,
@@ -111,40 +110,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               <span className="text-gray-600">{product.salesCount} đã bán</span>
             </div>
 
-            <div className="mb-4">
-              <div className="flex items-center gap-3 mb-1.5">
-                <span className="text-xl font-bold text-primary-green">
-                  {formatCurrency(product.currentPrice)}
-                </span>
-                {product.originalPrice && (
-                  <>
-                    <span className="text-sm text-gray-400 line-through">
-                      {formatCurrency(product.originalPrice)}
-                    </span>
-                  </>
-                )}
-              </div>
-              {discount > 0 && (
-                <div className="inline-block">
-                  <span className="border border-gray-300 text-gray-600 text-xs px-2 py-0.5 rounded">
-                    Giảm {discount}%
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-4">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-sm text-gray-600 shrink-0">Nhà cung cấp:</span>
-                <span className="text-base font-semibold text-primary-green leading-tight">
-                  {providerName || product.seller || 'Nông Xanh'}
-                </span>
-              </div>
-            </div>
-
-            <ProductDetailActions
+            <ProductPurchasePanel
               productId={product.id}
               productName={product.name}
+              providerName={providerName}
+              sellerFallback={product.seller}
+              initialCurrentPrice={product.currentPrice}
+              originalPrice={product.originalPrice}
             />
           </div>
 
@@ -261,7 +233,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         {/* Related Products */}
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-4">CÁC SẢN PHẨM TƯƠNG TỰ</h2>
-          <ProductGrid products={relatedProducts} columns={4} mobileColumns={2} />
+          <ProductGrid
+            products={relatedProducts}
+            columns={4}
+            mobileColumns={2}
+            showWishlist={false}
+          />
         </section>
       </div>
     </div>

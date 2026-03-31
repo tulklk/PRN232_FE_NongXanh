@@ -143,12 +143,12 @@ export default function CartPopup({
                 key={item.cartItemId}
                 className="flex gap-3 py-2 border-b border-gray-100 last:border-0"
               >
-                <div className="relative w-14 h-14 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
+                <div className="relative w-14 h-14 bg-white rounded flex-shrink-0 overflow-hidden border border-gray-100">
                   <Image
                     src={getImageSrc(item)}
                     alt={getDisplayName(item)}
                     fill
-                    className="object-cover rounded"
+                    className="object-contain p-1 rounded"
                     sizes="56px"
                     unoptimized={getImageSrc(item).startsWith('http')}
                   />

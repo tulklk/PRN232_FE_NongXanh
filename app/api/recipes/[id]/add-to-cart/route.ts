@@ -14,17 +14,29 @@ function getAuthHeaders(request: NextRequest): Record<string, string> {
   return headers
 }
 
+function getJsonHeaders(request: NextRequest): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json; charset=utf-8',
+    Accept: 'application/json',
+  }
+  const auth = request.headers.get('Authorization')
+  if (auth) headers['Authorization'] = auth
+  return headers
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
+    const rawBody = await request.text()
     const res = await fetch(
       `${API_BASE_URL}/api/Recipes/${encodeURIComponent(id)}/add-to-cart`,
       {
         method: 'POST',
-        headers: getAuthHeaders(request),
+        headers: getJsonHeaders(request),
+        body: rawBody.trim() ? rawBody : '{}',
       }
     )
 

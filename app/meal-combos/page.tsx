@@ -24,15 +24,16 @@ const PEOPLE_PRESETS = [1, 2, 4, 6, 8] as const
 const DAYS_PRESETS = [3, 5, 7, 14] as const
 const DIET_OPTIONS: Array<{ value: DietType; label: string; desc: string }> = [
   { value: '', label: 'Tất cả', desc: 'Không giới hạn chế độ ăn' },
-  { value: 'GiaDinh', label: 'Gia đình', desc: 'Phù hợp bữa cơm gia đình' },
+  // IMPORTANT: send the exact user-selected text to BE.
+  { value: 'Gia đình', label: 'Gia đình', desc: 'Phù hợp bữa cơm gia đình' },
   { value: 'Healthy', label: 'Healthy', desc: 'Ăn lành mạnh, cân bằng' },
-  { value: 'EatClean', label: 'Eat Clean', desc: 'Ít chế biến, ưu tiên tươi sạch' },
-  { value: 'Vegetarian', label: 'Ăn chay', desc: 'Ưu tiên rau củ, hạn chế thịt cá' },
-  { value: 'LowCarb', label: 'Low Carb', desc: 'Giảm tinh bột, ưu tiên đạm và rau' },
+  { value: 'Eat Clean', label: 'Eat Clean', desc: 'Ít chế biến, ưu tiên tươi sạch' },
+  { value: 'Ăn chay', label: 'Ăn chay', desc: 'Ưu tiên rau củ, hạn chế thịt cá' },
+  { value: 'Low Carb', label: 'Low Carb', desc: 'Giảm tinh bột, ưu tiên đạm và rau' },
   { value: 'Keto', label: 'Keto', desc: 'Rất ít carb, ưu tiên chất béo tốt' },
-  { value: 'HighProtein', label: 'Giàu đạm', desc: 'Ưu tiên thực phẩm giàu protein' },
-  { value: 'Diabetic', label: 'Tiểu đường', desc: 'Ưu tiên thực phẩm phù hợp kiểm soát đường huyết' },
-  { value: 'WeightLoss', label: 'Giảm cân', desc: 'Giảm năng lượng, ưu tiên rau củ và protein nạc' },
+  { value: 'Giàu đạm', label: 'Giàu đạm', desc: 'Ưu tiên thực phẩm giàu protein' },
+  { value: 'Tiểu đường', label: 'Tiểu đường', desc: 'Ưu tiên thực phẩm phù hợp kiểm soát đường huyết' },
+  { value: 'Giảm cân', label: 'Giảm cân', desc: 'Giảm năng lượng, ưu tiên rau củ và protein nạc' },
 ]
 
 export default function MealCombosPage() {
@@ -42,7 +43,7 @@ export default function MealCombosPage() {
 
   const [peopleCount, setPeopleCount] = useState<number>(4)
   const [days, setDays] = useState<number>(7)
-  const [dietType, setDietType] = useState<DietType>('GiaDinh')
+  const [dietType, setDietType] = useState<DietType>('Gia đình')
 
   const [items, setItems] = useState<MealComboDto[]>([])
   const [loading, setLoading] = useState(false)
@@ -214,7 +215,7 @@ export default function MealCombosPage() {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h1 className="text-xl font-bold text-gray-900 mb-2">
-              Tự build giỏ rau theo tuần
+              Tự tạo giỏ nông sản theo nhu cầu
             </h1>
             <p className="text-sm text-gray-600 mb-4">
               Vui lòng đăng nhập để nhận gợi ý combo theo nhu cầu của bạn.
@@ -243,7 +244,7 @@ export default function MealCombosPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                Tự build giỏ rau theo tuần
+                Tự tạo giỏ nông sản theo nhu cầu
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 Chọn số người, số ngày và chế độ ăn để nhận gợi ý tự động.
@@ -446,6 +447,15 @@ export default function MealCombosPage() {
                   key={c.mealComboId}
                   className="rounded-lg border border-gray-200 p-5 hover:shadow-sm transition-shadow"
                 >
+                  {(() => {
+                    const computedTotal = (c.items ?? []).reduce((s, it) => {
+                      const v = Number((it as any).lineTotal ?? 0)
+                      return s + (Number.isFinite(v) ? v : 0)
+                    }, 0)
+
+                    const totalToShow = computedTotal > 0 ? computedTotal : c.basePrice
+                    const totalLabel = 'Tổng'
+                    return (
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-bold text-gray-900 line-clamp-2">
@@ -458,12 +468,14 @@ export default function MealCombosPage() {
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">Base</p>
+                      <p className="text-sm text-gray-500">{totalLabel}</p>
                       <p className="font-bold text-primary-green">
-                        {formatCurrency(c.basePrice)}
+                        {formatCurrency(totalToShow)}
                       </p>
                     </div>
                   </div>
+                    )
+                  })()}
 
                   <div className="mt-4">
                     <p className="text-sm font-semibold text-gray-900 mb-2">
@@ -473,30 +485,56 @@ export default function MealCombosPage() {
                       <div className="divide-y divide-gray-100">
                       {(c.items ?? []).map((it) => (
                         <div
-                          key={`${c.mealComboId}-${it.productId}`}
-                          className="flex items-center justify-between py-2 text-sm gap-3"
+                          key={`${c.mealComboId}-${it.productId}-${(it as any).variantId ?? ''}`}
+                          className="py-2 text-sm"
                         >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {it.productId && productImageById[it.productId] ? (
-                              <div className="relative h-10 w-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
-                                <Image
-                                  src={productImageById[it.productId]}
-                                  alt={it.productName}
-                                  fill
-                                  className="object-cover"
-                                  sizes="40px"
-                                />
+                          {(() => {
+                            const unitPrice = Number((it as any).unitPrice ?? 0)
+                            const lineTotal = Number((it as any).lineTotal ?? 0)
+                            const variantName = String((it as any).variantName ?? '').trim()
+                            const qty = Number(it.quantity ?? 0)
+
+                            return (
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  {it.productId && productImageById[it.productId] ? (
+                                    <div className="relative h-10 w-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
+                                      <Image
+                                        src={productImageById[it.productId]}
+                                        alt={it.productName}
+                                        fill
+                                        className="object-cover"
+                                        sizes="40px"
+                                        unoptimized={productImageById[it.productId].startsWith('http')}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="h-10 w-10 flex-shrink-0 rounded-md bg-gray-100 border border-gray-100" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="text-gray-800 line-clamp-1">
+                                      {it.productName}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      x{qty}
+                                      {variantName ? (
+                                        <span className="ml-2">• {variantName}</span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-right flex-shrink-0">
+                                  <div className="text-xs text-gray-500">
+                                    {formatCurrency(unitPrice)}
+                                  </div>
+                                  <div className="font-semibold text-gray-900">
+                                    {formatCurrency(lineTotal)}
+                                  </div>
+                                </div>
                               </div>
-                            ) : (
-                              <div className="h-10 w-10 flex-shrink-0 rounded-md bg-gray-100 border border-gray-100" />
-                            )}
-                            <span className="text-gray-800 line-clamp-1">
-                              {it.productName}
-                            </span>
-                          </div>
-                          <span className="text-gray-500">
-                            {it.quantity} {it.unit}
-                          </span>
+                            )
+                          })()}
                         </div>
                       ))}
                       </div>

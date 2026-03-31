@@ -178,6 +178,17 @@ export interface ApiOrderDetail {
   productImageUrl?: string | null
   mealComboId?: string | null
   mealComboName?: string | null
+  /** Combo items when order detail is a meal combo (BE v2) */
+  comboItems?: Array<{
+    productId: string
+    productName?: string | null
+    quantity: number
+    unit?: string | null
+    imageUrl?: string | null
+    origin?: string | null
+  }> | null
+  unit?: string | null
+  origin?: string | null
   imageUrl?: string | null
 }
 
@@ -299,8 +310,19 @@ export interface ApiResponse<T> {
 export interface MealComboItemDto {
   productId: string
   productName: string
+  /** BE mới: số gói/bó theo variant (integer packs) */
   quantity: number
+  /** Legacy field (no longer used for AI suggestions UI) */
   unit?: string | null
+  /** BE mới: variant được chọn trong ProductVariants */
+  variantId?: string | null
+  /** BE mới: tên biến thể được chọn */
+  variantName?: string | null
+  /** BE mới: giá đơn vị theo variant */
+  unitPrice: number
+  /** BE mới: thành tiền của dòng = quantity * unitPrice */
+  lineTotal: number
+  /** Legacy field (keep for backwards compatibility) */
   price: number
 }
 

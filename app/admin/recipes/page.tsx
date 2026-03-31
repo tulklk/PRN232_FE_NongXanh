@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Edit, Plus, Search, Trash2 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { deleteRecipe, getRecipes } from '@/lib/api/recipes'
@@ -146,17 +147,32 @@ export default function AdminRecipesPage() {
             {filtered.map((r) => {
               const id = getRecipeId(r)
               const title = getRecipeTitle(r)
+              const thumb =
+                String((r as any).imageUrl ?? (r as any).thumbnailUrl ?? '').trim() ||
+                '/images/logo.png'
               return (
                 <div
                   key={id || title}
                   className="py-3 flex items-center justify-between gap-4"
                 >
-                  <div className="min-w-0">
-                    <div className="font-semibold text-gray-900 line-clamp-1">
-                      {title}
+                  <div className="min-w-0 flex items-center gap-3">
+                    <div className="relative h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
+                      <Image
+                        src={thumb}
+                        alt={title}
+                        fill
+                        className="object-cover"
+                        sizes="48px"
+                        unoptimized={thumb.startsWith('http')}
+                      />
                     </div>
-                    <div className="text-sm text-gray-500 line-clamp-1">
-                      {r.description ?? r.content ?? ''}
+                    <div className="min-w-0">
+                      <div className="font-semibold text-gray-900 line-clamp-1">
+                        {title}
+                      </div>
+                      <div className="text-sm text-gray-500 line-clamp-1">
+                        {r.description ?? r.content ?? ''}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">

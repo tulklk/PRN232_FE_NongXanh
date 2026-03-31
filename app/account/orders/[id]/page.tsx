@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { cancelOrder, getOrderById } from '@/lib/api/orders'
 import type { ApiOrder } from '@/lib/types/api'
@@ -29,6 +29,7 @@ export default function OrderDetailPage() {
   )
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [expandedComboKeys, setExpandedComboKeys] = useState<Set<string>>(() => new Set())
 
   const isDelivered = useMemo(() => {
     const s = (order?.status ?? '').trim().toLowerCase()
@@ -69,6 +70,33 @@ export default function OrderDetailPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Không thể tải đơn hàng'))
       .finally(() => setLoading(false))
   }, [isAuthenticated, tokens?.idToken, id])
+
+  const toggleCombo = useCallback((key: string) => {
+    setExpandedComboKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const rows = useMemo(() => {
+    const details = order?.orderDetails ?? []
+    return details.map((detail) => {
+      const raw = detail as unknown as Record<string, unknown>
+      const mealComboId = String((raw.mealComboId ?? raw.MealComboId ?? '') as string).trim()
+      const comboItems = (raw.comboItems ?? raw.ComboItems) as unknown
+      const isCombo =
+        !!mealComboId ||
+        (Array.isArray(comboItems) && comboItems.length > 0)
+
+      const key = isCombo
+        ? `combo-${mealComboId || String(detail.orderDetailId)}`
+        : `single-${String(detail.orderDetailId)}`
+
+      return { key, isCombo, detail }
+    })
+  }, [order?.orderDetails])
 
   if (!isAuthenticated) {
     router.push('/login')
@@ -161,25 +189,122 @@ export default function OrderDetailPage() {
       <div className="border-t border-gray-200 pt-4">
         <h3 className="font-semibold text-gray-900 mb-3">Chi tiết sản phẩm</h3>
         <div className="space-y-3">
-          {order.orderDetails?.map((detail) => {
+          {rows.map((row) => {
+            if (row.isCombo) {
+              const detail = row.detail
+              const raw = detail as unknown as Record<string, unknown>
+              const mealComboId = String((raw.mealComboId ?? raw.MealComboId ?? '') as string).trim()
+              const mealComboNameRaw =
+                (raw.mealComboName ?? raw.MealComboName) as string | null | undefined
+              const comboName = String(mealComboNameRaw ?? '').trim() || 'Meal combo'
+              const comboItems =
+                (raw.comboItems ?? raw.ComboItems) as
+                  | Array<{
+                      productId: string
+                      productName?: string | null
+                      quantity: number
+                      unit?: string | null
+                      imageUrl?: string | null
+                      origin?: string | null
+                    }>
+                  | null
+                  | undefined
+
+              const isOpen = expandedComboKeys.has(row.key)
+              return (
+                <div key={row.key} className="py-3 border-b border-gray-100">
+                  <div className="flex items-center justify-between gap-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleCombo(row.key)}
+                      className="flex items-center gap-3 min-w-0 text-left"
+                    >
+                      <span className="text-gray-500">
+                        {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-gray-900 line-clamp-1">
+                            {comboName}
+                          </span>
+                          <span className="text-[11px] font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 flex-shrink-0">
+                            Combo
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500">x{detail.quantity}</div>
+                      </div>
+                    </button>
+                    <span className="font-semibold text-primary-green flex-shrink-0">
+                      {formatCurrency(detail.subTotal)}
+                    </span>
+                  </div>
+
+                  {isOpen && (
+                    <div className="mt-3 pl-8">
+                      {Array.isArray(comboItems) && comboItems.length > 0 ? (
+                        <div className="max-h-[260px] overflow-auto overscroll-contain rounded-lg border border-gray-200 bg-white">
+                          <div className="divide-y divide-gray-100">
+                            {comboItems.map((it) => {
+                              const img = String(it.imageUrl ?? '').trim()
+                              const src = img.startsWith('http') ? img : '/images/logo.png'
+                              const name = String(it.productName ?? '').trim() || 'Sản phẩm'
+                              return (
+                                <div
+                                  key={it.productId}
+                                  className="px-3 py-2 text-sm flex items-center justify-between gap-3"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="relative h-9 w-9 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
+                                      <Image
+                                        src={src}
+                                        alt={name}
+                                        fill
+                                        className="object-cover"
+                                        sizes="36px"
+                                        unoptimized={src.startsWith('http')}
+                                      />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-gray-800 line-clamp-1">
+                                        {name}
+                                      </div>
+                                      {it.origin ? (
+                                        <div className="text-xs text-gray-500 line-clamp-1">
+                                          {it.origin}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <span className="text-gray-600 flex-shrink-0">
+                                    {it.quantity} {it.unit ?? ''}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 py-2">
+                          Không có dữ liệu sản phẩm trong combo.
+                        </div>
+                      )}
+                      <div className="mt-2 text-xs text-gray-400">
+                        Combo không hỗ trợ đánh giá.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            const detail = row.detail
             const raw = detail as unknown as Record<string, unknown>
-            const mealComboId =
-              (raw.mealComboId ?? raw.MealComboId ?? raw.comboId ?? raw.ComboId) as
-                | string
-                | null
-                | undefined
-            const mealComboName =
-              (raw.mealComboName ?? raw.MealComboName ?? raw.comboName ?? raw.ComboName) as
-                | string
-                | null
-                | undefined
             const imageUrl =
               (raw.productImageUrl ?? raw.ProductImageUrl ?? raw.imageUrl ?? raw.ImageUrl) as
               | string
               | undefined
             const productName =
-              ((mealComboId ? mealComboName : null) ??
-                raw.productName ??
+              (raw.productName ??
                 raw.ProductName ??
                 detail.variantName ??
                 'Sản phẩm') as string
@@ -210,12 +335,12 @@ export default function OrderDetailPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{productName}</p>
                   <p className="text-sm text-gray-500">
-                    {!mealComboId && detail.variantName && `${detail.variantName} • `}
+                    {detail.variantName && `${detail.variantName} • `}
                     x{detail.quantity}
                   </p>
                   {isDelivered && (
                     <div className="mt-2">
-                      {!mealComboId && productId ? (
+                      {productId ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -235,7 +360,7 @@ export default function OrderDetailPage() {
                         </button>
                       ) : (
                         <span className="text-xs text-gray-400">
-                          {mealComboId ? 'Combo không hỗ trợ đánh giá.' : 'Không thể đánh giá sản phẩm này.'}
+                          Không thể đánh giá sản phẩm này.
                         </span>
                       )}
                     </div>

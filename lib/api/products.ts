@@ -99,6 +99,117 @@ export interface GetProductsResult {
   totalPages?: number
 }
 
+export interface GetBestSellersParams {
+  top?: number
+  lastDays?: number
+}
+
+type BestSellerDto = {
+  productId?: number | string
+  productName?: string | null
+  imageUrl?: string | null
+  unit?: string | null
+  soldQuantity?: number
+}
+
+function normalizeBestSellerItem(raw: unknown): BestSellerDto | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as any
+  const productId = row.productId ?? row.ProductId ?? row.id ?? row.Id
+  if (productId == null) return null
+  const soldQuantity = Number(row.soldQuantity ?? row.SoldQuantity ?? row.salesCount ?? row.SalesCount ?? 0)
+  return {
+    productId,
+    productName: row.productName ?? row.ProductName ?? null,
+    imageUrl: row.imageUrl ?? row.ImageUrl ?? null,
+    unit: row.unit ?? row.Unit ?? null,
+    soldQuantity: Number.isFinite(soldQuantity) ? Math.trunc(soldQuantity) : 0,
+  }
+}
+
+function parseBestSellersPayload(raw: unknown): BestSellerDto[] {
+  if (Array.isArray(raw)) return raw.map(normalizeBestSellerItem).filter(Boolean) as BestSellerDto[]
+  if (!raw || typeof raw !== 'object') return []
+  const obj = raw as any
+  const data = obj.data ?? obj.Data ?? obj.items ?? obj.Items ?? obj
+  if (Array.isArray(data)) return data.map(normalizeBestSellerItem).filter(Boolean) as BestSellerDto[]
+  if (data && typeof data === 'object') {
+    const items = (data as any).items ?? (data as any).Items
+    if (Array.isArray(items)) return items.map(normalizeBestSellerItem).filter(Boolean) as BestSellerDto[]
+  }
+  return []
+}
+
+export async function getBestSellerProducts(
+  params?: GetBestSellersParams
+): Promise<Product[]> {
+  const top = params?.top ?? 10
+  const lastDays = params?.lastDays
+  const isServer = typeof window === 'undefined'
+  const qs = new URLSearchParams({ top: String(top) })
+  if (lastDays != null) qs.set('lastDays', String(lastDays))
+
+  const url = isServer
+    ? `${BACKEND_URL}/api/Products/best-sellers?${qs.toString()}`
+    : `${getBase()}/api/products/best-sellers?${qs.toString()}`
+
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    cache: isServer ? 'no-store' : 'no-store',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(
+      (err as { error?: string; message?: string }).error ||
+        (err as { error?: string; message?: string }).message ||
+        'Không thể tải sản phẩm bán chạy nhất'
+    )
+  }
+  const json = await res.json().catch(() => ({}))
+  const list = parseBestSellersPayload(json)
+  if (list.length === 0) return []
+
+  const ids = list.map((x) => String(x.productId))
+  const soldById = new Map<string, number>()
+  list.forEach((x) => {
+    const id = String(x.productId)
+    soldById.set(id, Math.max(0, Number(x.soldQuantity ?? 0) || 0))
+  })
+
+  // The best-sellers endpoint returns a lightweight DTO.
+  // Hydrate full product details for UI cards.
+  const CHUNK_SIZE = 8
+  const results: Array<Product | null> = []
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + CHUNK_SIZE)
+    const chunkResults = await Promise.all(
+      chunk.map(async (id) => {
+        try {
+          return await getProductById(id)
+        } catch {
+          return null
+        }
+      })
+    )
+    results.push(...chunkResults)
+  }
+
+  const byId = new Map<string, Product>()
+  results.forEach((p) => {
+    if (p) byId.set(String(p.id), p)
+  })
+
+  // Keep BE ranking order and set salesCount from soldQuantity.
+  return ids
+    .map((id) => {
+      const p = byId.get(id)
+      if (!p) return null
+      const sold = soldById.get(id)
+      return sold != null ? { ...p, salesCount: sold } : p
+    })
+    .filter((p): p is Product => Boolean(p))
+}
+
 function normalizeSoldQuantityJson(json: unknown): number {
   if (typeof json === 'number' && Number.isFinite(json)) return Math.trunc(json)
   if (!json || typeof json !== 'object' || Array.isArray(json)) return 0

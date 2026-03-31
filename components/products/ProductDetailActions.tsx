@@ -13,11 +13,13 @@ import type { ApiProductVariant } from "@/lib/types/api";
 interface ProductDetailActionsProps {
   productId: string;
   productName: string;
+  onVariantPriceChange?: (price: number) => void;
 }
 
 export default function ProductDetailActions({
   productId,
   productName,
+  onVariantPriceChange,
 }: ProductDetailActionsProps) {
   const router = useRouter();
   const { isAuthenticated } = useUser();
@@ -36,6 +38,13 @@ export default function ProductDetailActions({
     variants.find((v) => v.variantId === selectedVariantId) ?? variants[0];
   const selectedStock = Number(selectedVariant?.stockQuantity ?? 0);
   const isOutOfStock = selectedStock <= 0;
+
+  useEffect(() => {
+    const price = Number(selectedVariant?.price ?? 0);
+    if (!onVariantPriceChange) return;
+    if (!Number.isFinite(price) || price <= 0) return;
+    onVariantPriceChange(price);
+  }, [selectedVariant?.price, onVariantPriceChange]);
 
   useEffect(() => {
     const load = async () => {

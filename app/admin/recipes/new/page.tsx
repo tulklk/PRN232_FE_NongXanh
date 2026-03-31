@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Search, Trash2 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { createRecipe } from '@/lib/api/recipes'
+import { uploadImageToCloudinary } from '@/lib/api/cloudinary'
 import { prefetchProductSearchCatalog, searchProducts } from '@/lib/api/products'
 import type { Product } from '@/data/products'
 
@@ -32,6 +33,9 @@ export default function AdminRecipeCreatePage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [cookingTimeMinutes, setCookingTimeMinutes] = useState<number>(20)
   const [servings, setServings] = useState<number>(2)
   const [ingredients, setIngredients] = useState<IngredientRow[]>([])
@@ -118,7 +122,7 @@ export default function AdminRecipeCreatePage() {
 
   async function handleSubmit() {
     if (!tokens?.idToken) return
-    if (!canSubmit || saving) return
+    if (!canSubmit || saving || uploadingImage) return
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -128,6 +132,7 @@ export default function AdminRecipeCreatePage() {
           title: title.trim(),
           description: description.trim() ? description.trim() : undefined,
           instructions: instructions.trim(),
+          imageUrl,
           cookingTimeMinutes,
           servings,
           ingredients: ingredients.map((it) => ({
@@ -193,7 +198,7 @@ export default function AdminRecipeCreatePage() {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!canSubmit || saving}
+          disabled={!canSubmit || saving || uploadingImage}
           className="bg-primary-green text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={20} />
@@ -209,6 +214,11 @@ export default function AdminRecipeCreatePage() {
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+      {uploadError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {uploadError}
         </div>
       )}
 
@@ -239,6 +249,72 @@ export default function AdminRecipeCreatePage() {
                   className="w-full min-h-[90px] rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-green"
                   placeholder="Mô tả ngắn về công thức..."
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Ảnh công thức
+                </label>
+
+                {imageUrl ? (
+                  <div className="flex items-start gap-4">
+                    <div className="relative w-40 h-24 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                      <Image
+                        src={imageUrl}
+                        alt="Recipe image"
+                        fill
+                        className="object-cover"
+                        sizes="160px"
+                        unoptimized={imageUrl.startsWith('http')}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-600 break-all">{imageUrl}</div>
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl(null)}
+                        disabled={uploadingImage}
+                        className="mt-2 inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Xóa ảnh
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingImage}
+                      onChange={async (e) => {
+                        const inputEl = e.currentTarget
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setUploadError(null)
+                        setUploadingImage(true)
+                        try {
+                          const url = await uploadImageToCloudinary(file)
+                          setImageUrl(url)
+                        } catch (err) {
+                          setUploadError(
+                            err instanceof Error
+                              ? err.message
+                              : 'Không thể upload ảnh lên Cloudinary'
+                          )
+                        } finally {
+                          setUploadingImage(false)
+                          inputEl.value = ''
+                        }
+                      }}
+                      className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-green file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-green-dark disabled:opacity-60"
+                    />
+                    {uploadingImage && (
+                      <span className="text-sm text-gray-500 whitespace-nowrap">
+                        Đang upload...
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

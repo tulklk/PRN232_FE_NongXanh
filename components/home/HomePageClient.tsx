@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,6 +12,7 @@ import { getBlogs } from "@/lib/api/blogs";
 import type { ApiBlog } from "@/lib/types/api";
 import { getReviewsByProduct } from "@/lib/api/reviews";
 import { getCategories } from "@/lib/api/categories";
+import { getBestSellerProducts } from "@/lib/api/products";
 
 function normalizeExternalUrl(url?: string | null): string | null {
   if (!url) return null;
@@ -63,6 +64,11 @@ interface HomePageClientProps {
 
 export default function HomePageClient({ products }: HomePageClientProps) {
   const [activeTab, setActiveTab] = useState<"new" | "bestseller">("new");
+  const [bestSellerFromApi, setBestSellerFromApi] = useState<Product[] | null>(
+    null,
+  );
+  const [bestSellerLoading, setBestSellerLoading] = useState(false);
+  const bestSellerLoadedRef = useRef(false);
   const [featuredBlog, setFeaturedBlog] = useState<ApiBlog | null>(null);
   const [homepageNewsBlogs, setHomepageNewsBlogs] = useState<ApiBlog[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
@@ -74,6 +80,33 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     { id: string; name: string }[]
   >([]);
   const [selectedFruitCategoryId, setSelectedFruitCategoryId] = useState<
+    "all" | string
+  >("all");
+  const [meatParentCategoryId, setMeatParentCategoryId] = useState<string | null>(
+    null,
+  );
+  const [meatChildCategories, setMeatChildCategories] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedMeatCategoryId, setSelectedMeatCategoryId] = useState<
+    "all" | string
+  >("all");
+  const [seafoodParentCategoryId, setSeafoodParentCategoryId] = useState<
+    string | null
+  >(null);
+  const [seafoodChildCategories, setSeafoodChildCategories] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedSeafoodCategoryId, setSelectedSeafoodCategoryId] = useState<
+    "all" | string
+  >("all");
+  const [dairyParentCategoryId, setDairyParentCategoryId] = useState<
+    string | null
+  >(null);
+  const [dairyChildCategories, setDairyChildCategories] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedDairyCategoryId, setSelectedDairyCategoryId] = useState<
     "all" | string
   >("all");
   const [ratingOverrides, setRatingOverrides] = useState<
@@ -101,11 +134,14 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     return sorted.slice(0, 8);
   }, [productsWithOverrides]);
   const bestsellerProducts = useMemo(() => {
+    if (bestSellerFromApi && bestSellerFromApi.length > 0) {
+      return bestSellerFromApi.slice(0, 8);
+    }
     const sorted = [...productsWithOverrides].sort(
       (a, b) => (b.salesCount ?? 0) - (a.salesCount ?? 0),
     );
     return sorted.slice(0, 8);
-  }, [productsWithOverrides]);
+  }, [productsWithOverrides, bestSellerFromApi]);
   const tabProducts = activeTab === "new" ? newProducts : bestsellerProducts;
 
   const tetProducts = useMemo(
@@ -125,6 +161,41 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     }
     return filtered.slice(0, 7);
   }, [productsWithOverrides, fruitChildCategories, selectedFruitCategoryId]);
+  const meatProducts = useMemo(() => {
+    const childIds = meatChildCategories.map((c) => c.id);
+    if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
+    let filtered = productsWithOverrides.filter((p) =>
+      childIds.includes(String(p.category)),
+    );
+    if (selectedMeatCategoryId !== "all") {
+      filtered = filtered.filter((p) => String(p.category) === selectedMeatCategoryId);
+    }
+    return filtered.slice(0, 7);
+  }, [productsWithOverrides, meatChildCategories, selectedMeatCategoryId]);
+  const seafoodProducts = useMemo(() => {
+    const childIds = seafoodChildCategories.map((c) => c.id);
+    if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
+    let filtered = productsWithOverrides.filter((p) =>
+      childIds.includes(String(p.category)),
+    );
+    if (selectedSeafoodCategoryId !== "all") {
+      filtered = filtered.filter(
+        (p) => String(p.category) === selectedSeafoodCategoryId,
+      );
+    }
+    return filtered.slice(0, 7);
+  }, [productsWithOverrides, seafoodChildCategories, selectedSeafoodCategoryId]);
+  const dairyProducts = useMemo(() => {
+    const childIds = dairyChildCategories.map((c) => c.id);
+    if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
+    let filtered = productsWithOverrides.filter((p) =>
+      childIds.includes(String(p.category)),
+    );
+    if (selectedDairyCategoryId !== "all") {
+      filtered = filtered.filter((p) => String(p.category) === selectedDairyCategoryId);
+    }
+    return filtered.slice(0, 7);
+  }, [productsWithOverrides, dairyChildCategories, selectedDairyCategoryId]);
 
   const banners = [
     "/images/homepage/homebanner1.jpg",
@@ -137,6 +208,9 @@ export default function HomePageClient({ products }: HomePageClientProps) {
   const hotDealsInView = useInView({ threshold: 0.1 });
   const tetSectionInView = useInView({ threshold: 0.1 });
   const fruitsSectionInView = useInView({ threshold: 0.1 });
+  const meatsSectionInView = useInView({ threshold: 0.1 });
+  const seafoodSectionInView = useInView({ threshold: 0.1 });
+  const dairySectionInView = useInView({ threshold: 0.1 });
   const agrishowInView = useInView({ threshold: 0.05 });
 
   const handleNextBanner = () => {
@@ -162,29 +236,74 @@ export default function HomePageClient({ products }: HomePageClientProps) {
 
         const normalize = (s?: string | null) => (s ?? "").trim().toLowerCase();
 
-        const parent = cats.find(
-          (c) => normalize(c.categoryName) === "trái cây",
-        );
-        const children = parent?.children ?? [];
+        const findParent = (names: string[]) =>
+          cats.find((c) => names.includes(normalize(c.categoryName)));
 
-        setFruitParentCategoryId(parent ? String(parent.categoryId) : null);
-        setFruitChildCategories(
-          children.map((c) => ({
+        const mapChildren = (parent: any) =>
+          (parent?.children ?? []).map((c: any) => ({
             id: String(c.categoryId),
             name: c.categoryName,
-          })),
+          }));
+
+        const fruitParent = findParent(["trái cây"]);
+        setFruitParentCategoryId(fruitParent ? String(fruitParent.categoryId) : null);
+        setFruitChildCategories(mapChildren(fruitParent));
+
+        const meatParent = findParent(["thịt"]);
+        setMeatParentCategoryId(meatParent ? String(meatParent.categoryId) : null);
+        setMeatChildCategories(mapChildren(meatParent));
+
+        const seafoodParent = findParent(["cá, hải sản", "cá hải sản"]);
+        setSeafoodParentCategoryId(
+          seafoodParent ? String(seafoodParent.categoryId) : null,
         );
+        setSeafoodChildCategories(mapChildren(seafoodParent));
+
+        const dairyParent = findParent(["sữa"]);
+        setDairyParentCategoryId(dairyParent ? String(dairyParent.categoryId) : null);
+        setDairyChildCategories(mapChildren(dairyParent));
       })
       .catch(() => {
         if (cancelled) return;
         setFruitParentCategoryId(null);
         setFruitChildCategories([]);
+        setMeatParentCategoryId(null);
+        setMeatChildCategories([]);
+        setSeafoodParentCategoryId(null);
+        setSeafoodChildCategories([]);
+        setDairyParentCategoryId(null);
+        setDairyChildCategories([]);
       });
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "bestseller") return;
+    if (bestSellerLoadedRef.current) return;
+    bestSellerLoadedRef.current = true;
+
+    let cancelled = false;
+    setBestSellerLoading(true);
+    getBestSellerProducts({ top: 12 })
+      .then((list) => {
+        if (cancelled) return;
+        setBestSellerFromApi(list ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBestSellerFromApi([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBestSellerLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,12 +347,22 @@ export default function HomePageClient({ products }: HomePageClientProps) {
 
     const visibleIds = Array.from(
       new Set(
-        [...tabProducts, ...tetProducts, ...fruitProducts].map((p) => p.id),
+        [
+          ...tabProducts,
+          ...tetProducts,
+          ...fruitProducts,
+          ...meatProducts,
+          ...seafoodProducts,
+          ...dairyProducts,
+        ].map((p) => p.id),
       ),
     );
     const targets = visibleIds
       .map((id) => productsWithOverrides.find((p) => p.id === id))
       .filter((p): p is Product => Boolean(p))
+      // Avoid infinite loop: products with 0 reviews will stay (0,0) forever.
+      // Only hydrate each product once per session (even if result is 0,0).
+      .filter((p) => ratingOverrides[p.id] == null)
       .filter((p) => (p.rating ?? 0) === 0 && (p.reviewCount ?? 0) === 0)
       .slice(0, 20);
 
@@ -290,7 +419,16 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     return () => {
       cancelled = true;
     };
-  }, [tabProducts, tetProducts, fruitProducts, productsWithOverrides]);
+  }, [
+    tabProducts,
+    tetProducts,
+    fruitProducts,
+    meatProducts,
+    seafoodProducts,
+    dairyProducts,
+    productsWithOverrides,
+    ratingOverrides,
+  ]);
 
   const homepageNewsMain = homepageNewsBlogs[0] ?? null;
   const homepageNewsSupplementary = homepageNewsBlogs.slice(1, 3);
@@ -418,6 +556,9 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               Xem tất cả <ChevronRight size={16} />
             </Link>
           </div>
+          {activeTab === "bestseller" && bestSellerLoading && (
+            <p className="mb-3 text-sm text-gray-500">Đang tải sản phẩm bán chạy...</p>
+          )}
           <div className="relative">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
               {tabProducts.map((product, i) => (
@@ -568,6 +709,195 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <div
                 key={product.id}
                 className={`transition-all duration-500 ${fruitsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                style={{ transitionDelay: `${200 + i * 50}ms` }}
+              >
+                <ProductCard product={product} showWishlist={false} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Fresh Meat Section */}
+      <section ref={meatsSectionInView.ref} className="py-6 sm:py-8 bg-white">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${meatsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          >
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+              THỊT TƯƠI NGON
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+              {meatChildCategories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMeatCategoryId("all")}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedMeatCategoryId === "all"
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  Tất cả
+                </button>
+              )}
+              {meatChildCategories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedMeatCategoryId(c.id)}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedMeatCategoryId === c.id
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+              <Link
+                href={
+                  meatParentCategoryId
+                    ? `/products?category=${encodeURIComponent(meatParentCategoryId)}`
+                    : "/products?category=meat"
+                }
+                className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
+              >
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+            {meatProducts.map((product, i) => (
+              <div
+                key={product.id}
+                className={`transition-all duration-500 ${meatsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                style={{ transitionDelay: `${200 + i * 50}ms` }}
+              >
+                <ProductCard product={product} showWishlist={false} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Fresh Seafood Section */}
+      <section ref={seafoodSectionInView.ref} className="py-6 sm:py-8 bg-white">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${seafoodSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          >
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+              CÁ, HẢI SẢN TƯƠI NGON
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+              {seafoodChildCategories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSeafoodCategoryId("all")}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedSeafoodCategoryId === "all"
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  Tất cả
+                </button>
+              )}
+              {seafoodChildCategories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedSeafoodCategoryId(c.id)}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedSeafoodCategoryId === c.id
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+              <Link
+                href={
+                  seafoodParentCategoryId
+                    ? `/products?category=${encodeURIComponent(seafoodParentCategoryId)}`
+                    : "/products?category=seafood"
+                }
+                className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
+              >
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+            {seafoodProducts.map((product, i) => (
+              <div
+                key={product.id}
+                className={`transition-all duration-500 ${seafoodSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                style={{ transitionDelay: `${200 + i * 50}ms` }}
+              >
+                <ProductCard product={product} showWishlist={false} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Dairy Section */}
+      <section ref={dairySectionInView.ref} className="py-6 sm:py-8 bg-white">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-1 sm:mb-4 transition-all duration-600 ${dairySectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          >
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+              SỮA TƯƠI NGON
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+              {dairyChildCategories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDairyCategoryId("all")}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedDairyCategoryId === "all"
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  Tất cả
+                </button>
+              )}
+              {dairyChildCategories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedDairyCategoryId(c.id)}
+                  className={`text-sm font-medium transition-colors ${
+                    selectedDairyCategoryId === c.id
+                      ? "text-[#0A923C]"
+                      : "text-gray-600 hover:text-[#0A923C]"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+              <Link
+                href={
+                  dairyParentCategoryId
+                    ? `/products?category=${encodeURIComponent(dairyParentCategoryId)}`
+                    : "/products?category=dairy"
+                }
+                className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
+              >
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+            {dairyProducts.map((product, i) => (
+              <div
+                key={product.id}
+                className={`transition-all duration-500 ${dairySectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
                 style={{ transitionDelay: `${200 + i * 50}ms` }}
               >
                 <ProductCard product={product} showWishlist={false} />

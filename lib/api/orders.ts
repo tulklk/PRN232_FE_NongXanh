@@ -128,6 +128,47 @@ async function fetchWithTimeout(
   }
 }
 
+type OrdersCacheEntry = {
+  savedAt: number
+  value: ApiOrdersPagedResponse
+}
+
+const ORDERS_CACHE_TTL_MS = 2 * 60 * 1000
+function ordersCacheKey(pageNumber: number, pageSize: number): string {
+  return `nx_orders_${pageNumber}_${pageSize}`
+}
+
+function readOrdersCache(
+  pageNumber: number,
+  pageSize: number
+): ApiOrdersPagedResponse | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(ordersCacheKey(pageNumber, pageSize))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as OrdersCacheEntry
+    if (!parsed || typeof parsed !== 'object') return null
+    if (Date.now() - Number(parsed.savedAt ?? 0) > ORDERS_CACHE_TTL_MS) return null
+    return parsed.value ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeOrdersCache(
+  pageNumber: number,
+  pageSize: number,
+  value: ApiOrdersPagedResponse
+): void {
+  if (typeof window === 'undefined') return
+  try {
+    const entry: OrdersCacheEntry = { savedAt: Date.now(), value }
+    window.sessionStorage.setItem(ordersCacheKey(pageNumber, pageSize), JSON.stringify(entry))
+  } catch {
+    // ignore
+  }
+}
+
 export async function getOrders(
   pageNumber = 1,
   pageSize = 10,
@@ -136,10 +177,37 @@ export async function getOrders(
   const url = `${getBase()}/api/orders?pageNumber=${pageNumber}&pageSize=${pageSize}`
   let res: Response
   try {
-    res = await fetchWithTimeout(url, { headers: getHeaders(token) }, 10000)
+    // On client: return cache immediately if available, and also race a quick fetch.
+    const cached = readOrdersCache(pageNumber, pageSize)
+    if (cached) {
+      // fire-and-forget refresh in background
+      void (async () => {
+        try {
+          const rr = await fetchWithTimeout(url, { headers: getHeaders(token) }, 4500)
+          if (!rr.ok) return
+          const jj = (await rr.json()) as { data?: ApiOrdersPagedResponse } & ApiOrdersPagedResponse
+          const dd = jj?.data ?? jj
+          const rawItems = (dd?.items ?? jj?.items ?? []) as (ApiOrder & Record<string, unknown>)[]
+          const items = rawItems.map((o) => normalizeApiOrder(o))
+          writeOrdersCache(pageNumber, pageSize, {
+            items,
+            totalCount: dd?.totalCount ?? items.length,
+            pageNumber: dd?.pageNumber ?? pageNumber,
+            pageSize: dd?.pageSize ?? pageSize,
+            totalPages: dd?.totalPages,
+          })
+        } catch {
+          // ignore
+        }
+      })()
+      return cached
+    }
+
+    // No cache: do a faster attempt; then fall back to a longer attempt.
+    res = await fetchWithTimeout(url, { headers: getHeaders(token) }, 4500)
   } catch {
-    // Retry nhẹ một lần để giảm ảnh hưởng mạng/cold start
-    res = await fetchWithTimeout(url, { headers: getHeaders(token) }, 12000)
+    // Retry: longer timeout for cold start / slow network
+    res = await fetchWithTimeout(url, { headers: getHeaders(token) }, 10000)
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
@@ -151,13 +219,15 @@ export async function getOrders(
   const data = json?.data ?? json
   const rawItems = (data?.items ?? json?.items ?? []) as (ApiOrder & Record<string, unknown>)[]
   const items = rawItems.map((o) => normalizeApiOrder(o))
-  return {
+  const result = {
     items,
     totalCount: data?.totalCount ?? items.length,
     pageNumber: data?.pageNumber ?? pageNumber,
     pageSize: data?.pageSize ?? pageSize,
     totalPages: data?.totalPages,
   }
+  writeOrdersCache(pageNumber, pageSize, result)
+  return result
 }
 
 export async function getOrderById(

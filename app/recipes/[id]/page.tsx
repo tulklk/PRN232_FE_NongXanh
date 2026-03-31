@@ -9,6 +9,7 @@ import { useUser } from '@/contexts/UserContext'
 import { addRecipeIngredientsToCart, getRecipeById } from '@/lib/api/recipes'
 import type { RecipeIngredient, RecipeModel } from '@/lib/types/api'
 import { getProductById } from '@/lib/api/products'
+import { useCart } from '@/contexts/CartContext'
 
 function getTitle(r: RecipeModel): string {
   return String(r.title ?? r.name ?? 'Công thức')
@@ -27,10 +28,17 @@ function getIngredients(r: RecipeModel): RecipeIngredient[] {
   return Array.isArray(list) ? list : []
 }
 
+function getInstructions(r: RecipeModel): string {
+  const anyR = r as any
+  const s = String(anyR.instructions ?? anyR.Instructions ?? r.content ?? '').trim()
+  return s
+}
+
 export default function RecipeDetailPage() {
   const params = useParams()
   const id = String(params.id ?? '')
   const { tokens, isAuthenticated } = useUser()
+  const { refreshCart } = useCart()
 
   const [recipe, setRecipe] = useState<RecipeModel | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,6 +67,14 @@ export default function RecipeDetailPage() {
   const ingredients = useMemo(() => (recipe ? getIngredients(recipe) : []), [recipe])
   const title = recipe ? getTitle(recipe) : ''
   const imageUrl = recipe ? getImageUrl(recipe) : null
+  const instructions = useMemo(
+    () => (recipe ? getInstructions(recipe) : ''),
+    [recipe]
+  )
+  const instructionLines = useMemo(
+    () => instructions.split(/\r?\n/),
+    [instructions]
+  )
 
   useEffect(() => {
     if (!ingredients.length) return
@@ -116,6 +132,7 @@ export default function RecipeDetailPage() {
     setInfo(null)
     try {
       await addRecipeIngredientsToCart(id, tokens.idToken)
+      await refreshCart()
       setInfo('Chúng tôi đã làm tròn số lượng theo đơn vị bán nhỏ nhất của cửa hàng.')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể thêm vào giỏ')
@@ -182,7 +199,7 @@ export default function RecipeDetailPage() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 space-y-6">
             <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100">
               <div className="relative w-full aspect-[16/9] bg-gray-100">
                 {imageUrl ? (
@@ -209,25 +226,12 @@ export default function RecipeDetailPage() {
                 )}
               </div>
             </div>
-          </div>
 
-          <div className="lg:col-span-5">
             <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <h2 className="text-base font-bold text-gray-900">Nguyên liệu</h2>
                 <span className="text-sm text-gray-500">{ingredients.length}</span>
               </div>
-
-              {info && (
-                <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-                  {info}
-                </div>
-              )}
-              {error && (
-                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
 
               {ingredients.length === 0 ? (
                 <p className="text-sm text-gray-500 py-6 text-center">
@@ -249,7 +253,9 @@ export default function RecipeDetailPage() {
                               fill
                               className="object-cover"
                               sizes="40px"
-                              unoptimized={productMetaById[String(it.productId)].image.startsWith('http')}
+                              unoptimized={productMetaById[String(it.productId)].image.startsWith(
+                                'http'
+                              )}
                             />
                           ) : (
                             <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
@@ -268,6 +274,53 @@ export default function RecipeDetailPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+
+          <div className="lg:col-span-5">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
+              {info && (
+                <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                  {info}
+                </div>
+              )}
+              {error && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <h2 className="text-base font-bold text-gray-900">Hướng dẫn</h2>
+              </div>
+              {instructions ? (
+                <div className="text-sm text-gray-700 leading-relaxed">
+                  {instructionLines.map((line, idx) => {
+                    const raw = String(line ?? '')
+                    const trimmed = raw.trim()
+                    if (!trimmed) {
+                      return <div key={`sp-${idx}`} className="h-4" />
+                    }
+                    const m = trimmed.match(/^(B\d+)\s*:\s*(.+)$/i)
+                    if (m) {
+                      return (
+                        <p key={`b-${idx}`} className="font-bold text-gray-900">
+                          {m[1].toUpperCase()}: {m[2]}
+                        </p>
+                      )
+                    }
+                    return (
+                      <p key={`t-${idx}`} className="text-gray-800">
+                        {raw}
+                      </p>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Chưa có hướng dẫn cho công thức này.
+                </p>
               )}
 
               <button

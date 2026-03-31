@@ -1035,7 +1035,7 @@ export default function Header() {
                   <div className="w-5 h-5 rounded-full bg-[#0A923C] flex items-center justify-center">
                     <Download size={10} className="text-white" />
                   </div>
-                  <span>GIỎ RAU THEO TUẦN</span>
+                  <span>GIỎ HÀNG THEO TUẦN</span>
                 </Link>
                 <Link
                   href="/recipes"

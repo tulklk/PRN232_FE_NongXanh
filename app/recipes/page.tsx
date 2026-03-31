@@ -134,7 +134,7 @@ export default function RecipesPage() {
                     )}
                   </div>
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 line-clamp-2">
+                    <h3 className="text-lg font-bold text-gray-900 line-clamp-2">
                       {title}
                     </h3>
                     <p className="mt-2 text-sm text-gray-600 line-clamp-2">

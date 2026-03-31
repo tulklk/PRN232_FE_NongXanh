@@ -122,7 +122,11 @@ export async function addRecipeIngredientsToCart(
     `${getBase()}/api/recipes/${encodeURIComponent(recipeId)}/add-to-cart`,
     {
       method: 'POST',
-      headers: getHeaders(token),
+      headers: {
+        ...getHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
     }
   )
 

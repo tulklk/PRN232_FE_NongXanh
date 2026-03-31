@@ -14,6 +14,17 @@ const getBase = () =>
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000'
 
+const CACHE_TTL_MS = 10 * 60 * 1000
+let variantsCache:
+  | { loadedAt: number; items: Awaited<ReturnType<typeof getProductVariants>> }
+  | null = null
+let variantsPromise: Promise<Awaited<ReturnType<typeof getProductVariants>>> | null =
+  null
+
+let productsMapCache: { loadedAt: number; map: Map<string, ApiProduct> } | null =
+  null
+let productsMapPromise: Promise<Map<string, ApiProduct>> | null = null
+
 function getHeaders(token?: string): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -85,13 +96,53 @@ async function fetchProductsMap(): Promise<Map<string, ApiProduct>> {
   return map
 }
 
+async function getCachedVariants(): Promise<Awaited<ReturnType<typeof getProductVariants>>> {
+  const now = Date.now()
+  if (variantsCache && now - variantsCache.loadedAt < CACHE_TTL_MS) {
+    return variantsCache.items
+  }
+  if (variantsPromise) return variantsPromise
+
+  variantsPromise = (async () => {
+    const items = await getProductVariants()
+    variantsCache = { loadedAt: Date.now(), items }
+    variantsPromise = null
+    return items
+  })().catch((e) => {
+    variantsPromise = null
+    throw e
+  })
+
+  return variantsPromise
+}
+
+async function getCachedProductsMap(): Promise<Map<string, ApiProduct>> {
+  const now = Date.now()
+  if (productsMapCache && now - productsMapCache.loadedAt < CACHE_TTL_MS) {
+    return productsMapCache.map
+  }
+  if (productsMapPromise) return productsMapPromise
+
+  productsMapPromise = (async () => {
+    const map = await fetchProductsMap()
+    productsMapCache = { loadedAt: Date.now(), map }
+    productsMapPromise = null
+    return map
+  })().catch((e) => {
+    productsMapPromise = null
+    throw e
+  })
+
+  return productsMapPromise
+}
+
 async function enrichCartItems(cart: ApiCart): Promise<ApiCart> {
   if (!cart.cartItems?.length) return cart
 
   try {
     const [variants, productsMap] = await Promise.all([
-      getProductVariants(),
-      fetchProductsMap(),
+      getCachedVariants(),
+      getCachedProductsMap(),
     ])
     const variantMap = new Map(variants.map((v) => [String(v.variantId), v]))
     const productIdSet = new Set<string>()

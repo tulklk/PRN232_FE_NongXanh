@@ -12,12 +12,12 @@ export default function HotDealCard({ product }: HotDealCardProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
       <Link href={`/products/${product.id}`}>
-        <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
+        <div className="relative w-full aspect-square bg-white overflow-hidden">
           <Image
             src={product.image}
             alt={product.name}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            className="object-contain p-2 transition-transform duration-300"
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
           />
           {/* Logo badge */}

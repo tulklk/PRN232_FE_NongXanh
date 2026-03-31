@@ -173,13 +173,13 @@ export default function CartPage() {
                   >
                     <Link
                       href={href}
-                      className="relative w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden"
+                      className="relative w-20 h-20 bg-white rounded-lg flex-shrink-0 overflow-hidden border border-gray-100"
                     >
                       <Image
                         src={imageSrc}
                         alt={displayName}
                         fill
-                        className="object-cover rounded-lg"
+                        className="object-contain p-1.5 rounded-lg"
                         sizes="80px"
                         unoptimized={imageSrc.startsWith('http')}
                       />

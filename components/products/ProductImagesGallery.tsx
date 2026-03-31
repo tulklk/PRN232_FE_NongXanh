@@ -43,12 +43,12 @@ export default function ProductImagesGallery({
 
   return (
     <div>
-      <div className="relative w-full aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden">
+      <div className="relative w-full aspect-square bg-white rounded-lg mb-3 overflow-hidden">
         <Image
           src={allImages[currentIndex]}
           alt={name}
           fill
-          className="object-cover rounded-lg"
+          className="object-contain p-3 rounded-lg"
           sizes="(max-width: 768px) 100vw, 40vw"
         />
         {allImages.length > 1 && (
@@ -85,7 +85,7 @@ export default function ProductImagesGallery({
               src={url}
               alt={`${name} ${index + 1}`}
               fill
-              className="object-cover"
+              className="object-contain p-1"
               sizes="(max-width: 768px) 25vw, 10vw"
             />
           </button>

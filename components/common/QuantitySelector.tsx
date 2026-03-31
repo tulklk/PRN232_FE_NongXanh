@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Minus, Plus } from 'lucide-react'
 
 interface QuantitySelectorProps {
@@ -19,6 +19,10 @@ export default function QuantitySelector({
   className = '',
 }: QuantitySelectorProps) {
   const [quantity, setQuantity] = useState(defaultValue)
+
+  useEffect(() => {
+    setQuantity(defaultValue)
+  }, [defaultValue])
 
   const handleDecrease = () => {
     if (quantity > min) {

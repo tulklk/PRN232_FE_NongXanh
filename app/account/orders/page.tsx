@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { getOrders } from '@/lib/api/orders'
@@ -13,6 +13,14 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<ApiOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pageNumber, setPageNumber] = useState(1)
+  const [pageSize] = useState(6)
+  const [totalCount, setTotalCount] = useState(0)
+
+  const totalPages = useMemo(() => {
+    const n = Math.ceil((totalCount || 0) / pageSize)
+    return Math.max(1, Number.isFinite(n) ? n : 1)
+  }, [totalCount, pageSize])
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.idToken) {
@@ -23,8 +31,9 @@ export default function OrdersPage() {
     const load = async () => {
       try {
         setLoading(true)
-        const res = await getOrders(1, 20, tokens.idToken)
+        const res = await getOrders(pageNumber, pageSize, tokens.idToken)
         setOrders(res.items ?? [])
+        setTotalCount(Number(res.totalCount ?? 0) || 0)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không thể tải đơn hàng')
       } finally {
@@ -33,7 +42,13 @@ export default function OrdersPage() {
     }
 
     load()
-  }, [isAuthenticated, tokens?.idToken])
+  }, [isAuthenticated, tokens?.idToken, pageNumber, pageSize])
+
+  // Clamp page when totalCount changes (e.g. orders cancelled/created)
+  useEffect(() => {
+    if (pageNumber > totalPages) setPageNumber(totalPages)
+    if (pageNumber < 1) setPageNumber(1)
+  }, [pageNumber, totalPages])
 
   if (!isAuthenticated) {
     return (
@@ -122,6 +137,53 @@ export default function OrdersPage() {
           </Link>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-gray-600">
+            Trang{' '}
+            <span className="font-semibold text-gray-900">{pageNumber}</span> /{' '}
+            <span className="font-semibold text-gray-900">{totalPages}</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber <= 1 || loading}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trước
+            </button>
+
+            <select
+              value={pageNumber}
+              onChange={(e) => setPageNumber(Number(e.target.value))}
+              disabled={loading}
+              className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800"
+              aria-label="Chọn trang"
+            >
+              {Array.from({ length: totalPages }).map((_, idx) => {
+                const p = idx + 1
+                return (
+                  <option key={p} value={p}>
+                    Trang {p}
+                  </option>
+                )
+              })}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
+              disabled={pageNumber >= totalPages || loading}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

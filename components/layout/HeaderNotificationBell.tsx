@@ -29,6 +29,11 @@ export default function HeaderNotificationBell() {
   const [markingAll, setMarkingAll] = useState(false);
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const openRef = useRef(open);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const refreshCount = useCallback(async () => {
     if (!tokens?.idToken) {
@@ -91,14 +96,14 @@ export default function HeaderNotificationBell() {
     const client = createSignalrClient(tokens.idToken);
     const off = client.onReceiveNotification(() => {
       void refreshCount();
-      if (open) void loadNotifications();
+      if (openRef.current) void loadNotifications();
     });
     void client.start().catch(() => {});
     return () => {
       off();
       void client.stop().catch(() => {});
     };
-  }, [isAuthenticated, tokens?.idToken, refreshCount, loadNotifications, open]);
+  }, [isAuthenticated, tokens?.idToken, refreshCount, loadNotifications]);
 
   useEffect(() => {
     if (!open || !isAuthenticated || !tokens?.idToken) return;
