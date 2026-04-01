@@ -68,6 +68,7 @@ export default function Header() {
   const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const mobileSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestSeqRef = useRef(0);
 
   const handleCategoryMenuEnter = () => {
     setIsMenuOpen(true);
@@ -225,19 +226,24 @@ export default function Header() {
     }
 
     searchTimeoutRef.current = setTimeout(async () => {
+      const seq = ++searchRequestSeqRef.current;
       setSearchLoading(true);
       try {
         const results = await searchProducts(trimmed, 8);
+        if (seq !== searchRequestSeqRef.current) return;
         setSearchResults(results);
         setShowSuggestions(true);
       } catch (error) {
         console.warn("[Header] search error", error);
+        if (seq !== searchRequestSeqRef.current) return;
         setSearchResults([]);
         setShowSuggestions(true);
       } finally {
-        setSearchLoading(false);
+        if (seq === searchRequestSeqRef.current) {
+          setSearchLoading(false);
+        }
       }
-    }, 300);
+    }, 280);
   };
 
   const triggerFullSearch = () => {
@@ -460,27 +466,21 @@ export default function Header() {
                             <Link
                               key={product.id}
                               href={`/products/${product.id}`}
-                              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors"
                               onClick={() => {
                                 setShowSuggestions(false);
                                 setMobileSearchOpen(false);
                               }}
                             >
-                              <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
-                                <Image
-                                  src={product.image}
-                                  alt={product.name}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 line-clamp-2">
                                   {product.name}
                                 </p>
-                                <p className="text-xs text-primary-green font-semibold mt-0.5">
-                                  {formatCurrency(product.currentPrice)}
-                                </p>
+                                {product.currentPrice > 0 ? (
+                                  <p className="text-xs text-primary-green font-semibold mt-0.5">
+                                    {formatCurrency(product.currentPrice)}
+                                  </p>
+                                ) : null}
                               </div>
                             </Link>
                           ))
@@ -543,24 +543,18 @@ export default function Header() {
                               <Link
                                 key={product.id}
                                 href={`/products/${product.id}`}
-                                className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors"
                                 onClick={() => setShowSuggestions(false)}
                               >
-                                <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
-                                  <Image
-                                    src={product.image}
-                                    alt={product.name}
-                                    fill
-                                    className="object-cover"
-                                  />
-                                </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-gray-900 line-clamp-2">
                                     {product.name}
                                   </p>
-                                  <p className="text-xs text-primary-green font-semibold mt-0.5">
-                                    {formatCurrency(product.currentPrice)}
-                                  </p>
+                                  {product.currentPrice > 0 ? (
+                                    <p className="text-xs text-primary-green font-semibold mt-0.5">
+                                      {formatCurrency(product.currentPrice)}
+                                    </p>
+                                  ) : null}
                                 </div>
                               </Link>
                             ))

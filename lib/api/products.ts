@@ -42,6 +42,71 @@ function normalizeImageUrl(url?: string | null): string | null {
   return null
 }
 
+/** Ảnh từ BE (lookup / DTO) thường là path tương đối — ghép origin Azure để Next/Image tải được. */
+function resolveProductImageUrlForDisplay(raw: string | null | undefined): string {
+  const s = String(raw ?? '').trim()
+  if (!s || s.toLowerCase() === 'string') return '/images/logo.png'
+  if (s.startsWith('http://') || s.startsWith('https://')) return s
+  if (s.startsWith('//')) return `https:${s}`
+  const base = BACKEND_URL.replace(/\/$/, '')
+  if (s.startsWith('/')) return `${base}${s}`
+  return `${base}/${s.replace(/^\/+/, '')}`
+}
+
+function pickLookupImageFromDto(x: Record<string, unknown> | null | undefined): string | null {
+  if (!x || typeof x !== 'object') return null
+  const o = x as Record<string, unknown>
+  const firstImg = (arr: unknown): string | null => {
+    if (!Array.isArray(arr) || arr.length === 0) return null
+    const row = arr[0] as Record<string, unknown> | undefined
+    if (!row || typeof row !== 'object') return null
+    const u =
+      row.imageUrl ??
+      row.ImageUrl ??
+      row.url ??
+      row.Url ??
+      row.image ??
+      row.Image
+    return typeof u === 'string' && u.trim() ? u.trim() : null
+  }
+  const candidates: unknown[] = [
+    o.imageUrl,
+    o.ImageUrl,
+    o.primaryImageUrl,
+    o.PrimaryImageUrl,
+    o.thumbnailUrl,
+    o.ThumbnailUrl,
+    o.image,
+    o.Image,
+    o.mainImageUrl,
+    o.MainImageUrl,
+    o.thumbnailImageUrl,
+    o.ThumbnailImageUrl,
+    firstImg(o.productImages),
+    firstImg(o.ProductImages),
+  ]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim()
+  }
+  return null
+}
+
+/**
+ * Một số payload nhầm categoryId thành productId dạng "c" + UUID.
+ * Chuẩn hóa để gọi GET /api/Products/{id} đúng.
+ */
+export function normalizeProductIdForApi(raw: string): string {
+  const s = String(raw ?? '').trim()
+  if (
+    /^c[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      s
+    )
+  ) {
+    return s.slice(1)
+  }
+  return s
+}
+
 function pickProviderIdFromApi(api: ApiProduct): string | undefined {
   const extended = api as ApiProduct & { ProviderId?: number | string }
   const raw = api.providerId ?? extended.ProviderId
@@ -62,7 +127,7 @@ function mapApiProductToProduct(api: ApiProduct): Product {
   const providerId = pickProviderIdFromApi(api)
 
   return {
-    id: String(api.productId),
+    id: normalizeProductIdForApi(String(api.productId)),
     name: api.productName,
     seller: api.provider ?? 'Nông Xanh',
     image: imageUrl,
@@ -108,6 +173,8 @@ export interface GetBestSellersParams {
 export type ProductLookupItem = {
   productId: string
   productName: string
+  imageUrl?: string | null
+  basePrice?: number | null
 }
 
 export async function lookupProducts(
@@ -152,10 +219,24 @@ export async function lookupProducts(
   }
   const list = unwrapList(json)
   return list
-    .map((x: any) => ({
-      productId: String(x?.productId ?? x?.id ?? '').trim(),
-      productName: String(x?.productName ?? x?.name ?? '').trim(),
-    }))
+    .map((x: any) => {
+      const rawPid = String(x?.productId ?? x?.id ?? '').trim()
+      const picked = pickLookupImageFromDto(
+        x && typeof x === 'object' ? (x as Record<string, unknown>) : null
+      )
+      const imgResolved = picked
+        ? resolveProductImageUrlForDisplay(picked)
+        : null
+      const priceRaw =
+        x?.basePrice ?? x?.BasePrice ?? x?.price ?? x?.Price ?? x?.unitPrice
+      const n = Number(priceRaw)
+      return {
+        productId: normalizeProductIdForApi(rawPid),
+        productName: String(x?.productName ?? x?.name ?? '').trim(),
+        imageUrl: imgResolved,
+        basePrice: Number.isFinite(n) ? n : null,
+      }
+    })
     .filter((x) => x.productId && x.productName)
 }
 
@@ -163,7 +244,7 @@ export async function getVariantsByProductId(
   productId: string,
   token?: string
 ): Promise<ApiProductVariant[]> {
-  const pid = String(productId ?? '').trim()
+  const pid = normalizeProductIdForApi(String(productId ?? '').trim())
   if (!pid) return []
   const res = await fetch(`${getBase()}/api/products/${encodeURIComponent(pid)}/variants`, {
     headers: getHeaders(token),
@@ -459,10 +540,11 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
+  const idNorm = normalizeProductIdForApi(id)
   const isServer = typeof window === 'undefined'
   const url = isServer
-    ? `${BACKEND_URL}/api/Products/${id}`
-    : `${getBase()}/api/products/${id}`
+    ? `${BACKEND_URL}/api/Products/${encodeURIComponent(idNorm)}`
+    : `${getBase()}/api/products/${encodeURIComponent(idNorm)}`
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     cache: isServer ? 'no-store' : undefined,
@@ -471,14 +553,14 @@ export async function getProductById(id: string): Promise<Product | null> {
     if (res.status === 404) {
       try {
         const list = await getProducts({ pageNumber: 1, pageSize: 100 })
-        const found = list.items.find((p) => p.id === id)
+        const found = list.items.find((p) => p.id === idNorm)
         return found ?? null
       } catch {
         return null
       }
     }
     const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    console.warn('[getProductById]', res.status, id, err)
+    console.warn('[getProductById]', res.status, idNorm, err)
     return null
   }
   const json = (await res.json()) as ApiProductDetailResponse | ApiProduct | Record<string, unknown>
@@ -508,54 +590,14 @@ export async function getProductById(id: string): Promise<Product | null> {
   return product
 }
 
-const SEARCH_CATALOG_TTL_MS = 10 * 60 * 1000
-let searchCatalogCache: Product[] | null = null
-let searchCatalogLoadedAt = 0
-let searchCatalogPromise: Promise<Product[]> | null = null
-
-/** Tải catalog một lần (nhẹ, không hydrate sold-quantity), có TTL. */
-async function loadSearchCatalog(): Promise<Product[]> {
-  const now = Date.now()
-  if (searchCatalogCache && now - searchCatalogLoadedAt < SEARCH_CATALOG_TTL_MS) {
-    return searchCatalogCache
-  }
-  if (searchCatalogPromise) return searchCatalogPromise
-
-  searchCatalogPromise = (async () => {
-    const merged: Product[] = []
-    let page = 1
-    const pageSize = 100
-
-    for (let safety = 0; safety < 20; safety++) {
-      const res = await getProducts({
-        pageNumber: page,
-        pageSize,
-        skipSoldQuantityHydration: true,
-      })
-      merged.push(...res.items)
-      const doneByShortPage = res.items.length < pageSize
-      const doneByTotal =
-        res.totalCount != null && merged.length >= res.totalCount
-      if (doneByShortPage || doneByTotal) break
-      page += 1
-    }
-
-    searchCatalogCache = merged
-    searchCatalogLoadedAt = Date.now()
-    searchCatalogPromise = null
-    return merged
-  })()
-
-  return searchCatalogPromise
-}
-
 /**
- * Gọi sớm (vd. mount trang tạo công thức) để lần gõ đầu không phải chờ fetch.
+ * Trước đây preload cả catalog — không còn cần vì tìm kiếm dùng API lookup.
  */
 export function prefetchProductSearchCatalog(): void {
-  void loadSearchCatalog()
+  void 0
 }
 
+/** Tìm gợi ý header / staff: một request tới BE, không tải hàng nghìn SP. */
 export async function searchProducts(
   keyword: string,
   limit = 10
@@ -564,18 +606,25 @@ export async function searchProducts(
   if (!trimmed) return []
 
   try {
-    const items = await loadSearchCatalog()
-    const lower = trimmed.toLowerCase()
-
-    const filtered = items.filter((p) => {
-      const nameMatch = p.name.toLowerCase().includes(lower)
-      const descMatch = p.description
-        ? p.description.toLowerCase().includes(lower)
-        : false
-      return nameMatch || descMatch
+    const items = await lookupProducts(trimmed, limit)
+    return items.map((it) => {
+      const img =
+        it.imageUrl && String(it.imageUrl).trim()
+          ? String(it.imageUrl).trim()
+          : '/images/logo.png'
+      const price = it.basePrice
+      return {
+        id: it.productId,
+        name: it.productName,
+        seller: 'Nông Xanh',
+        image: img,
+        rating: 0,
+        reviewCount: 0,
+        salesCount: 0,
+        currentPrice: price != null && Number.isFinite(price) ? price : 0,
+        category: '',
+      }
     })
-
-    return filtered.slice(0, limit)
   } catch (error) {
     console.warn('[searchProducts] error', error)
     return []

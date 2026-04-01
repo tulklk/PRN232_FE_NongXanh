@@ -11,7 +11,7 @@ import WishlistToggleButton from '@/components/products/WishlistToggleButton'
 import ReviewCard from '@/components/reviews/ReviewCard'
 import ProductPurchasePanel from '@/components/products/ProductPurchasePanel'
 import { calculateDiscount } from '@/lib/utils'
-import { getProductById, getProducts } from '@/lib/api/products'
+import { getProductById, getProducts, normalizeProductIdForApi } from '@/lib/api/products'
 import ProductImagesGallery from '@/components/products/ProductImagesGallery'
 import { getReviewsByProduct, mapApiReviewToCardModel } from '@/lib/api/reviews'
 import { getProviderById } from '@/lib/api/providers'
@@ -23,7 +23,8 @@ interface ProductDetailPageProps {
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const { id } = await params
+  const { id: rawId } = await params
+  const id = normalizeProductIdForApi(rawId)
   const product = await getProductById(id)
 
   if (!product) {
@@ -55,14 +56,19 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   const discount = product.originalPrice ? calculateDiscount(product.originalPrice, product.currentPrice) : 0
 
-  const relatedRes = await getProducts({
-    pageNumber: 1,
-    pageSize: 10,
-    categoryId: product.category,
-  })
-  const relatedProducts = relatedRes.items
-    .filter((p) => p.id !== product.id)
-    .slice(0, 4)
+  let relatedProducts: Awaited<ReturnType<typeof getProducts>>['items'] = []
+  try {
+    const relatedRes = await getProducts({
+      pageNumber: 1,
+      pageSize: 10,
+      categoryId: product.category,
+    })
+    relatedProducts = relatedRes.items
+      .filter((p) => p.id !== product.id)
+      .slice(0, 4)
+  } catch {
+    relatedProducts = []
+  }
 
   return (
     <div className="bg-white min-h-screen">

@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { cancelOrder, getOrderById } from '@/lib/api/orders'
+import { getReviewsByProduct } from '@/lib/api/reviews'
 import type { ApiOrder } from '@/lib/types/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getOrderStatusLabel, getVnPayStatusLabel } from '@/lib/orderDisplay'
@@ -16,7 +17,7 @@ export default function OrderDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
-  const { tokens, isAuthenticated } = useUser()
+  const { user, tokens, isAuthenticated } = useUser()
   const [order, setOrder] = useState<ApiOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +87,56 @@ export default function OrderDetailPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Không thể tải đơn hàng'))
       .finally(() => setLoading(false))
   }, [isAuthenticated, tokens?.idToken, id])
+
+  useEffect(() => {
+    if (!order || !tokens?.idToken || !user?.userId) return
+    const details = order.orderDetails ?? []
+    const productIds = new Set<string>()
+    for (const d of details) {
+      const raw = d as unknown as Record<string, unknown>
+      const mealComboId = String((raw.mealComboId ?? raw.MealComboId ?? '') as string).trim()
+      const comboItems = (raw.comboItems ?? raw.ComboItems) as unknown
+      const isCombo =
+        !!mealComboId || (Array.isArray(comboItems) && comboItems.length > 0)
+      if (isCombo) continue
+      const productIdRaw = (raw.productId ??
+        raw.ProductId ??
+        (d as { productId?: string | number }).productId) as string | number | null | undefined
+      if (productIdRaw != null) productIds.add(String(productIdRaw))
+    }
+    if (productIds.size === 0) return
+    let cancelled = false
+    const uid = String(user.userId).trim().toLowerCase()
+    ;(async () => {
+      const reviewed = new Set<string>()
+      await Promise.all(
+        Array.from(productIds).map(async (pid) => {
+          try {
+            const reviews = await getReviewsByProduct(pid, tokens.idToken)
+            const mine = reviews.some((r) => {
+              const raw = r as { userId?: string; UserId?: string }
+              const rid = String(raw.userId ?? raw.UserId ?? '')
+                .trim()
+                .toLowerCase()
+              return rid !== '' && rid === uid
+            })
+            if (mine) reviewed.add(pid)
+          } catch {
+            /* ignore per-product fetch errors */
+          }
+        })
+      )
+      if (cancelled) return
+      setReviewedProductIds((prev) => {
+        const next = new Set(prev)
+        Array.from(reviewed).forEach((rid) => next.add(rid))
+        return next
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [order, tokens?.idToken, user?.userId])
 
   const toggleCombo = useCallback((key: string) => {
     setExpandedComboKeys((prev) => {
