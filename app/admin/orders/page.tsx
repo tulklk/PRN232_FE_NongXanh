@@ -76,9 +76,11 @@ export default function OrdersPage() {
 
   const getStatusLabel = (status?: string | null) => {
     const labels: Record<string, string> = {
+      pending: 'Đang xử lý',
       processing: 'Đang xử lý',
       confirmed: 'Đã xác nhận',
-      shipped: 'Đã giao hàng',
+      shipping: 'Đang giao',
+      shipped: 'Đang giao',
       delivered: 'Đã nhận hàng',
       cancelled: 'Đã hủy',
     }
@@ -99,8 +101,10 @@ export default function OrdersPage() {
 
   const mapStatusForBadge = (status?: string | null) => {
     const map: Record<string, 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'> = {
+      pending: 'processing',
       processing: 'processing',
       confirmed: 'confirmed',
+      shipping: 'shipped',
       shipped: 'shipped',
       delivered: 'delivered',
       cancelled: 'cancelled',

@@ -3,16 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import QuantitySelector from '@/components/common/QuantitySelector'
 import { formatCurrency } from '@/lib/utils'
 import { useCart } from '@/contexts/CartContext'
 import { useUser } from '@/contexts/UserContext'
-import { getMealComboById } from '@/lib/api/mealCombos'
-import type { MealComboDto } from '@/lib/types/api'
 
 export default function CartPage() {
-  const { isAuthenticated, tokens } = useUser()
+  const { isAuthenticated } = useUser()
   const {
     cart,
     loading,
@@ -25,12 +23,6 @@ export default function CartPage() {
   const [expandedComboIds, setExpandedComboIds] = useState<Set<string>>(
     () => new Set()
   )
-  const [comboById, setComboById] = useState<Record<string, MealComboDto | null>>(
-    {}
-  )
-  const [comboLoadingById, setComboLoadingById] = useState<Record<string, boolean>>(
-    {}
-  )
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -41,37 +33,21 @@ export default function CartPage() {
   const items = useMemo(() => cart?.cartItems ?? [], [cart?.cartItems])
   const totalAmount = cart?.totalAmount ?? 0
 
-  const comboIdsInCart = useMemo(() => {
-    const ids = new Set<string>()
-    for (const it of items) {
-      if (it.mealComboId) ids.add(String(it.mealComboId))
-    }
-    return Array.from(ids)
-  }, [items])
-
-  // Prefetch combo details for any combo items in cart (best-effort).
-  useEffect(() => {
-    if (!isAuthenticated) return
-    if (comboIdsInCart.length === 0) return
-
-    comboIdsInCart.forEach((id) => {
-      if (comboById[id] !== undefined) return
-      if (comboLoadingById[id]) return
-
-      setComboLoadingById((prev) => ({ ...prev, [id]: true }))
-      getMealComboById(id, tokens?.idToken)
-        .then((combo) => {
-          setComboById((prev) => ({ ...prev, [id]: combo }))
-        })
-        .catch(() => {
-          setComboById((prev) => ({ ...prev, [id]: null }))
-        })
-        .finally(() => {
-          setComboLoadingById((prev) => ({ ...prev, [id]: false }))
-        })
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comboIdsInCart.join('|'), isAuthenticated, tokens?.idToken])
+  const sanitizeVariantLabel = useCallback((label: string | null | undefined) => {
+    const raw = String(label ?? '').trim()
+    if (!raw) return null
+    // Keep pure weight/volume variants (e.g. "100g", "1kg", "500 ml")
+    if (/^\d+(?:[.,]\d+)?\s*(kg|g|ml|l)\b/i.test(raw)) return raw
+    // Drop pure "bó" variants (e.g. "1 bó")
+    if (/^\d+(?:[.,]\d+)?\s*(bó|bo)\b/i.test(raw)) return null
+    const cleaned = raw
+      // remove weight/unit fragments like "100g", "1 kg", "1 bó"
+      .replace(/(^|[\s-])\d+(?:[.,]\d+)?\s*(kg|g|bó|bo|ml|l)\b/gi, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/[-–—]\s*$/g, '')
+      .trim()
+    return cleaned || raw
+  }, [])
 
   const toggleCombo = useCallback(
     (id: string) => {
@@ -152,8 +128,6 @@ export default function CartPage() {
                   const isCombo = !!item.mealComboId
                   const comboId = isCombo ? String(item.mealComboId ?? '') : ''
                   const isExpanded = isCombo && expandedComboIds.has(comboId)
-                  const combo = isCombo ? comboById[comboId] : null
-                  const comboLoading = isCombo ? comboLoadingById[comboId] : false
                   const displayName = isCombo
                     ? item.mealComboName || 'Combo'
                     : [item.productName, item.variantName].filter(Boolean).join(' - ') ||
@@ -165,7 +139,9 @@ export default function CartPage() {
                       : '/products'
                   const imageSrc = item.imageUrl?.startsWith('http')
                     ? item.imageUrl
-                    : '/images/logo.png'
+                    : isCombo
+                      ? '/images/combo/iconcombo.png'
+                      : '/images/logo.png'
                   return (
                   <div
                     key={item.cartItemId}
@@ -179,7 +155,7 @@ export default function CartPage() {
                         src={imageSrc}
                         alt={displayName}
                         fill
-                        className="object-contain p-1.5 rounded-lg"
+                        className="object-cover"
                         sizes="80px"
                         unoptimized={imageSrc.startsWith('http')}
                       />
@@ -221,21 +197,18 @@ export default function CartPage() {
                             </Link>
                           </div>
 
-                          {comboLoading ? (
-                            <div className="flex items-center gap-2 text-xs text-gray-600 py-2">
-                              <Loader2 className="animate-spin" size={14} />
-                              Đang tải...
-                            </div>
-                          ) : combo && Array.isArray(combo.items) && combo.items.length > 0 ? (
+                          {Array.isArray(item.comboItems) && item.comboItems.length > 0 ? (
                             <div className="max-h-[220px] overflow-auto pr-1 overscroll-contain">
                               <ul className="space-y-2">
-                                {combo.items.map((it) => {
-                                  const left = [it.productName, it.variantName]
+                                {item.comboItems.map((it) => {
+                                  const variantLabel = sanitizeVariantLabel(it.variantName)
+                                  const left = [it.productName, variantLabel]
                                     .filter(Boolean)
                                     .join(' - ')
+                                  const unitPrice = Number(it.unitPrice ?? NaN)
                                   return (
                                     <li
-                                      key={`${combo.mealComboId}-${it.productId}-${it.variantId ?? ''}`}
+                                      key={`${comboId}-${it.productId}-${it.variantId ?? ''}`}
                                       className="flex items-start justify-between gap-3"
                                     >
                                       <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
@@ -243,9 +216,7 @@ export default function CartPage() {
                                       </span>
                                       <span className="text-xs text-gray-600 whitespace-nowrap text-right">
                                         <span className="block">x{it.quantity}</span>
-                                        <span className="block">
-                                          {formatCurrency(it.unitPrice)} / {formatCurrency(it.lineTotal)}
-                                        </span>
+                                        <span className="block">{formatCurrency(unitPrice)}</span>
                                       </span>
                                     </li>
                                   )
@@ -254,7 +225,7 @@ export default function CartPage() {
                             </div>
                           ) : (
                             <p className="text-xs text-gray-600">
-                              Không tải được chi tiết combo.
+                              Không có dữ liệu sản phẩm trong combo.
                             </p>
                           )}
                         </div>

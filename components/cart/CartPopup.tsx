@@ -2,13 +2,10 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { ChevronDown, ChevronRight, Loader2, Minus, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Minus, Plus, X } from 'lucide-react'
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
 import type { ApiCartItem } from '@/lib/types/api'
-import { useUser } from '@/contexts/UserContext'
-import { getMealComboById } from '@/lib/api/mealCombos'
-import type { MealComboDto } from '@/lib/types/api'
 
 interface CartPopupProps {
   items: ApiCartItem[]
@@ -28,7 +25,9 @@ function getDisplayName(item: ApiCartItem): string {
 }
 
 function getImageSrc(item: ApiCartItem): string {
-  return item.imageUrl && item.imageUrl.startsWith('http') ? item.imageUrl : '/images/logo.png'
+  const isCombo = !!item.mealComboId
+  const fallback = isCombo ? '/images/combo/iconcombo.png' : '/images/logo.png'
+  return item.imageUrl && item.imageUrl.startsWith('http') ? item.imageUrl : fallback
 }
 
 function getCartItemKey(item: ApiCartItem): string {
@@ -43,47 +42,31 @@ export default function CartPopup({
   onRemoveItem,
   onClose,
 }: CartPopupProps) {
-  const { tokens } = useUser()
+  const sanitizeVariantLabel = useCallback((label: string | null | undefined) => {
+    const raw = String(label ?? '').trim()
+    if (!raw) return null
+    // Keep pure weight/volume variants (e.g. "100g", "1kg", "500 ml")
+    if (/^\d+(?:[.,]\d+)?\s*(kg|g|ml|l)\b/i.test(raw)) return raw
+    // Drop pure "bó" variants (e.g. "1 bó")
+    if (/^\d+(?:[.,]\d+)?\s*(bó|bo)\b/i.test(raw)) return null
+    const cleaned = raw
+      .replace(/(^|[\s-])\d+(?:[.,]\d+)?\s*(kg|g|bó|bo|ml|l)\b/gi, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/[-–—]\s*$/g, '')
+      .trim()
+    return cleaned || raw
+  }, [])
+
   const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
     () => Object.fromEntries(items.map((i) => [getCartItemKey(i), i.quantity]))
   )
   const [expandedComboIds, setExpandedComboIds] = useState<Set<string>>(
     () => new Set()
   )
-  const [comboById, setComboById] = useState<Record<string, MealComboDto | null>>(
-    {}
-  )
-  const [comboLoadingById, setComboLoadingById] = useState<Record<string, boolean>>(
-    {}
-  )
 
   useEffect(() => {
     setLocalQuantities(Object.fromEntries(items.map((i) => [getCartItemKey(i), i.quantity])))
   }, [items])
-
-  const comboIdsInCart = useMemo(() => {
-    const ids = new Set<string>()
-    for (const it of items) {
-      if (it.mealComboId) ids.add(String(it.mealComboId))
-    }
-    return Array.from(ids)
-  }, [items])
-
-  useEffect(() => {
-    if (comboIdsInCart.length === 0) return
-    comboIdsInCart.forEach((id) => {
-      if (!id) return
-      if (comboById[id] !== undefined) return
-      if (comboLoadingById[id]) return
-
-      setComboLoadingById((prev) => ({ ...prev, [id]: true }))
-      getMealComboById(id, tokens?.idToken)
-        .then((combo) => setComboById((prev) => ({ ...prev, [id]: combo })))
-        .catch(() => setComboById((prev) => ({ ...prev, [id]: null })))
-        .finally(() => setComboLoadingById((prev) => ({ ...prev, [id]: false })))
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comboIdsInCart.join('|'), tokens?.idToken])
 
   const toggleCombo = useCallback((id: string) => {
     const key = String(id ?? '').trim()
@@ -136,8 +119,7 @@ export default function CartPopup({
               const isCombo = !!item.mealComboId
               const comboId = isCombo ? String(item.mealComboId ?? '') : ''
               const expanded = isCombo && expandedComboIds.has(comboId)
-              const combo = isCombo ? comboById[comboId] : null
-              const comboLoading = isCombo ? comboLoadingById[comboId] : false
+              const comboQty = localQuantities[cartItemKey] ?? item.quantity
               return (
               <div
                 key={item.cartItemId}
@@ -148,7 +130,7 @@ export default function CartPopup({
                     src={getImageSrc(item)}
                     alt={getDisplayName(item)}
                     fill
-                    className="object-contain p-1 rounded"
+                    className="object-cover"
                     sizes="56px"
                     unoptimized={getImageSrc(item).startsWith('http')}
                   />
@@ -185,32 +167,42 @@ export default function CartPopup({
 
                   {isCombo && expanded && (
                     <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2">
-                      {comboLoading ? (
-                        <div className="flex items-center gap-2 text-xs text-gray-600 py-1">
-                          <Loader2 className="animate-spin" size={12} />
-                          Đang tải...
-                        </div>
-                      ) : combo && Array.isArray(combo.items) && combo.items.length > 0 ? (
+                      {Array.isArray(item.comboItems) && item.comboItems.length > 0 ? (
                         <div className="max-h-40 overflow-auto overscroll-contain pr-1">
                           <ul className="space-y-1.5">
-                            {combo.items.map((it) => (
-                              <li
-                                key={`${combo.mealComboId}-${it.productId}`}
-                                className="flex items-start justify-between gap-2"
-                              >
-                                <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
-                                  {it.productName}
-                                </span>
-                                <span className="text-xs text-gray-600 whitespace-nowrap">
-                                  {it.quantity} {it.unit ?? ''}
-                                </span>
-                              </li>
-                            ))}
+                            {item.comboItems.map((it) => {
+                              const variantLabel = sanitizeVariantLabel(it.variantName)
+                              const left = [it.productName, variantLabel]
+                                .filter(Boolean)
+                                .join(' - ')
+                              const packsPerCombo = Number(it.quantity ?? 0)
+                              const packsTotal =
+                                Number.isFinite(comboQty) && comboQty > 1 && Number.isFinite(packsPerCombo)
+                                  ? packsPerCombo * comboQty
+                                  : null
+                              const unitPrice = Number(it.unitPrice ?? NaN)
+                              const lineTotal = Number(it.lineTotal ?? NaN)
+
+                              return (
+                                <li
+                                  key={`${comboId}-${it.productId}-${it.variantId ?? ''}`}
+                                  className="flex items-start justify-between gap-2"
+                                >
+                                  <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
+                                    {left}
+                                  </span>
+                                  <span className="text-xs text-gray-600 whitespace-nowrap text-right">
+                                    <span className="block">x{it.quantity}</span>
+                                    <span className="block">{formatCurrency(unitPrice)}</span>
+                                  </span>
+                                </li>
+                              )
+                            })}
                           </ul>
                         </div>
                       ) : (
                         <p className="text-xs text-gray-600">
-                          Không tải được chi tiết combo.
+                          Không có dữ liệu sản phẩm trong combo.
                         </p>
                       )}
                     </div>

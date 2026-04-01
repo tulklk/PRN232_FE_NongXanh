@@ -6,6 +6,7 @@ import { useUser } from '@/contexts/UserContext'
 import {
   deleteNotification,
   getNotifications,
+  markAllNotificationsRead,
   markNotificationRead,
   type NotificationModel,
 } from '@/lib/api/notifications'
@@ -20,6 +21,7 @@ export default function AdminNotificationsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [markingAll, setMarkingAll] = useState(false)
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil((totalCount || 0) / pageSize)),
@@ -92,6 +94,30 @@ export default function AdminNotificationsPage() {
     }
   }
 
+  const unreadCount = useMemo(
+    () => items.reduce((sum, n) => sum + (n.isRead ? 0 : 1), 0),
+    [items]
+  )
+
+  const handleMarkAllRead = async () => {
+    if (!tokens?.idToken || markingAll || items.length === 0 || unreadCount === 0) return
+    setMarkingAll(true)
+    const before = items
+    // optimistic UI
+    setItems((prev) => prev.map((n) => ({ ...n, isRead: true })))
+    try {
+      await markAllNotificationsRead(tokens.idToken)
+      window.dispatchEvent(new Event('notifications-updated'))
+      // reload to keep list in sync (in case pagination / partial update)
+      await fetchPage(pageNumber)
+    } catch (e) {
+      setItems(before)
+      setError(e instanceof Error ? e.message : 'Không thể đánh dấu đã đọc tất cả')
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-5">
@@ -102,9 +128,24 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Bell size={18} className="text-[#0A923C]" />
-        <h2 className="text-base font-bold text-gray-900">Notifications</h2>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <Bell size={18} className="text-[#0A923C]" />
+          <h2 className="text-base font-bold text-gray-900">Notifications</h2>
+          {unreadCount > 0 && (
+            <span className="text-xs font-semibold text-gray-500">
+              (Chưa đọc: {unreadCount})
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleMarkAllRead()}
+          disabled={markingAll || items.length === 0 || unreadCount === 0}
+          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:border-[#0A923C]/40 hover:text-[#0A923C] hover:bg-[#0A923C]/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {markingAll ? 'Đang đánh dấu...' : 'Đọc tất cả'}
+        </button>
       </div>
 
       {loading && <p className="text-sm text-gray-500 py-10 text-center">Đang tải...</p>}

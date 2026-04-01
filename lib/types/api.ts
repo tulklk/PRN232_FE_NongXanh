@@ -128,6 +128,22 @@ export interface ApiProvidersPagedResponse {
 }
 
 // API Cart structure
+export interface MealComboCartItemDto {
+  productId: string
+  productName?: string | null
+  variantId?: string | null
+  variantName?: string | null
+  /** packs per 1 combo */
+  quantity: number
+  unit?: string | null
+  /** unit price of AI suggested variant */
+  unitPrice: number
+  /** unitPrice * quantity (rounded by BE) */
+  lineTotal: number
+  imageUrl?: string | null
+  origin?: string | null
+}
+
 export interface ApiCartItem {
   /** BE có thể trả Guid string */
   cartItemId: number | string
@@ -142,6 +158,8 @@ export interface ApiCartItem {
   /** present nếu là combo */
   mealComboId?: string | null
   mealComboName?: string | null
+  /** Combo items when cart item is a meal combo (BE v3) */
+  comboItems?: MealComboCartItemDto[] | null
   imageUrl?: string | null
 }
 
@@ -165,6 +183,20 @@ export interface UpdateCartItemRequest {
 }
 
 // API Order structure
+export interface MealComboOrderItemDto {
+  productId: string
+  productName?: string | null
+  variantId?: string | null
+  variantName?: string | null
+  /** packs per 1 combo in DTO */
+  quantity: number
+  unit?: string | null
+  unitPrice: number
+  lineTotal: number
+  imageUrl?: string | null
+  origin?: string | null
+}
+
 export interface ApiOrderDetail {
   orderDetailId: number
   quantity: number
@@ -179,14 +211,7 @@ export interface ApiOrderDetail {
   mealComboId?: string | null
   mealComboName?: string | null
   /** Combo items when order detail is a meal combo (BE v2) */
-  comboItems?: Array<{
-    productId: string
-    productName?: string | null
-    quantity: number
-    unit?: string | null
-    imageUrl?: string | null
-    origin?: string | null
-  }> | null
+  comboItems?: MealComboOrderItemDto[] | null
   unit?: string | null
   origin?: string | null
   imageUrl?: string | null

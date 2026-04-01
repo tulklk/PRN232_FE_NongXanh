@@ -5,7 +5,16 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Truck, CreditCard, Wallet, Building2, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  Truck,
+  CreditCard,
+  Wallet,
+  Building2,
+  X,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react'
 import {
   formatCurrency,
   formatPhoneNumber,
@@ -88,7 +97,49 @@ export default function CheckoutPage() {
   const [finalAmount, setFinalAmount] = useState(0)
 
   const cartItems = useMemo(() => cart?.cartItems ?? [], [cart?.cartItems])
+  const [expandedSummaryComboIds, setExpandedSummaryComboIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const summaryCombosInitializedRef = useRef(false)
+
+  const sanitizeVariantLabel = useMemo(() => {
+    return (label: string | null | undefined): string | null => {
+      const raw = String(label ?? '').trim()
+      if (!raw) return null
+      // Keep pure weight/volume variants (e.g. "100g", "1kg", "500 ml")
+      if (/^\d+(?:[.,]\d+)?\s*(kg|g|ml|l)\b/i.test(raw)) return raw
+      // Drop pure "bó" variants (e.g. "1 bó")
+      if (/^\d+(?:[.,]\d+)?\s*(bó|bo)\b/i.test(raw)) return null
+      const cleaned = raw
+        .replace(/(^|[\s-])\d+(?:[.,]\d+)?\s*(kg|g|bó|bo|ml|l)\b/gi, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/[-–—]\s*$/g, '')
+        .trim()
+      return cleaned || raw
+    }
+  }, [])
   const previewCacheRef = useRef<Map<string, CheckoutPreviewResponse>>(new Map())
+
+  useEffect(() => {
+    if (summaryCombosInitializedRef.current) return
+    const comboIds = cartItems
+      .map((i) => String((i as any).mealComboId ?? '').trim())
+      .filter(Boolean)
+    if (comboIds.length === 0) return
+    summaryCombosInitializedRef.current = true
+    setExpandedSummaryComboIds(new Set(comboIds))
+  }, [cartItems])
+
+  const toggleSummaryCombo = (comboId: string) => {
+    const key = String(comboId ?? '').trim()
+    if (!key) return
+    setExpandedSummaryComboIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
   const cartItemIds = useMemo(
     () => cartItems.map((i) => i.cartItemId).filter(Boolean),
     [cartItems]
@@ -1043,7 +1094,14 @@ export default function CheckoutPage() {
                           : [item.productName, item.variantName]
                               .filter(Boolean)
                               .join(' - ') || 'Sản phẩm'
-                        const imageSrc = item.imageUrl?.startsWith('http') ? item.imageUrl : '/images/logo.png'
+                        const imageSrc = item.imageUrl?.startsWith('http')
+                          ? item.imageUrl
+                          : item.mealComboId
+                            ? '/images/combo/iconcombo.png'
+                            : '/images/logo.png'
+                        const isCombo = !!item.mealComboId
+                        const comboId = isCombo ? String(item.mealComboId ?? '').trim() : ''
+                        const isSummaryExpanded = isCombo ? expandedSummaryComboIds.has(comboId) : false
                         return (
                         <div key={item.cartItemId} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
                           <div className="relative w-12 h-12 bg-white rounded-lg flex-shrink-0 overflow-hidden border border-gray-100">
@@ -1051,19 +1109,63 @@ export default function CheckoutPage() {
                               src={imageSrc}
                               alt={displayName}
                               fill
-                              className="object-contain p-1 rounded-lg"
+                              className="object-cover"
                               sizes="48px"
                               unoptimized={imageSrc.startsWith('http')}
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm truncate">{displayName}</h3>
+                            {isCombo ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleSummaryCombo(comboId)}
+                                className="w-full text-left font-medium text-sm hover:underline inline-flex items-center gap-1 min-w-0"
+                              >
+                                {isSummaryExpanded ? (
+                                  <ChevronDown size={16} className="text-gray-500 flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight size={16} className="text-gray-500 flex-shrink-0" />
+                                )}
+                                <span className="truncate">{displayName}</span>
+                              </button>
+                            ) : (
+                              <h3 className="font-medium text-sm truncate">{displayName}</h3>
+                            )}
                             <div className="flex items-center justify-between mt-0.5">
                               <span className="text-xs text-gray-500">Số lượng: {item.quantity}</span>
                               <span className="font-semibold text-primary-green text-sm">
                                 {formatCurrency(item.subTotal)}
                               </span>
                             </div>
+                            {isCombo &&
+                            isSummaryExpanded &&
+                            Array.isArray(item.comboItems) &&
+                            item.comboItems.length > 0 ? (
+                              <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+                                <ul className="space-y-1.5 max-h-40 overflow-auto overscroll-contain pr-1">
+                                  {item.comboItems.map((ci) => {
+                                    const variantLabel = sanitizeVariantLabel(ci.variantName)
+                                    const left = [ci.productName, variantLabel]
+                                      .filter(Boolean)
+                                      .join(' - ')
+                                    return (
+                                      <li
+                                        key={`${item.cartItemId}-${ci.productId}-${ci.variantId ?? ''}`}
+                                        className="flex items-start justify-between gap-2"
+                                      >
+                                        <span className="text-xs text-gray-800 min-w-0 line-clamp-2">
+                                          {left || ci.productName || 'Sản phẩm'}
+                                        </span>
+                                        <span className="text-xs text-gray-600 whitespace-nowrap text-right">
+                                          <span className="block">x{ci.quantity}</span>
+                                          <span className="block">{formatCurrency(ci.unitPrice)}</span>
+                                        </span>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                         )

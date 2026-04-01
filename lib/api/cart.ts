@@ -40,6 +40,79 @@ function getJsonHeaders(token?: string): Record<string, string> {
   return headers
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v)
+}
+
+function pickValueCI(obj: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) {
+    if (k in obj) return obj[k]
+  }
+  const lower = new Map<string, string>()
+  for (const k of Object.keys(obj)) lower.set(k.toLowerCase(), k)
+  for (const k of keys) {
+    const hit = lower.get(k.toLowerCase())
+    if (hit) return obj[hit]
+  }
+  return undefined
+}
+
+function normalizeComboItems(value: unknown): ApiCartItem['comboItems'] {
+  if (!Array.isArray(value)) return null
+  return value
+    .map((raw) => {
+      if (!isRecord(raw)) return null
+      const productId = String(pickValueCI(raw, ['productId', 'ProductId']) ?? '').trim()
+      if (!productId) return null
+      const productName = pickValueCI(raw, ['productName', 'ProductName']) as
+        | string
+        | null
+        | undefined
+      const variantId = pickValueCI(raw, ['variantId', 'VariantId']) as
+        | string
+        | null
+        | undefined
+      const variantName = pickValueCI(raw, ['variantName', 'VariantName']) as
+        | string
+        | null
+        | undefined
+      const quantity = Number(pickValueCI(raw, ['quantity', 'Quantity']) ?? 0)
+      const unit = pickValueCI(raw, ['unit', 'Unit']) as string | null | undefined
+      const unitPrice = Number(pickValueCI(raw, ['unitPrice', 'UnitPrice']) ?? 0)
+      const lineTotal = Number(pickValueCI(raw, ['lineTotal', 'LineTotal']) ?? 0)
+      const imageUrl = pickValueCI(raw, ['imageUrl', 'ImageUrl']) as
+        | string
+        | null
+        | undefined
+      const origin = pickValueCI(raw, ['origin', 'Origin']) as string | null | undefined
+      return {
+        productId,
+        productName: productName ?? null,
+        variantId: variantId != null ? String(variantId) : null,
+        variantName: variantName ?? null,
+        quantity: Number.isFinite(quantity) ? Math.trunc(quantity) : 0,
+        unit: unit ?? null,
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+        lineTotal: Number.isFinite(lineTotal) ? lineTotal : 0,
+        imageUrl: imageUrl ?? null,
+        origin: origin ?? null,
+      }
+    })
+    .filter(Boolean) as NonNullable<ApiCartItem['comboItems']>
+}
+
+function normalizeCart(cart: ApiCart | null): ApiCart | null {
+  if (!cart || !Array.isArray(cart.cartItems)) return cart
+  const items = cart.cartItems.map((it) => {
+    const raw = it as unknown as Record<string, unknown>
+    const comboItemsRaw = raw.comboItems ?? raw.ComboItems
+    const comboItems = normalizeComboItems(comboItemsRaw)
+    if (!comboItems) return it
+    return { ...it, comboItems }
+  })
+  return { ...cart, cartItems: items }
+}
+
 export async function getCart(token: string): Promise<ApiCart | null> {
   const res = await fetch(`${getBase()}/api/carts`, {
     headers: getHeaders(token),
@@ -56,7 +129,7 @@ export async function getCart(token: string): Promise<ApiCart | null> {
     raw && typeof raw === 'object' && 'data' in raw
       ? (raw as { data?: ApiCart }).data
       : (raw as ApiCart)
-  const cart = (extracted ?? null) as ApiCart | null
+  const cart = normalizeCart((extracted ?? null) as ApiCart | null)
   if (cart?.cartItems?.length) {
     return await enrichCartItems(cart)
   }
@@ -180,12 +253,24 @@ async function enrichCartItems(cart: ApiCart): Promise<ApiCart> {
         imageUrl: imageUrl || item.imageUrl,
       }
     })
-    const computedTotal =
-      enrichedItems.reduce((sum, i) => sum + (i.subTotal ?? i.priceAtTime * i.quantity), 0)
+    const computedTotal = enrichedItems.reduce((sum, i) => {
+      const sub = Number(i.subTotal)
+      if (Number.isFinite(sub) && sub >= 0) return sum + sub
+      const unit = Number(i.priceAtTime)
+      const qty = Number(i.quantity)
+      return sum + (Number.isFinite(unit) && Number.isFinite(qty) ? unit * qty : 0)
+    }, 0)
+
+    const backendTotal = Number(cart.totalAmount)
+    const shouldTrustBackendTotal =
+      Number.isFinite(backendTotal) &&
+      backendTotal >= 0 &&
+      // chỉ tin backend khi tổng khớp (tránh case BE trả sai chỉ 1 item)
+      Math.abs(backendTotal - computedTotal) < 1
     return {
       ...cart,
       cartItems: enrichedItems,
-      totalAmount: cart.totalAmount > 0 ? cart.totalAmount : computedTotal,
+      totalAmount: shouldTrustBackendTotal ? backendTotal : computedTotal,
     }
   } catch {
     return cart

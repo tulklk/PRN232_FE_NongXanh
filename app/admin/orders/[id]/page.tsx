@@ -32,6 +32,21 @@ export default function AdminOrderDetailPage() {
 
   const [expandedComboKeys, setExpandedComboKeys] = useState<Set<string>>(() => new Set())
 
+  const sanitizeVariantLabel = useCallback((label: string | null | undefined) => {
+    const raw = String(label ?? '').trim()
+    if (!raw) return null
+    // Keep pure weight/volume variants (e.g. "100g", "1kg", "500 ml")
+    if (/^\d+(?:[.,]\d+)?\s*(kg|g|ml|l)\b/i.test(raw)) return raw
+    // Drop pure "bó" variants (e.g. "1 bó")
+    if (/^\d+(?:[.,]\d+)?\s*(bó|bo)\b/i.test(raw)) return null
+    const cleaned = raw
+      .replace(/(^|[\s-])\d+(?:[.,]\d+)?\s*(kg|g|bó|bo|ml|l)\b/gi, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/[-–—]\s*$/g, '')
+      .trim()
+    return cleaned || raw
+  }, [])
+
   const toggleCombo = useCallback((key: string) => {
     setExpandedComboKeys((prev) => {
       const next = new Set(prev)
@@ -75,10 +90,11 @@ export default function AdminOrderDetailPage() {
 
   const getStatusLabel = (status?: string | null) => {
     const labels: Record<string, string> = {
-      pending: 'Chờ xử lý',
+      pending: 'Đang xử lý',
       processing: 'Đang xử lý',
       confirmed: 'Đã xác nhận',
-      shipped: 'Đã giao hàng',
+      shipping: 'Đang giao',
+      shipped: 'Đang giao',
       delivered: 'Đã nhận hàng',
       cancelled: 'Đã hủy',
     }
@@ -342,8 +358,12 @@ export default function AdminOrderDetailPage() {
                   | Array<{
                       productId: string
                       productName?: string | null
+                      variantId?: string | null
+                      variantName?: string | null
                       quantity: number
                       unit?: string | null
+                      unitPrice?: number | null
+                      lineTotal?: number | null
                       imageUrl?: string | null
                       origin?: string | null
                     }>
@@ -387,10 +407,25 @@ export default function AdminOrderDetailPage() {
                             {comboItems.map((it) => {
                               const img = String(it.imageUrl ?? '').trim()
                               const src = img.startsWith('http') ? img : '/images/logo.png'
-                              const name = String(it.productName ?? '').trim() || 'Sản phẩm'
+                              const baseName = String(it.productName ?? '').trim() || 'Sản phẩm'
+                              const variantLabel = sanitizeVariantLabel(it.variantName)
+                              const name = [baseName, variantLabel].filter(Boolean).join(' - ')
+                              const comboQty = Number(detail.quantity ?? 1)
+                              const packsPerCombo = Number(it.quantity ?? 0)
+                              const packsTotal =
+                                Number.isFinite(comboQty) && comboQty > 1 && Number.isFinite(packsPerCombo)
+                                  ? packsPerCombo * comboQty
+                                  : null
+                              const unitPrice = Number(it.unitPrice ?? NaN)
+                              const lineTotal = Number(it.lineTotal ?? NaN)
+                              const hasPrices =
+                                Number.isFinite(unitPrice) &&
+                                unitPrice >= 0 &&
+                                Number.isFinite(lineTotal) &&
+                                lineTotal >= 0
                               return (
                                 <div
-                                  key={it.productId}
+                                  key={`${it.productId}-${it.variantId ?? ''}`}
                                   className="px-3 py-2 text-sm flex items-center justify-between gap-3"
                                 >
                                   <div className="flex items-center gap-3 min-w-0">
@@ -408,15 +443,20 @@ export default function AdminOrderDetailPage() {
                                       <div className="text-gray-800 line-clamp-1">
                                         {name}
                                       </div>
-                                      {it.origin ? (
-                                        <div className="text-xs text-gray-500 line-clamp-1">
-                                          {it.origin}
-                                        </div>
-                                      ) : null}
                                     </div>
                                   </div>
-                                  <span className="text-gray-600 flex-shrink-0">
-                                    {it.quantity} {it.unit ?? ''}
+                                  <span className="text-gray-600 flex-shrink-0 text-right whitespace-nowrap">
+                                    <span className="block">
+                                      x{it.quantity}
+                                      {packsTotal != null ? (
+                                        <span className="text-gray-500">{` (x${comboQty} combo = ${packsTotal})`}</span>
+                                      ) : null}
+                                    </span>
+                                    {hasPrices ? (
+                                      <span className="block text-xs">
+                                        {formatCurrency(unitPrice)}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </div>
                               )
@@ -441,10 +481,10 @@ export default function AdminOrderDetailPage() {
                 raw.ProductImageUrl ??
                 raw.imageUrl ??
                 raw.ImageUrl) as string | undefined
-            const productName = (raw.productName ??
-              raw.ProductName ??
-              detail.variantName ??
-              'Sản phẩm') as string
+            const baseName = String((raw.productName ?? raw.ProductName ?? '') as string).trim()
+            const variantLabel = sanitizeVariantLabel(detail.variantName)
+            const productName =
+              [baseName || 'Sản phẩm', variantLabel].filter(Boolean).join(' - ') || 'Sản phẩm'
             const imageSrc =
               imageUrl && imageUrl.startsWith('http')
                 ? imageUrl
@@ -467,10 +507,7 @@ export default function AdminOrderDetailPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{productName}</p>
-                  <p className="text-sm text-gray-500">
-                    {detail.variantName && `${detail.variantName} • `}x
-                    {detail.quantity}
-                  </p>
+                  <p className="text-sm text-gray-500">x{detail.quantity}</p>
                 </div>
                 <span className="font-semibold text-primary-green flex-shrink-0">
                   {formatCurrency(detail.subTotal)}
