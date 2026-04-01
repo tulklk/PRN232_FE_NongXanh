@@ -745,7 +745,7 @@ export default function Header() {
                   {topLevelCategories.map((cat) => (
                     <Link
                       key={cat.categoryId}
-                      href={`/products?category=${cat.categoryId}`}
+                      href={`/products?categoryId=${cat.categoryId}`}
                       className="block px-8 py-2 text-base font-medium text-gray-700"
                       onClick={() => setMobileDrawerOpen(false)}
                     >
@@ -867,7 +867,7 @@ export default function Header() {
                                 setIsMenuOpen(false);
                                 setCategorySubmenuHovered(null);
                                 router.push(
-                                  `/products?category=${cat.categoryId}`,
+                                  `/products?categoryId=${cat.categoryId}`,
                                 );
                               }}
                             >
@@ -900,7 +900,7 @@ export default function Header() {
                             return children.map((child) => (
                               <Link
                                 key={child.categoryId}
-                                href={`/products?category=${child.categoryId}`}
+                                href={`/products?categoryId=${child.categoryId}`}
                                 onClick={() => {
                                   setIsMenuOpen(false);
                                   setCategorySubmenuHovered(null);
@@ -960,7 +960,7 @@ export default function Header() {
                       }}
                     >
                       <Link
-                        href={`/products?category=${cat.categoryId}`}
+                        href={`/products?categoryId=${cat.categoryId}`}
                         className="flex items-center gap-1.5 px-4 py-2.5 text-gray-700 hover:text-[#0A923C] transition-colors text-xs font-medium"
                         onClick={() => setNavCategoryDropdownHovered(null)}
                       >
@@ -1004,7 +1004,7 @@ export default function Header() {
                             {children.map((child) => (
                               <Link
                                 key={child.categoryId}
-                                href={`/products?category=${child.categoryId}`}
+                                href={`/products?categoryId=${child.categoryId}`}
                                 onClick={() =>
                                   setNavCategoryDropdownHovered(null)
                                 }

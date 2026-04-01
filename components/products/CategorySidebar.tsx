@@ -33,9 +33,16 @@ export default function CategorySidebar({
       if (raw === null || raw === "") p.delete(key);
       else p.set(key, raw);
     }
+    // Đồng bộ BE: chỉ dùng categoryId; bỏ query cũ ?category=
+    if (Object.prototype.hasOwnProperty.call(overrides, "categoryId")) {
+      p.delete("category");
+    }
     const qs = p.toString();
     return qs ? `/products?${qs}` : "/products";
   };
+
+  const activeCategoryIdFromUrl =
+    searchParams.get("categoryId") || searchParams.get("category") || "all";
 
   const curMin = searchParams.get("minPrice");
   const curMax = searchParams.get("maxPrice");
@@ -142,9 +149,11 @@ export default function CategorySidebar({
         <ul className="space-y-2">
           <li>
             <Link
-              href={buildProductsHref({ category: null })}
+              href={buildProductsHref({ categoryId: null, category: null })}
               className={`block px-3 py-2 rounded hover:bg-gray-100 ${
-                !activeCategory || activeCategory === "all"
+                !activeCategory ||
+                activeCategory === "all" ||
+                activeCategoryIdFromUrl === "all"
                   ? "bg-primary-green-light text-primary-green-dark font-semibold"
                   : "text-gray-700"
               }`}
@@ -163,10 +172,11 @@ export default function CategorySidebar({
                 <li key={cat.categoryId}>
                   <Link
                     href={buildProductsHref({
-                      category: String(cat.categoryId),
+                      categoryId: String(cat.categoryId),
                     })}
                     className={`block px-3 py-2 rounded hover:bg-gray-100 ${
-                      activeCategory === String(cat.categoryId)
+                      activeCategory === String(cat.categoryId) ||
+                      activeCategoryIdFromUrl === String(cat.categoryId)
                         ? "bg-primary-green-light text-primary-green-dark font-semibold"
                         : "text-gray-700"
                     }`}
@@ -184,9 +194,12 @@ export default function CategorySidebar({
                 onMouseLeave={handleParentLeave}
               >
                 <Link
-                  href={buildProductsHref({ category: String(cat.categoryId) })}
+                  href={buildProductsHref({
+                    categoryId: String(cat.categoryId),
+                  })}
                   className={`block px-3 py-2 rounded hover:bg-gray-100 ${
-                    activeCategory === String(cat.categoryId)
+                    activeCategory === String(cat.categoryId) ||
+                    activeCategoryIdFromUrl === String(cat.categoryId)
                       ? "bg-primary-green-light text-primary-green-dark font-semibold"
                       : "text-gray-700"
                   }`}
@@ -199,10 +212,11 @@ export default function CategorySidebar({
                       <Link
                         key={child.categoryId}
                         href={buildProductsHref({
-                          category: String(child.categoryId),
+                          categoryId: String(child.categoryId),
                         })}
                         className={`block px-4 py-2 text-sm rounded-r hover:bg-gray-100 ${
-                          activeCategory === String(child.categoryId)
+                          activeCategory === String(child.categoryId) ||
+                          activeCategoryIdFromUrl === String(child.categoryId)
                             ? "bg-primary-green-light text-primary-green-dark font-semibold"
                             : "text-gray-700"
                         }`}

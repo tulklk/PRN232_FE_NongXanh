@@ -35,8 +35,7 @@ export async function GET(request: NextRequest) {
     let url = `${API_BASE_URL}/api/Products?pageNumber=${pageNumber}&pageSize=${pageSize}`
     if (categoryId) {
       const encoded = encodeURIComponent(categoryId)
-      // Gửi cả 2 key để tương thích BE filter.
-      url += `&categoryId=${encoded}&category=${encoded}`
+      url += `&categoryId=${encoded}`
     }
     if (providerId) {
       const enc = encodeURIComponent(providerId)

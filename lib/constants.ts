@@ -1,9 +1,9 @@
 export const NAVIGATION_LINKS = [
   { label: 'DANH MỤC SẢN PHẨM', href: '/products' },
   { label: 'ĐI CHỢ ONLINE', href: '/products' },
-  { label: 'TRÁI CÂY', href: '/products?category=fruits' },
-  { label: 'TRÀ - CÀ PHÊ', href: '/products?category=tea-coffee' },
-  { label: 'ĐẶC SẢN', href: '/products?category=specialties' },
+  { label: 'TRÁI CÂY', href: '/products' },
+  { label: 'TRÀ - CÀ PHÊ', href: '/products' },
+  { label: 'ĐẶC SẢN', href: '/products' },
   { label: 'Tin tức', href: '/news' },
   { label: 'Liên hệ', href: '/contact' },
 ]

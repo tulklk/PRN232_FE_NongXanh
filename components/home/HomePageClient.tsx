@@ -6,13 +6,17 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
 import HotDealCard from "@/components/products/HotDealCard";
+import {
+  HomeProductCarousel,
+  HomeProductCarouselSlide,
+} from "@/components/home/HomeProductCarousel";
 import type { Product } from "@/data/products";
 import { useInView } from "@/lib/hooks/useInView";
 import { getBlogs } from "@/lib/api/blogs";
 import type { ApiBlog } from "@/lib/types/api";
 import { getReviewsByProduct } from "@/lib/api/reviews";
 import { getCategories } from "@/lib/api/categories";
-import { getBestSellerProducts } from "@/lib/api/products";
+import { getBestSellerProducts, getProducts } from "@/lib/api/products";
 
 function normalizeExternalUrl(url?: string | null): string | null {
   if (!url) return null;
@@ -82,6 +86,9 @@ export default function HomePageClient({ products }: HomePageClientProps) {
   const [selectedFruitCategoryId, setSelectedFruitCategoryId] = useState<
     "all" | string
   >("all");
+  const [fruitFromApi, setFruitFromApi] = useState<Product[] | null>(null);
+  const [fruitLoading, setFruitLoading] = useState(false);
+  const fruitLoadedKeyRef = useRef<string>("");
   const [meatParentCategoryId, setMeatParentCategoryId] = useState<string | null>(
     null,
   );
@@ -109,6 +116,8 @@ export default function HomePageClient({ products }: HomePageClientProps) {
   const [selectedDairyCategoryId, setSelectedDairyCategoryId] = useState<
     "all" | string
   >("all");
+  const [dairyFromApi, setDairyFromApi] = useState<Product[] | null>(null);
+  const dairyLoadedKeyRef = useRef<string>("");
   const [ratingOverrides, setRatingOverrides] = useState<
     Record<string, { rating: number; reviewCount: number }>
   >({});
@@ -149,6 +158,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     [productsWithOverrides],
   );
   const fruitProducts = useMemo(() => {
+    if (fruitFromApi && fruitFromApi.length > 0) return fruitFromApi.slice(0, 7);
     const childIds = fruitChildCategories.map((c) => c.id);
     if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
     let filtered = productsWithOverrides.filter((p) =>
@@ -160,7 +170,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       );
     }
     return filtered.slice(0, 7);
-  }, [productsWithOverrides, fruitChildCategories, selectedFruitCategoryId]);
+  }, [productsWithOverrides, fruitFromApi, fruitChildCategories, selectedFruitCategoryId]);
   const meatProducts = useMemo(() => {
     const childIds = meatChildCategories.map((c) => c.id);
     if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
@@ -186,6 +196,8 @@ export default function HomePageClient({ products }: HomePageClientProps) {
     return filtered.slice(0, 7);
   }, [productsWithOverrides, seafoodChildCategories, selectedSeafoodCategoryId]);
   const dairyProducts = useMemo(() => {
+    // Cùng contract với /products: GET ...?categoryId= — cha = cả cây con, con/lá = đúng danh mục đó.
+    if (dairyFromApi !== null) return dairyFromApi.slice(0, 7);
     const childIds = dairyChildCategories.map((c) => c.id);
     if (childIds.length === 0) return productsWithOverrides.slice(0, 7);
     let filtered = productsWithOverrides.filter((p) =>
@@ -195,7 +207,7 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       filtered = filtered.filter((p) => String(p.category) === selectedDairyCategoryId);
     }
     return filtered.slice(0, 7);
-  }, [productsWithOverrides, dairyChildCategories, selectedDairyCategoryId]);
+  }, [productsWithOverrides, dairyFromApi, dairyChildCategories, selectedDairyCategoryId]);
 
   const banners = [
     "/images/homepage/homebanner1.jpg",
@@ -236,8 +248,13 @@ export default function HomePageClient({ products }: HomePageClientProps) {
 
         const normalize = (s?: string | null) => (s ?? "").trim().toLowerCase();
 
-        const findParent = (names: string[]) =>
-          cats.find((c) => names.includes(normalize(c.categoryName)));
+        const findParent = (names: string[]) => {
+          const targets = names.map((n) => normalize(n)).filter(Boolean);
+          return cats.find((c) => {
+            const n = normalize(c.categoryName);
+            return targets.some((t) => n === t || n.includes(t));
+          });
+        };
 
         const mapChildren = (parent: any) =>
           (parent?.children ?? []).map((c: any) => ({
@@ -279,6 +296,139 @@ export default function HomePageClient({ products }: HomePageClientProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    // Fetch Fruits section by category to include all child-category products.
+    if (!fruitsSectionInView.isInView) return;
+    if (!fruitParentCategoryId) return;
+
+    const childIds = fruitChildCategories.map((c) => c.id).filter(Boolean);
+    const selected =
+      selectedFruitCategoryId !== "all" ? selectedFruitCategoryId : null;
+    const key = JSON.stringify({
+      parent: fruitParentCategoryId,
+      child: childIds,
+      selected,
+    });
+    if (fruitLoadedKeyRef.current === key) return;
+    fruitLoadedKeyRef.current = key;
+
+    let cancelled = false;
+    setFruitLoading(true);
+
+    const uniqById = (list: Product[]) => {
+      const seen = new Set<string>();
+      const out: Product[] = [];
+      for (const p of list) {
+        const id = String(p.id);
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        out.push(p);
+      }
+      return out;
+    };
+
+    const load = async () => {
+      try {
+        if (selected) {
+          const res = await getProducts({ pageNumber: 1, pageSize: 12, categoryId: selected });
+          return res.items ?? [];
+        }
+
+        // Prefer loading from child categories first (covers "Trái cây nhiệt đới" + "Trái cây ôn đới").
+        if (childIds.length > 0) {
+          const results = await Promise.all(
+            childIds.slice(0, 6).map(async (cid) => {
+              try {
+                const res = await getProducts({
+                  pageNumber: 1,
+                  pageSize: 12,
+                  categoryId: cid,
+                });
+                return res.items ?? [];
+              } catch {
+                return [];
+              }
+            }),
+          );
+          const merged = uniqById(results.flat());
+          if (merged.length > 0) return merged;
+        }
+
+        // Fallback to parent category if children absent/empty.
+        const res = await getProducts({
+          pageNumber: 1,
+          pageSize: 12,
+          categoryId: fruitParentCategoryId,
+        });
+        return res.items ?? [];
+      } catch {
+        return [];
+      }
+    };
+
+    load()
+      .then((items) => {
+        if (cancelled) return;
+        setFruitFromApi(items);
+      })
+      .finally(() => {
+        if (!cancelled) setFruitLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fruitsSectionInView.isInView,
+    fruitParentCategoryId,
+    fruitChildCategories,
+    selectedFruitCategoryId,
+  ]);
+
+  useEffect(() => {
+    if (!dairySectionInView.isInView) return;
+    if (!dairyParentCategoryId) return;
+
+    const selected =
+      selectedDairyCategoryId !== "all" ? selectedDairyCategoryId : null;
+    const key = JSON.stringify({
+      parent: dairyParentCategoryId,
+      selected,
+    });
+    if (dairyLoadedKeyRef.current === key) return;
+    dairyLoadedKeyRef.current = key;
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const categoryId = selected ?? dairyParentCategoryId;
+        const res = await getProducts({
+          pageNumber: 1,
+          pageSize: 15,
+          categoryId,
+          skipSoldQuantityHydration: true,
+        });
+        return res.items ?? [];
+      } catch {
+        return [];
+      }
+    };
+
+    load().then((items) => {
+      if (cancelled) return;
+      setDairyFromApi(items);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    dairySectionInView.isInView,
+    dairyParentCategoryId,
+    selectedDairyCategoryId,
+  ]);
 
   useEffect(() => {
     if (activeTab !== "bestseller") return;
@@ -559,25 +709,25 @@ export default function HomePageClient({ products }: HomePageClientProps) {
           {activeTab === "bestseller" && bestSellerLoading && (
             <p className="mb-3 text-sm text-gray-500">Đang tải sản phẩm bán chạy...</p>
           )}
-          <div className="relative">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-              {tabProducts.map((product, i) => (
+          <HomeProductCarousel
+            key={activeTab}
+            aria-label={
+              activeTab === "new"
+                ? "Sản phẩm mới"
+                : "Sản phẩm bán chạy nhất"
+            }
+          >
+            {tabProducts.map((product, i) => (
+              <HomeProductCarouselSlide key={product.id}>
                 <div
-                  key={product.id}
                   className={`transition-all duration-500 ${hotDealsInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-                  style={{ transitionDelay: `${150 + i * 80}ms` }}
+                  style={{ transitionDelay: `${150 + i * 40}ms` }}
                 >
                   <HotDealCard product={product} />
                 </div>
-              ))}
-            </div>
-            <button className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 hover:scale-110 border border-gray-200 transition-transform duration-200">
-              <ChevronLeft size={24} className="text-gray-600" />
-            </button>
-            <button className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 hover:scale-110 border border-gray-200 transition-transform duration-200">
-              <ChevronRight size={24} className="text-gray-600" />
-            </button>
-          </div>
+              </HomeProductCarouselSlide>
+            ))}
+          </HomeProductCarousel>
         </div>
       </section>
 
@@ -621,8 +771,8 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <Link
                 href={
                   fruitParentCategoryId
-                    ? `/products?category=${encodeURIComponent(fruitParentCategoryId)}`
-                    : "/products?category=fruits"
+                    ? `/products?categoryId=${encodeURIComponent(fruitParentCategoryId)}`
+                    : "/products"
                 }
                 className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
               >
@@ -641,17 +791,22 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               sizes="(max-width: 1400px) 100vw, 1400px"
             />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+          <HomeProductCarousel
+            key={`fruit-${selectedFruitCategoryId}`}
+            className="mt-1 sm:mt-0"
+            aria-label="Trái cây tươi ngon"
+          >
             {fruitProducts.map((product, i) => (
-              <div
-                key={product.id}
-                className={`transition-all duration-500 ${fruitsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-                style={{ transitionDelay: `${200 + i * 50}ms` }}
-              >
-                <ProductCard product={product} showWishlist={false} />
-              </div>
+              <HomeProductCarouselSlide key={product.id}>
+                <div
+                  className={`transition-all duration-500 ${fruitsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                  style={{ transitionDelay: `${200 + i * 40}ms` }}
+                >
+                  <ProductCard product={product} showWishlist={false} />
+                </div>
+              </HomeProductCarouselSlide>
             ))}
-          </div>
+          </HomeProductCarousel>
         </div>
       </section>
 
@@ -695,8 +850,8 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <Link
                 href={
                   meatParentCategoryId
-                    ? `/products?category=${encodeURIComponent(meatParentCategoryId)}`
-                    : "/products?category=meat"
+                    ? `/products?categoryId=${encodeURIComponent(meatParentCategoryId)}`
+                    : "/products"
                 }
                 className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
               >
@@ -704,17 +859,22 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+          <HomeProductCarousel
+            key={`meat-${selectedMeatCategoryId}`}
+            className="mt-1 sm:mt-0"
+            aria-label="Thịt tươi ngon"
+          >
             {meatProducts.map((product, i) => (
-              <div
-                key={product.id}
-                className={`transition-all duration-500 ${meatsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-                style={{ transitionDelay: `${200 + i * 50}ms` }}
-              >
-                <ProductCard product={product} showWishlist={false} />
-              </div>
+              <HomeProductCarouselSlide key={product.id}>
+                <div
+                  className={`transition-all duration-500 ${meatsSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                  style={{ transitionDelay: `${200 + i * 40}ms` }}
+                >
+                  <ProductCard product={product} showWishlist={false} />
+                </div>
+              </HomeProductCarouselSlide>
             ))}
-          </div>
+          </HomeProductCarousel>
         </div>
       </section>
 
@@ -758,8 +918,8 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <Link
                 href={
                   seafoodParentCategoryId
-                    ? `/products?category=${encodeURIComponent(seafoodParentCategoryId)}`
-                    : "/products?category=seafood"
+                    ? `/products?categoryId=${encodeURIComponent(seafoodParentCategoryId)}`
+                    : "/products"
                 }
                 className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
               >
@@ -767,17 +927,22 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+          <HomeProductCarousel
+            key={`seafood-${selectedSeafoodCategoryId}`}
+            className="mt-1 sm:mt-0"
+            aria-label="Cá, hải sản tươi ngon"
+          >
             {seafoodProducts.map((product, i) => (
-              <div
-                key={product.id}
-                className={`transition-all duration-500 ${seafoodSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-                style={{ transitionDelay: `${200 + i * 50}ms` }}
-              >
-                <ProductCard product={product} showWishlist={false} />
-              </div>
+              <HomeProductCarouselSlide key={product.id}>
+                <div
+                  className={`transition-all duration-500 ${seafoodSectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                  style={{ transitionDelay: `${200 + i * 40}ms` }}
+                >
+                  <ProductCard product={product} showWishlist={false} />
+                </div>
+              </HomeProductCarouselSlide>
             ))}
-          </div>
+          </HomeProductCarousel>
         </div>
       </section>
 
@@ -821,8 +986,8 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               <Link
                 href={
                   dairyParentCategoryId
-                    ? `/products?category=${encodeURIComponent(dairyParentCategoryId)}`
-                    : "/products?category=dairy"
+                    ? `/products?categoryId=${encodeURIComponent(dairyParentCategoryId)}`
+                    : "/products"
                 }
                 className="text-gray-600 hover:text-[#0A923C] flex items-center gap-1 text-sm"
               >
@@ -830,17 +995,22 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mt-1 sm:mt-0">
+          <HomeProductCarousel
+            key={`dairy-${selectedDairyCategoryId}`}
+            className="mt-1 sm:mt-0"
+            aria-label="Sữa tươi ngon"
+          >
             {dairyProducts.map((product, i) => (
-              <div
-                key={product.id}
-                className={`transition-all duration-500 ${dairySectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-                style={{ transitionDelay: `${200 + i * 50}ms` }}
-              >
-                <ProductCard product={product} showWishlist={false} />
-              </div>
+              <HomeProductCarouselSlide key={product.id}>
+                <div
+                  className={`transition-all duration-500 ${dairySectionInView.isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                  style={{ transitionDelay: `${200 + i * 40}ms` }}
+                >
+                  <ProductCard product={product} showWishlist={false} />
+                </div>
+              </HomeProductCarouselSlide>
             ))}
-          </div>
+          </HomeProductCarousel>
         </div>
       </section>
 

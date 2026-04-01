@@ -417,9 +417,7 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
     pageSize: String(pageSize),
   })
   if (categoryId) {
-    // Hỗ trợ nhiều backend naming conventions.
     search.set('categoryId', categoryId)
-    search.set('category', categoryId)
   }
   if (providerId) {
     search.set('providerId', providerId)
@@ -433,8 +431,15 @@ export async function getProducts(params?: GetProductsParams): Promise<GetProduc
     ...(typeof window === 'undefined' && { next: { revalidate: 60 } }),
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((err as { error?: string }).error || 'Không thể tải sản phẩm')
+    const err = (await res.json().catch(() => ({}))) as {
+      error?: string
+      message?: string
+    }
+    const msg =
+      err.message ||
+      err.error ||
+      (res.status === 404 ? 'Danh mục không tồn tại' : 'Không thể tải sản phẩm')
+    throw new Error(msg)
   }
   const json = (await res.json()) as ApiProductsResponse & { items?: ApiProduct[] }
   const data = json.data

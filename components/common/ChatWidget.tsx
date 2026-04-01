@@ -373,8 +373,8 @@ export default function ChatWidget() {
         <div
           className={`fixed bottom-24 right-4 z-[80] w-[calc(100vw-2rem)] max-w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl transition-all duration-300 ease-out sm:right-6 sm:w-[360px] ${
             open
-              ? "translate-y-0 scale-100 opacity-100"
-              : "translate-y-5 scale-90 opacity-0"
+              ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+              : "pointer-events-none translate-y-5 scale-90 opacity-0"
           }`}
         >
           <div className="flex items-center justify-between bg-[#0A923C] px-4 py-3 text-white">

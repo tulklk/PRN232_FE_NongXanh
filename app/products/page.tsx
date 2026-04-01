@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  Suspense,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -50,40 +57,20 @@ function flattenCategories(cats: ApiCategory[]): ApiCategory[] {
   return result;
 }
 
-function normalizeCategoryId(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-function getDirectChildCategoryIds(
-  selectedCategoryId: string,
-  categories: ApiCategory[],
-): string[] {
-  const selectedKey = normalizeCategoryId(selectedCategoryId);
-  if (!selectedKey) return [];
-
-  const fromParentId = categories
-    .filter(
-      (c) =>
-        !c.isDeleted &&
-        normalizeCategoryId((c as any).parentId) === selectedKey,
-    )
-    .map((c) => String(c.categoryId));
-
-  const fromChildrenField = categories
-    .filter((c) => normalizeCategoryId(c.categoryId) === selectedKey)
-    .flatMap((c) => (c.children ?? []).filter((x) => !x.isDeleted))
-    .map((c) => String(c.categoryId));
-
-  return Array.from(new Set([...fromParentId, ...fromChildrenField]));
-}
-
 const LARGE_FETCH_PAGE_SIZE = 500;
+
+function categoryIdsEqual(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
 
 function ProductsContent() {
   const searchParams = useSearchParams();
-  const category = searchParams.get("category") || "all";
+  /** BE: lọc theo cây danh mục qua categoryId (Guid). Hỗ trợ ?category= cũ. */
+  const categoryIdParam =
+    searchParams.get("categoryId")?.trim() ||
+    searchParams.get("category")?.trim() ||
+    "";
+  const isAllCategories = !categoryIdParam;
   const sortParam = searchParams.get("sort");
   const keyword = searchParams.get("q")?.trim() ?? "";
   const providerParam = searchParams.get("provider")?.trim() ?? "";
@@ -105,6 +92,7 @@ function ProductsContent() {
   const [ratingOverrides, setRatingOverrides] = useState<
     Record<string, { rating: number; reviewCount: number }>
   >({});
+  const [listError, setListError] = useState<string | null>(null);
   const pageSize = 16;
 
   useEffect(() => {
@@ -150,13 +138,15 @@ function ProductsContent() {
     };
   }, []);
 
-  useEffect(() => {
+  /** Reset trang trước khi paint để lần fetch đầu không dùng nhầm pageNumber cũ (gây race / re-fetch liên tục). */
+  useLayoutEffect(() => {
     setPageNumber(1);
-  }, [category, providerParam, minPriceStr, maxPriceStr]);
+  }, [categoryIdParam, providerParam, minPriceStr, maxPriceStr]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setListError(null);
 
     const loadProducts = async () => {
       const providerIdArg = providerParam || undefined;
@@ -165,103 +155,44 @@ function ProductsContent() {
       const apiPageSize = useLargeBatch ? LARGE_FETCH_PAGE_SIZE : pageSize;
 
       try {
-        if (category === "all") {
-          const res = await getProducts({
-            pageNumber: apiPage,
-            pageSize: apiPageSize,
-            providerId: providerIdArg,
-          });
-          if (cancelled) return;
-          setProducts(res.items);
-          if (useLargeBatch) {
-            setTotalPages(1);
-          } else {
-            setTotalPages(
-              res.totalPages ??
-                (Math.ceil((res.totalCount ?? 0) / pageSize) || 1),
-            );
-          }
-          return;
-        }
-
-        const childCategoryIds = getDirectChildCategoryIds(
-          category,
-          categories,
-        );
-        const isParentCategory = childCategoryIds.length > 0;
-
-        if (!isParentCategory) {
-          const res = await getProducts({
-            pageNumber: apiPage,
-            pageSize: apiPageSize,
-            categoryId: category,
-            providerId: providerIdArg,
-          });
-          if (cancelled) return;
-          setProducts(res.items);
-          if (useLargeBatch) {
-            setTotalPages(1);
-          } else {
-            setTotalPages(
-              res.totalPages ??
-                (Math.ceil((res.totalCount ?? 0) / pageSize) || 1),
-            );
-          }
-          return;
-        }
-
-        const perChildSize = useLargeBatch ? 500 : 200;
-        const results = await Promise.all(
-          childCategoryIds.map((childId) =>
-            getProducts({
-              pageNumber: 1,
-              pageSize: perChildSize,
-              categoryId: childId,
-              providerId: providerIdArg,
-            }),
-          ),
-        );
-        if (cancelled) return;
-
-        const merged: Product[] = [];
-        const seen = new Set<string>();
-        results.forEach((res) => {
-          res.items.forEach((item) => {
-            const key = String(item.id);
-            if (seen.has(key)) return;
-            seen.add(key);
-            merged.push(item);
-          });
+        const res = await getProducts({
+          pageNumber: apiPage,
+          pageSize: apiPageSize,
+          ...(isAllCategories ? {} : { categoryId: categoryIdParam }),
+          providerId: providerIdArg,
+          /** Danh sách SP: không cần sold-quantity từng SKU — tránh hàng chục request làm UI đơ. */
+          skipSoldQuantityHydration: true,
         });
-
+        if (cancelled) return;
+        setProducts(res.items);
         if (useLargeBatch) {
-          setProducts(merged);
           setTotalPages(1);
         } else {
-          const start = (pageNumber - 1) * pageSize;
-          const paged = merged.slice(start, start + pageSize);
-          setProducts(paged);
-          setTotalPages(Math.max(1, Math.ceil(merged.length / pageSize)));
+          setTotalPages(
+            res.totalPages ??
+              (Math.ceil((res.totalCount ?? 0) / pageSize) || 1),
+          );
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           setProducts([]);
           setTotalPages(1);
+          setListError(e instanceof Error ? e.message : "Không thể tải sản phẩm");
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    loadProducts();
+    void loadProducts();
     return () => {
       cancelled = true;
     };
   }, [
-    category,
+    categoryIdParam,
+    isAllCategories,
     pageNumber,
     pageSize,
-    categories,
     providerParam,
     hasPriceFilter,
   ]);
@@ -272,13 +203,15 @@ function ProductsContent() {
   );
 
   const activeCategoryObj =
-    category !== "all"
-      ? allCategories.find((c) => String(c.categoryId) === category)
+    !isAllCategories
+      ? allCategories.find((c) =>
+          categoryIdsEqual(String(c.categoryId), categoryIdParam),
+        )
       : null;
 
   const pageTitle =
     activeCategoryObj?.categoryName?.toUpperCase() ??
-    (category === "all" ? "TẤT CẢ SẢN PHẨM" : "SẢN PHẨM");
+    (isAllCategories ? "TẤT CẢ SẢN PHẨM" : "SẢN PHẨM");
 
   const selectedProviderName = useMemo(() => {
     if (!providerParam) return null;
@@ -300,27 +233,6 @@ function ProductsContent() {
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products];
-
-    if (category !== "all") {
-      const selectedCategory = String(category).trim().toLowerCase();
-      const childCategoryIds = getDirectChildCategoryIds(
-        category,
-        categories,
-      ).map((id) => normalizeCategoryId(id));
-      const isParentCategory = childCategoryIds.length > 0;
-      const allowedCategoryIds = isParentCategory
-        ? new Set(childCategoryIds)
-        : new Set([selectedCategory]);
-
-      filtered = filtered.filter((p) => {
-        const categoryOfProduct = String(
-          (p as any).categoryId ?? p.category ?? "",
-        )
-          .trim()
-          .toLowerCase();
-        return allowedCategoryIds.has(categoryOfProduct);
-      });
-    }
 
     if (providerParam) {
       filtered = filtered.filter((p) => {
@@ -371,8 +283,6 @@ function ProductsContent() {
     products,
     sortBy,
     keyword,
-    category,
-    categories,
     providerParam,
     selectedProviderName,
     filterMinPrice,
@@ -403,14 +313,27 @@ function ProductsContent() {
     return productsWithOverrides;
   }, [hasPriceFilter, pageNumber, pageSize, productsWithOverrides]);
 
+  const pagedProductIdsKey = useMemo(
+    () =>
+      pagedProducts
+        .map((p) => p.id)
+        .sort()
+        .join("|"),
+    [pagedProducts],
+  );
+
+  const pagedProductsRef = useRef(pagedProducts);
+  pagedProductsRef.current = pagedProducts;
+
   useEffect(() => {
     let cancelled = false;
 
-    const targets = Array.from(new Set(pagedProducts.map((p) => p.id)))
-      .map((id) => pagedProducts.find((p) => p.id === id))
+    const pp = pagedProductsRef.current;
+    const targets = Array.from(new Set(pp.map((p) => p.id)))
+      .map((id) => pp.find((p) => p.id === id))
       .filter((p): p is Product => Boolean(p))
       .filter((p) => (p.rating ?? 0) === 0 && (p.reviewCount ?? 0) === 0)
-      .slice(0, 20);
+      .slice(0, 12);
 
     const load = async () => {
       const updates: Record<string, { rating: number; reviewCount: number }> =
@@ -465,7 +388,7 @@ function ProductsContent() {
     return () => {
       cancelled = true;
     };
-  }, [pagedProducts]);
+  }, [pagedProductIdsKey]);
 
   return (
     <div className="bg-white min-h-screen">
@@ -473,7 +396,7 @@ function ProductsContent() {
         <div className="flex flex-col md:flex-row gap-6">
           {/* Sidebar (desktop) */}
           <div className="hidden md:block">
-            <CategorySidebar activeCategory={category} />
+            <CategorySidebar activeCategory={categoryIdParam || "all"} />
           </div>
 
           {/* Main Content */}
@@ -502,6 +425,12 @@ function ProductsContent() {
                 <span className="font-medium">{keyword}</span>
                 &quot; ({productsWithOverrides.length} sản phẩm)
               </p>
+            )}
+
+            {listError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {listError}
+              </div>
             )}
 
             {/* Sort Options */}
@@ -537,7 +466,7 @@ function ProductsContent() {
               </div>
             ) : pagedProducts.length === 0 ? (
               <div className="py-12 text-center text-gray-500">
-                Không tìm thấy sản phẩm.
+                {listError ? "Không thể hiển thị danh sách." : "Không tìm thấy sản phẩm."}
               </div>
             ) : (
               <ProductGrid
