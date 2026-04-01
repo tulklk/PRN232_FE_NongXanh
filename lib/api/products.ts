@@ -3,6 +3,7 @@ import type {
   ApiProductsResponse,
   ApiProductDetailResponse,
 } from '@/lib/types/api'
+import type { ApiProductVariant } from '@/lib/types/api'
 import type { Product } from '@/data/products'
 
 const BACKEND_URL = 'https://nongxanhbe-g6h9aadudccrgzbs.eastasia-01.azurewebsites.net'
@@ -102,6 +103,93 @@ export interface GetProductsResult {
 export interface GetBestSellersParams {
   top?: number
   lastDays?: number
+}
+
+export type ProductLookupItem = {
+  productId: string
+  productName: string
+}
+
+export async function lookupProducts(
+  query: string,
+  limit = 20,
+  token?: string
+): Promise<ProductLookupItem[]> {
+  const q = String(query ?? '').trim()
+  if (!q) return []
+  const search = new URLSearchParams({ query: q, limit: String(limit) })
+  const res = await fetch(`${getBase()}/api/products/lookup?${search.toString()}`, {
+    headers: getHeaders(token),
+    cache: 'no-store',
+  })
+  const json = (await res.json().catch(() => null)) as unknown
+  if (!res.ok) {
+    const err = (json ?? {}) as { error?: string; message?: string }
+    throw new Error(err.error || err.message || 'Không thể tìm kiếm sản phẩm')
+  }
+  const unwrapList = (raw: unknown): unknown[] => {
+    if (Array.isArray(raw)) return raw
+    if (!raw || typeof raw !== 'object') return []
+    const o = raw as any
+    const candidates = [
+      o.data,
+      o.items,
+      o.result,
+      o.value,
+      o.Data,
+      o.Items,
+      o.Result,
+      o.Value,
+    ]
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c
+      if (c && typeof c === 'object') {
+        const cc = (c as any).items ?? (c as any).Items ?? (c as any).data ?? (c as any).Data
+        if (Array.isArray(cc)) return cc
+      }
+    }
+    return []
+  }
+  const list = unwrapList(json)
+  return list
+    .map((x: any) => ({
+      productId: String(x?.productId ?? x?.id ?? '').trim(),
+      productName: String(x?.productName ?? x?.name ?? '').trim(),
+    }))
+    .filter((x) => x.productId && x.productName)
+}
+
+export async function getVariantsByProductId(
+  productId: string,
+  token?: string
+): Promise<ApiProductVariant[]> {
+  const pid = String(productId ?? '').trim()
+  if (!pid) return []
+  const res = await fetch(`${getBase()}/api/products/${encodeURIComponent(pid)}/variants`, {
+    headers: getHeaders(token),
+    cache: 'no-store',
+  })
+  const json = (await res.json().catch(() => null)) as unknown
+  if (!res.ok) {
+    const err = (json ?? {}) as { error?: string; message?: string }
+    throw new Error(err.error || err.message || 'Không thể tải danh sách biến thể')
+  }
+  // BE returns a plain array per contract; keep compatibility with wrapped payloads too.
+  const list = Array.isArray(json)
+    ? (json as any[])
+    : (json && typeof json === 'object' && Array.isArray((json as any).data)
+        ? (json as any).data
+        : [])
+  return list.map((row: any) => ({
+    variantId: row.variantId ?? row.VariantId ?? row.id ?? row.Id,
+    variantName: String(row.variantName ?? row.VariantName ?? ''),
+    price: Number(row.price ?? 0),
+    discountPrice: row.discountPrice ?? row.DiscountPrice ?? null,
+    stockQuantity: Number(row.stockQuantity ?? row.StockQuantity ?? 0),
+    sku: row.sku ?? row.Sku ?? null,
+    status: row.status ?? row.Status ?? null,
+    productId: row.productId ?? row.ProductId ?? pid,
+  })) as unknown as ApiProductVariant[]
 }
 
 type BestSellerDto = {

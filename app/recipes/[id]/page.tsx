@@ -261,16 +261,22 @@ export default function RecipeDetailPage() {
                             <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
                           )}
                         </div>
-                        <span className="text-gray-800 line-clamp-1">
-                          {it.productName ??
-                            productMetaById[String(it.productId)]?.name ??
-                            'Sản phẩm'}
-                        </span>
+                        <div className="min-w-0">
+                          <div className="text-gray-900 font-medium line-clamp-1">
+                            {String(
+                              it.ingredientName ??
+                                it.productName ??
+                                productMetaById[String(it.productId)]?.name ??
+                                'Nguyên liệu'
+                            )}
+                          </div>
+                          {String(it.variantName ?? '').trim() ? (
+                            <div className="text-xs text-gray-500 line-clamp-1">
+                              {String(it.variantName)}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                      <span className="text-gray-500">
-                        {it.quantity}
-                        {it.unit ? ` ${it.unit}` : ''}
-                      </span>
                     </div>
                   ))}
                 </div>

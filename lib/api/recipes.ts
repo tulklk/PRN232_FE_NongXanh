@@ -34,6 +34,7 @@ type CreateRecipeRequest = {
   servings: number
   ingredients: Array<{
     productId: string
+    variantId?: string | null
     ingredientName: string
     quantity: number
     unit: string
@@ -156,6 +157,10 @@ export async function createRecipe(
     imageUrl: payload.imageUrl ?? null,
     ingredients: payload.ingredients.map((row) => ({
       productId: String(row.productId).trim(),
+      variantId:
+        row.variantId == null || String(row.variantId).trim() === ''
+          ? null
+          : String(row.variantId).trim(),
       ingredientName: String(row.ingredientName).trim(),
       quantity: Number(row.quantity),
       unit: String(row.unit).trim(),
@@ -200,6 +205,10 @@ export async function updateRecipe(
       ? {
           ingredients: payload.ingredients.map((row) => ({
             productId: String(row.productId).trim(),
+            variantId:
+              (row as any).variantId == null || String((row as any).variantId).trim() === ''
+                ? null
+                : String((row as any).variantId).trim(),
             ingredientName: String(row.ingredientName).trim(),
             quantity: Number(row.quantity),
             unit: String(row.unit).trim(),

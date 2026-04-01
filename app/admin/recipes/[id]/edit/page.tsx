@@ -8,14 +8,22 @@ import { ArrowLeft, Plus, Search, Trash2 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { getRecipeById, updateRecipe } from '@/lib/api/recipes'
 import { uploadImageToCloudinary } from '@/lib/api/cloudinary'
-import { prefetchProductSearchCatalog, searchProducts } from '@/lib/api/products'
-import type { Product } from '@/data/products'
+import {
+  getVariantsByProductId,
+  getProductById,
+  lookupProducts,
+  type ProductLookupItem,
+} from '@/lib/api/products'
+import type { ApiProductVariant } from '@/lib/types/api'
 import type { RecipeIngredient, RecipeModel } from '@/lib/types/api'
 
 type IngredientRow = {
+  rowId: string
   productId: string
+  productName?: string
+  variantId: string | null
+  variantName?: string | null
   ingredientName: string
-  image?: string
   quantity: string
   unit: string
 }
@@ -60,20 +68,20 @@ export default function AdminRecipeEditPage() {
   const [cookingTimeMinutes, setCookingTimeMinutes] = useState<number>(20)
   const [servings, setServings] = useState<number>(2)
   const [ingredients, setIngredients] = useState<IngredientRow[]>([])
+  const [variantsByProductId, setVariantsByProductId] = useState<
+    Record<string, ApiProductVariant[]>
+  >({})
+  const [productImageById, setProductImageById] = useState<Record<string, string>>({})
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const [productQuery, setProductQuery] = useState('')
-  const [productLoading, setProductLoading] = useState(false)
-  const [productResults, setProductResults] = useState<Product[]>([])
-  const [productOpen, setProductOpen] = useState(false)
-  const productSeqRef = useRef(0)
-
-  useEffect(() => {
-    prefetchProductSearchCatalog()
-  }, [])
+  const [productQuery, setProductQuery] = useState<Record<string, string>>({})
+  const [productLoading, setProductLoading] = useState<Record<string, boolean>>({})
+  const [productResults, setProductResults] = useState<Record<string, ProductLookupItem[]>>({})
+  const [productOpenRow, setProductOpenRow] = useState<string | null>(null)
+  const productSeqRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.idToken || !isAdmin) {
@@ -111,46 +119,97 @@ export default function AdminRecipeEditPage() {
           const ingredientName =
             String(anyIt.ingredientName ?? it.productName ?? '').trim() ||
             String(it.productId ?? '').trim()
+          const productId = String(it.productId ?? '').trim()
+          const productName = String(it.productName ?? '').trim()
+          const variantIdRaw = anyIt.variantId ?? anyIt.VariantId ?? null
+          const variantNameRaw = anyIt.variantName ?? anyIt.VariantName ?? null
+          const rowId = `row_${productId || Date.now()}_${Math.random().toString(16).slice(2)}`
           return {
-            productId: String(it.productId ?? '').trim(),
-            ingredientName,
+            rowId,
+            productId,
+            productName: productName || undefined,
+            variantId: variantIdRaw != null && String(variantIdRaw).trim() ? String(variantIdRaw) : null,
+            variantName: variantNameRaw != null ? String(variantNameRaw) : null,
+            ingredientName: ingredientName || productName || productId,
             quantity: String(anyIt.quantity ?? it.quantity ?? 1),
             unit: String(anyIt.unit ?? it.unit ?? 'kg'),
           }
         })
-        setIngredients(rows.filter((x) => x.productId))
+        const cleaned = rows.filter((x) => x.productId)
+        setIngredients(cleaned)
+        // preload variants for existing ingredients
+        void (async () => {
+          const unique = Array.from(new Set(cleaned.map((x) => x.productId)))
+          const entries: Record<string, ApiProductVariant[]> = {}
+          await Promise.all(
+            unique.map(async (pid) => {
+              try {
+                entries[pid] = await getVariantsByProductId(pid, tokens.idToken)
+              } catch {
+                entries[pid] = []
+              }
+            })
+          )
+          setVariantsByProductId((prev) => ({ ...prev, ...entries }))
+        })()
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Không thể tải recipe'))
       .finally(() => setLoadingRecipe(false))
   }, [isAuthenticated, tokens?.idToken, isAdmin, routeId])
 
+  const anyRowQueryKey = useMemo(() => JSON.stringify(productQuery), [productQuery])
   useEffect(() => {
-    if (!productQuery.trim()) {
-      setProductResults([])
-      setProductOpen(false)
+    const rowId = productOpenRow
+    if (!rowId) return
+    const q = (productQuery[rowId] ?? '').trim()
+    if (!q) {
+      setProductResults((prev) => ({ ...prev, [rowId]: [] }))
       return
     }
-    const seq = ++productSeqRef.current
-    setProductLoading(true)
+    const seq = (productSeqRef.current[rowId] ?? 0) + 1
+    productSeqRef.current[rowId] = seq
+    setProductLoading((prev) => ({ ...prev, [rowId]: true }))
     const t = setTimeout(() => {
-      searchProducts(productQuery.trim(), 10)
+      lookupProducts(q, 20, tokens?.idToken)
         .then((res) => {
-          if (productSeqRef.current !== seq) return
-          setProductResults(res)
-          setProductOpen(true)
+          if ((productSeqRef.current[rowId] ?? 0) !== seq) return
+          setProductResults((prev) => ({ ...prev, [rowId]: res }))
+
+          const ids = res.map((x) => x.productId).filter(Boolean)
+          const missing = ids.filter((id) => !productImageById[id])
+          if (missing.length > 0) {
+            void (async () => {
+              const next: Record<string, string> = {}
+              const chunk = missing.slice(0, 8)
+              await Promise.all(
+                chunk.map(async (id) => {
+                  try {
+                    const p = await getProductById(id)
+                    const img = p?.image
+                    if (img) next[id] = img
+                  } catch {
+                    // ignore
+                  }
+                })
+              )
+              if (Object.keys(next).length > 0) {
+                setProductImageById((prev) => ({ ...prev, ...next }))
+              }
+            })()
+          }
         })
         .catch(() => {
-          if (productSeqRef.current !== seq) return
-          setProductResults([])
-          setProductOpen(true)
+          if ((productSeqRef.current[rowId] ?? 0) !== seq) return
+          setProductResults((prev) => ({ ...prev, [rowId]: [] }))
         })
         .finally(() => {
-          if (productSeqRef.current !== seq) return
-          setProductLoading(false)
+          if ((productSeqRef.current[rowId] ?? 0) !== seq) return
+          setProductLoading((prev) => ({ ...prev, [rowId]: false }))
         })
-    }, 120)
+    }, 150)
     return () => clearTimeout(t)
-  }, [productQuery])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- query object is tracked via anyRowQueryKey
+  }, [anyRowQueryKey, productOpenRow])
 
   const canSubmit = useMemo(() => {
     if (!title.trim()) return false
@@ -160,6 +219,7 @@ export default function AdminRecipeEditPage() {
     if (ingredients.length === 0) return false
     for (const it of ingredients) {
       if (!it.productId) return false
+      if (!it.variantId) return false
       if (!it.ingredientName.trim()) return false
       const q = Number(it.quantity)
       if (!Number.isFinite(q) || q <= 0) return false
@@ -168,26 +228,52 @@ export default function AdminRecipeEditPage() {
     return true
   }, [title, instructions, cookingTimeMinutes, servings, ingredients])
 
-  function addIngredientFromProduct(p: Product) {
-    setIngredients((prev) => {
-      if (prev.some((x) => x.productId === p.id)) return prev
-      return [
-        ...prev,
-        {
-          productId: p.id,
-          ingredientName: p.name,
-          image: p.image,
-          quantity: '1',
-          unit: 'kg',
-        },
-      ]
-    })
-    setProductQuery('')
-    setProductOpen(false)
+  function addIngredientRow() {
+    const rowId = `row_${Date.now()}_${Math.random().toString(16).slice(2)}`
+    setIngredients((prev) => [
+      ...prev,
+      {
+        rowId,
+        productId: '',
+        productName: '',
+        variantId: null,
+        variantName: null,
+        ingredientName: '',
+        quantity: '1',
+        unit: 'kg',
+      },
+    ])
+    setProductOpenRow(rowId)
+    setProductQuery((prev) => ({ ...prev, [rowId]: '' }))
   }
 
-  function removeIngredient(productId: string) {
-    setIngredients((prev) => prev.filter((x) => x.productId !== productId))
+  async function handleSelectProduct(rowId: string, p: ProductLookupItem) {
+    setIngredients((prev) =>
+      prev.map((x) =>
+        x.rowId !== rowId
+          ? x
+          : {
+              ...x,
+              productId: p.productId,
+              productName: p.productName,
+              ingredientName: x.ingredientName.trim() ? x.ingredientName : p.productName,
+              variantId: null,
+              variantName: null,
+            }
+      )
+    )
+    setProductQuery((prev) => ({ ...prev, [rowId]: p.productName }))
+    setProductOpenRow(null)
+    try {
+      const variants = await getVariantsByProductId(p.productId, tokens?.idToken)
+      setVariantsByProductId((prev) => ({ ...prev, [p.productId]: variants }))
+    } catch {
+      setVariantsByProductId((prev) => ({ ...prev, [p.productId]: [] }))
+    }
+  }
+
+  function removeIngredientRow(rowId: string) {
+    setIngredients((prev) => prev.filter((x) => x.rowId !== rowId))
   }
 
   async function handleSubmit() {
@@ -210,6 +296,7 @@ export default function AdminRecipeEditPage() {
           servings,
           ingredients: ingredients.map((it) => ({
             productId: it.productId,
+            variantId: it.variantId,
             ingredientName: it.ingredientName.trim(),
             quantity: Number(it.quantity),
             unit: normalizeUnit(it.unit),
@@ -464,52 +551,18 @@ export default function AdminRecipeEditPage() {
 
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Nguyên liệu</h2>
-
-            <div className="relative">
-              <div className="relative">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={productQuery}
-                  onChange={(e) => setProductQuery(e.target.value)}
-                  placeholder="Tìm sản phẩm để thêm..."
-                  className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-green"
-                />
-              </div>
-
-              {productOpen && (
-                <div className="absolute z-10 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
-                  {productLoading ? (
-                    <div className="px-4 py-3 text-sm text-gray-500">Đang tìm...</div>
-                  ) : productResults.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500">
-                      Không tìm thấy sản phẩm.
-                    </div>
-                  ) : (
-                    <div className="max-h-72 overflow-auto">
-                      {productResults.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => addIngredientFromProduct(p)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left"
-                        >
-                          <div className="relative h-10 w-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
-                            <Image src={p.image} alt={p.name} fill className="object-cover" sizes="40px" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-gray-900 line-clamp-1">
-                              {p.name}
-                            </div>
-                            <div className="text-xs text-gray-500 line-clamp-1">
-                              {p.seller}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-gray-600">
+                Mỗi nguyên liệu cần chọn sản phẩm và biến thể (variant).
+              </p>
+              <button
+                type="button"
+                onClick={addIngredientRow}
+                className="inline-flex items-center justify-center rounded-lg bg-primary-green px-4 py-2 text-sm font-semibold text-white hover:bg-primary-green-dark"
+              >
+                <Plus size={16} />
+                Thêm nguyên liệu
+              </button>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -518,30 +571,148 @@ export default function AdminRecipeEditPage() {
               ) : (
                 ingredients.map((it) => (
                   <div
-                    key={it.productId}
+                    key={it.rowId}
                     className="rounded-lg border border-gray-200 p-3"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative h-10 w-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
-                          {it.image ? (
-                            <Image src={it.image} alt={it.ingredientName} fill className="object-cover" sizes="40px" />
-                          ) : (
-                            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-yellow-50" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 line-clamp-1">
-                            {it.ingredientName}
+                      <div className="min-w-0 flex-1">
+                        <div className="grid grid-cols-1 gap-3">
+                          <div className="relative">
+                            <Search
+                              size={18}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            />
+                            <input
+                              value={productQuery[it.rowId] ?? it.productName ?? ''}
+                              onChange={(e) => {
+                                const v = e.target.value
+                                setProductQuery((prev) => ({ ...prev, [it.rowId]: v }))
+                                setProductOpenRow(it.rowId)
+                              }}
+                              onFocus={() => setProductOpenRow(it.rowId)}
+                              placeholder="Tìm sản phẩm..."
+                              className="w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-green"
+                            />
+                            {productOpenRow === it.rowId && (
+                              <div className="absolute left-0 right-0 mt-2 z-50 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                                <div className="max-h-72 overflow-y-auto">
+                                  {productLoading[it.rowId] ? (
+                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                      Đang tìm...
+                                    </div>
+                                  ) : (productResults[it.rowId] ?? []).length === 0 ? (
+                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                      Không tìm thấy sản phẩm
+                                    </div>
+                                  ) : (
+                                    (productResults[it.rowId] ?? []).map((p) => (
+                                      <button
+                                        key={p.productId}
+                                        type="button"
+                                        onClick={() => void handleSelectProduct(it.rowId, p)}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className="relative h-9 w-9 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-100">
+                                            {productImageById[p.productId] ? (
+                                              <Image
+                                                src={productImageById[p.productId]}
+                                                alt={p.productName}
+                                                fill
+                                                className="object-cover"
+                                                sizes="36px"
+                                                unoptimized={productImageById[p.productId].startsWith('http')}
+                                              />
+                                            ) : null}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="text-sm font-semibold text-gray-900 line-clamp-1">
+                                              {p.productName}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setProductOpenRow(null)}
+                                  className="w-full border-t border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Đóng
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="text-xs text-gray-500 line-clamp-1">
-                            {it.productId}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                Variant <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={it.variantId ?? ''}
+                                disabled={!it.productId}
+                                onChange={(e) => {
+                                  const vid = e.target.value || null
+                                  const variants = it.productId
+                                    ? variantsByProductId[it.productId] ?? []
+                                    : []
+                                  const vn =
+                                    vid && variants.length
+                                      ? variants.find((v) => String(v.variantId) === String(vid))?.variantName ?? null
+                                      : null
+                                  setIngredients((prev) =>
+                                    prev.map((x) =>
+                                      x.rowId === it.rowId
+                                        ? { ...x, variantId: vid, variantName: vn }
+                                        : x
+                                    )
+                                  )
+                                }}
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-green disabled:bg-gray-50 disabled:text-gray-500"
+                              >
+                                <option value="">
+                                  {it.productId ? 'Chọn variant' : 'Chọn sản phẩm trước'}
+                                </option>
+                                {(it.productId ? (variantsByProductId[it.productId] ?? []) : []).map((v) => (
+                                  <option key={String(v.variantId)} value={String(v.variantId)}>
+                                    {v.variantName} (tồn: {Number(v.stockQuantity ?? 0) || 0})
+                                  </option>
+                                ))}
+                              </select>
+                              {it.productId && !it.variantId && (
+                                <p className="mt-1 text-xs text-amber-700">
+                                  Recipe cũ chưa có variant. Vui lòng chọn variant.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                Tên nguyên liệu
+                              </label>
+                              <input
+                                value={it.ingredientName}
+                                onChange={(e) =>
+                                  setIngredients((prev) =>
+                                    prev.map((x) =>
+                                      x.rowId === it.rowId
+                                        ? { ...x, ingredientName: e.target.value }
+                                        : x
+                                    )
+                                  )
+                                }
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-green"
+                                placeholder="Ví dụ: Sữa chua"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeIngredient(it.productId)}
+                        onClick={() => removeIngredientRow(it.rowId)}
                         className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
                         aria-label="Xóa"
                       >
@@ -559,7 +730,7 @@ export default function AdminRecipeEditPage() {
                           onChange={(e) =>
                             setIngredients((prev) =>
                               prev.map((x) =>
-                                x.productId === it.productId
+                                x.rowId === it.rowId
                                   ? { ...x, quantity: e.target.value }
                                   : x
                               )
@@ -577,7 +748,7 @@ export default function AdminRecipeEditPage() {
                           onChange={(e) =>
                             setIngredients((prev) =>
                               prev.map((x) =>
-                                x.productId === it.productId
+                                x.rowId === it.rowId
                                   ? { ...x, unit: e.target.value }
                                   : x
                               )

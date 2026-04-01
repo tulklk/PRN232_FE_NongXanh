@@ -399,6 +399,11 @@ export interface SubscriptionModel {
 export interface RecipeIngredient {
   productId: string
   productName?: string | null
+  /** New BE contract */
+  variantId?: string | null
+  variantName?: string | null
+  /** New BE contract (still keep backward compatibility) */
+  ingredientName?: string | null
   quantity: number
   unit?: string | null
   price?: number | null

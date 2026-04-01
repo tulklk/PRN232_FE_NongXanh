@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -87,6 +87,8 @@ export default function ProductsPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [variantProduct, setVariantProduct] = useState<ApiProduct | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [pageNumber, setPageNumber] = useState(1)
+  const pageSize = 7
 
   const fetchProducts = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true
@@ -99,7 +101,7 @@ export default function ProductsPage() {
     try {
       const data = await getAdminProducts(
         1,
-        100,
+        500,
         selectedCategory === 'all' ? undefined : selectedCategory,
         token
       )
@@ -144,6 +146,45 @@ export default function ProductsPage() {
     return matchesSearch && matchesCategory
   })
 
+  useEffect(() => {
+    setPageNumber(1)
+  }, [searchQuery, selectedCategory])
+
+  const totalPages = useMemo(() => {
+    const total = filteredProducts.length
+    return Math.max(1, Math.ceil(total / pageSize))
+  }, [filteredProducts.length])
+
+  const pageItems = useMemo(() => {
+    const safeTotal = Math.max(1, totalPages)
+    const cur = Math.min(Math.max(1, pageNumber), safeTotal)
+    const range = 2
+
+    const pageSet = new Set<number>()
+    pageSet.add(1)
+    pageSet.add(safeTotal)
+    for (let p = cur - range; p <= cur + range; p++) {
+      if (p >= 1 && p <= safeTotal) pageSet.add(p)
+    }
+
+    const sortedPages = Array.from(pageSet).sort((a, b) => a - b)
+    const items: Array<number | '...'> = []
+    for (let i = 0; i < sortedPages.length; i++) {
+      const p = sortedPages[i]
+      const prev = sortedPages[i - 1]
+      if (i > 0 && prev != null && p - prev > 1) items.push('...')
+      items.push(p)
+    }
+    return items
+  }, [pageNumber, totalPages])
+
+  const pagedProducts = useMemo(() => {
+    const safeTotal = Math.max(1, totalPages)
+    const cur = Math.min(Math.max(1, pageNumber), safeTotal)
+    const start = (cur - 1) * pageSize
+    return filteredProducts.slice(start, start + pageSize)
+  }, [filteredProducts, pageNumber, totalPages])
+
   const handleCreate = async (data: CreateProductInput) => {
     setSubmitLoading(true)
     setSubmitError(null)
@@ -151,6 +192,7 @@ export default function ProductsPage() {
       await createProduct(data, token)
       setShowAddModal(false)
       await Promise.all([fetchProducts({ silent: true }), loadMeta()])
+      setPageNumber(1)
       setSuccessMessage('Thêm sản phẩm thành công')
       setShowSuccessPopup(true)
     } catch (err) {
@@ -167,6 +209,7 @@ export default function ProductsPage() {
       await updateProduct(String(id), data, token)
       setEditProduct(null)
       await Promise.all([fetchProducts({ silent: true }), loadMeta()])
+      setPageNumber(1)
       setSuccessMessage('Cập nhật sản phẩm thành công')
       setShowSuccessPopup(true)
     } catch (err) {
@@ -184,6 +227,7 @@ export default function ProductsPage() {
       await deleteProduct(String(deleteTarget.productId), token)
       setDeleteTarget(null)
       await fetchProducts({ silent: true })
+      setPageNumber(1)
       setSuccessMessage('Đã xóa sản phẩm')
       setShowSuccessPopup(true)
     } catch (err) {
@@ -298,7 +342,7 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((product) => {
+                {pagedProducts.map((product) => {
                   const primaryImage = product.productImages?.find((i) => i.isPrimary)
                   const imageUrl =
                     primaryImage?.imageUrl || product.productImages?.[0]?.imageUrl || ''
@@ -386,6 +430,62 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {!loading && !error && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber === 1}
+              className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trang trước
+            </button>
+
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {pageItems.map((item, idx) => {
+                if (item === '...') {
+                  return (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
+                      ...
+                    </span>
+                  )
+                }
+                const p = item
+                const isActive = p === pageNumber
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPageNumber(p)}
+                    disabled={isActive}
+                    className={`px-3 py-2 rounded-lg text-sm ${
+                      isActive
+                        ? 'bg-primary-green text-white'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
+              disabled={pageNumber === totalPages}
+              className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trang sau
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-500 text-center">
+            Đang xem trang {pageNumber}/{totalPages} • {pageSize} sản phẩm/trang
+          </p>
+        </div>
+      )}
 
       {/* Add Modal */}
       {showAddModal &&
