@@ -859,6 +859,17 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
+          <div
+            className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${meatsSectionInView.isInView ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          >
+            <Image
+              src="/images/homepage/thit-tuoi-ngon-transparent.png"
+              alt="Thịt tươi ngon"
+              fill
+              className="object-contain"
+              sizes="(max-width: 1400px) 100vw, 1400px"
+            />
+          </div>
           <HomeProductCarousel
             key={`meat-${selectedMeatCategoryId}`}
             className="mt-1 sm:mt-0"
@@ -927,6 +938,17 @@ export default function HomePageClient({ products }: HomePageClientProps) {
               </Link>
             </div>
           </div>
+          <div
+            className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${seafoodSectionInView.isInView ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          >
+            <Image
+              src="/images/homepage/ca_hai_san_transparent.png"
+              alt="Cá, hải sản tươi ngon"
+              fill
+              className="object-contain"
+              sizes="(max-width: 1400px) 100vw, 1400px"
+            />
+          </div>
           <HomeProductCarousel
             key={`seafood-${selectedSeafoodCategoryId}`}
             className="mt-1 sm:mt-0"
@@ -994,6 +1016,17 @@ export default function HomePageClient({ products }: HomePageClientProps) {
                 Xem tất cả <ChevronRight size={16} />
               </Link>
             </div>
+          </div>
+          <div
+            className={`relative rounded-2xl overflow-hidden min-h-[200px] h-[220px] sm:h-[260px] mb-0 sm:mb-6 transition-all duration-600 delay-150 ${dairySectionInView.isInView ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          >
+            <Image
+              src="/images/homepage/sua_tuoi_ngon_transparent.png"
+              alt="Sữa tươi ngon"
+              fill
+              className="object-contain"
+              sizes="(max-width: 1400px) 100vw, 1400px"
+            />
           </div>
           <HomeProductCarousel
             key={`dairy-${selectedDairyCategoryId}`}
