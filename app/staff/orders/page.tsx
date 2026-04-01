@@ -13,37 +13,80 @@ export default function StaffOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [orders, setOrders] = useState<ApiOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [pageNumber, setPageNumber] = useState(1)
+  const pageSize = 10
+  const [totalPages, setTotalPages] = useState(1)
+
+  const getPaginationItems = () => {
+    const safeTotal = Math.max(1, totalPages)
+    const cur = Math.min(Math.max(1, pageNumber), safeTotal)
+    const range = 2
+
+    const pageSet = new Set<number>()
+    pageSet.add(1)
+    pageSet.add(safeTotal)
+    for (let p = cur - range; p <= cur + range; p++) {
+      if (p >= 1 && p <= safeTotal) pageSet.add(p)
+    }
+
+    const sortedPages = Array.from(pageSet).sort((a, b) => a - b)
+    const items: Array<number | '...'> = []
+    for (let i = 0; i < sortedPages.length; i++) {
+      const p = sortedPages[i]
+      const prev = sortedPages[i - 1]
+      if (i > 0 && prev != null && p - prev > 1) items.push('...')
+      items.push(p)
+    }
+    return items
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.idToken) {
       setLoading(false)
       return
     }
-    getOrders(1, 100, tokens.idToken)
-      .then((res) => setOrders(res.items ?? []))
+    setLoading(true)
+    getOrders(pageNumber, pageSize, tokens.idToken)
+      .then((res) => {
+        setOrders(res.items ?? [])
+        const fallbackTotalPages = Math.ceil(
+          (res.totalCount ?? res.items?.length ?? 0) / pageSize
+        )
+        const computedTotalPages = res.totalPages ?? fallbackTotalPages ?? 1
+        setTotalPages(computedTotalPages || 1)
+      })
       .catch(() => setOrders([]))
       .finally(() => setLoading(false))
-  }, [isAuthenticated, tokens?.idToken])
+  }, [isAuthenticated, tokens?.idToken, pageNumber])
 
   const filteredOrders = orders.filter(
-    (order) =>
-      String(order.orderId).includes(searchQuery) ||
-      String(order.orderNumber ?? '').includes(searchQuery) ||
-      order.userId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(order.finalAmount).includes(searchQuery) ||
-      (order.shippingAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    (order) => {
+      const q = searchQuery.trim().toLowerCase()
+      if (!q) return true
+      return (
+        String(order.orderId).includes(q) ||
+        String(order.orderNumber ?? '').toLowerCase().includes(q) ||
+        order.userId?.toLowerCase().includes(q) ||
+        order.displayName?.toLowerCase().includes(q) ||
+        order.customerDisplayName?.toLowerCase().includes(q) ||
+        String(order.finalAmount).includes(q) ||
+        (order.shippingAddress?.toLowerCase().includes(q) ?? false)
+      )
+    }
   )
 
   const getStatusLabel = (status?: string | null) => {
     const labels: Record<string, string> = {
+      pending: 'Đang xử lý',
       processing: 'Đang xử lý',
       confirmed: 'Đã xác nhận',
-      shipped: 'Đã giao hàng',
+      shipping: 'Đang giao',
+      shipped: 'Đang giao',
       delivered: 'Đã nhận hàng',
       cancelled: 'Đã hủy',
     }
-    return labels[status ?? ''] ?? status ?? '—'
+    const key = (status ?? '').toLowerCase()
+    return labels[key] ?? status ?? '—'
   }
 
   const getPaymentLabel = (status?: string | null) => {
@@ -59,13 +102,16 @@ export default function StaffOrdersPage() {
 
   const mapStatusForBadge = (status?: string | null) => {
     const map: Record<string, 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'> = {
+      pending: 'processing',
       processing: 'processing',
       confirmed: 'confirmed',
+      shipping: 'shipped',
       shipped: 'shipped',
       delivered: 'delivered',
       cancelled: 'cancelled',
     }
-    return map[status ?? ''] ?? 'processing'
+    const key = (status ?? '').toLowerCase()
+    return map[key] ?? 'processing'
   }
 
   return (
@@ -82,7 +128,10 @@ export default function StaffOrdersPage() {
         <SearchBar
           placeholder="Tìm theo mã đơn, userId, địa chỉ hoặc tổng tiền"
           value={searchQuery}
-          onChange={setSearchQuery}
+          onChange={(v) => {
+            setPageNumber(1)
+            setSearchQuery(v)
+          }}
         />
       </div>
 
@@ -112,7 +161,9 @@ export default function StaffOrdersPage() {
                     </td>
                     <td className="py-3 px-4">
                       <span className="font-medium text-gray-900">
-                        {order.displayName ?? order.userId}
+                        {order.customerDisplayName ??
+                          order.displayName ??
+                          order.userId}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -136,16 +187,13 @@ export default function StaffOrdersPage() {
                       <span className="text-gray-600">{formatDate(order.orderDate)}</span>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end">
                         <a
-                          href={`/account/orders/${order.orderId}`}
-                          className="px-3 py-2 bg-[#0A923C] text-white rounded-lg hover:bg-[#10723A] transition-colors text-sm font-semibold"
+                          href={`/staff/orders/${order.orderId}`}
+                          className="px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-colors text-sm font-semibold"
                         >
                           Xem
                         </a>
-                        <button className="px-3 py-2 bg-[#10723A] text-white rounded-lg hover:bg-[#0A923C] transition-colors text-sm font-semibold">
-                          Cập nhật
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -156,6 +204,57 @@ export default function StaffOrdersPage() {
         )}
         {!loading && filteredOrders.length === 0 && (
           <p className="py-8 text-center text-gray-500">Không có đơn hàng nào</p>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber === 1}
+              className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trang trước
+            </button>
+
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {getPaginationItems().map((item, idx) => {
+                if (item === '...') {
+                  return (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
+                      ...
+                    </span>
+                  )
+                }
+                const p = item
+                const isActive = p === pageNumber
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPageNumber(p)}
+                    disabled={isActive}
+                    className={`px-3 py-2 rounded-lg text-sm ${
+                      isActive
+                        ? 'bg-primary-green text-white'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
+              disabled={pageNumber === totalPages}
+              className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trang sau
+            </button>
+          </div>
         )}
       </div>
     </div>
